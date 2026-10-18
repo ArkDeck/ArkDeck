@@ -33,6 +33,8 @@
 //! leaves the Job where it stood. The record is persisted exactly where
 //! Swift persists it, so its index row counts the same writes.
 use super::*;
+#[path = "flash_recommission_retry_run.rs"]
+mod controlled_retry;
 #[path = "flash_maintenance_run.rs"]
 mod maintenance;
 use crate::artifact_publication::{ArtifactPublisher, Product};
@@ -445,7 +447,9 @@ impl FlashRunner<'_> {
                 .jobs
                 .arkforge_state(&run.record.job_id)
                 .map_err(|_| uncertain())?;
-            if let Err(reason) = state.require_recovery_completion(&run.record, flash.lane) {
+            if let Err(reason) =
+                state.require_recovery_completion(&run.record, flash.lane, self.runner.jobs)
+            {
                 run.record.timeline.push(reason);
                 run.persist(self.runner.jobs)?;
                 return Err(uncertain());
@@ -642,9 +646,30 @@ impl FlashRunner<'_> {
             .map(|declaration| declaration.name.as_str())
             .collect();
         let steps: Vec<&str> = completed.iter().map(String::as_str).collect();
-        let report =
+        let mut report =
             crate::capture_documents::flash_report(descriptor, &run.record, &recorded, &steps)
                 .map_err(|error| format!("cannot encode final Artifact {REPORT}: {error}"))?;
+        if self.controlled_retry_allocation(run).is_some() {
+            let flash = self.flash.ok_or("recommission.providerUnavailable")?;
+            let state = self
+                .runner
+                .jobs
+                .arkforge_state(&run.record.job_id)
+                .map_err(|_| "recommission.executionUnavailable")?;
+            let proof = self.runner.jobs.require_controlled_retry_proof(
+                &run.record,
+                state
+                    .execution
+                    .as_ref()
+                    .ok_or("recommission.executionUnavailable")?,
+                flash.lane,
+            )?;
+            let mut document: Value =
+                serde_json::from_slice(&report).map_err(|_| "recommission.reportMalformed")?;
+            document["controlledRetryReadback"] = proof;
+            report = crate::session_json::encode_canonical_pretty(&document)
+                .map_err(|_| "recommission.reportEncodingFailed")?;
+        }
         self.product(
             run,
             descriptor,
@@ -1176,13 +1201,21 @@ impl FlashRunner<'_> {
                     .get("retainedJobId")
                     .and_then(Value::as_str)
                     .ok_or_else(|| Stop::Failed("recommission.sourceRequired".into()))?;
-                let execution = jobs
-                    .recommission_source_execution(source)
+                let executions = jobs
+                    .recommission_source_executions(
+                        source,
+                        request
+                            .inputs
+                            .get("failedRecommissionJobId")
+                            .and_then(Value::as_str),
+                    )
                     .map_err(Stop::Failed)?;
-                flash
-                    .planning
-                    .require_recommission_quiescence(&execution)
-                    .map_err(Stop::Failed)?;
+                for execution in executions {
+                    flash
+                        .planning
+                        .require_recommission_quiescence(&execution)
+                        .map_err(Stop::Failed)?;
+                }
                 jobs.recommission_admission(store, &request, &fresh, &run.clock()?)
             } else {
                 jobs.complete_overwrite_admission(
@@ -1427,15 +1460,23 @@ impl FlashRunner<'_> {
                 .and_then(RecoveryContext::from_evidence)
                 .and_then(|context| context.recommission)
                 .ok_or_else(|| Stop::Refused(uncertain()))?;
-            let execution = self
+            let executions = self
                 .runner
                 .jobs
-                .recommission_source_execution(&allocation.source_job_id)
+                .recommission_source_executions(
+                    &allocation.source_job_id,
+                    allocation
+                        .controlled_retry
+                        .as_ref()
+                        .map(|retry| retry.failed_job_id.as_str()),
+                )
                 .map_err(Stop::Failed)?;
-            flash
-                .lane
-                .recommission_quiescent(&execution)
-                .map_err(Stop::Failed)?;
+            for execution in executions {
+                flash
+                    .lane
+                    .recommission_quiescent(&execution)
+                    .map_err(Stop::Failed)?;
+            }
         }
         let purpose = if run
             .record
@@ -1447,13 +1488,20 @@ impl FlashRunner<'_> {
             "primaryFlash"
         };
         let toolchain = flash.lane.toolchain_sha256().to_owned();
+        let retry = self.prepare_controlled_retry(run, flash, facts, resolved)?;
         let execution = match job.state.execution.clone() {
             Some(execution) => execution,
             None => {
-                let execution = flash
-                    .lane
-                    .prepare(&job_id, &artifact, &binding, purpose)
-                    .map_err(lane_stop)?;
+                let execution = match &retry {
+                    Some(retry) => flash.lane.prepare_recommission(
+                        &job_id,
+                        &retry.primary,
+                        &artifact,
+                        &binding,
+                    ),
+                    None => flash.lane.prepare(&job_id, &artifact, &binding, purpose),
+                }
+                .map_err(lane_stop)?;
                 correlated(
                     &execution, &job_id, &artifact, &binding, purpose, &toolchain,
                 )?;
@@ -1466,6 +1514,14 @@ impl FlashRunner<'_> {
         correlated(
             &execution, &job_id, &artifact, &binding, purpose, &toolchain,
         )?;
+        if retry.as_ref().is_some_and(|retry| {
+            execution.plan_id != retry.primary.plan_id
+                || execution.plan_sha256 != retry.primary.plan_sha256
+        }) {
+            return Err(Stop::NotExecuted(
+                "recommission.preparedPrimaryPlanDrifted".into(),
+            ));
+        }
         let intent = format!("intent-{id}");
         let arguments =
             delegated_arguments(id, &resolved.facts()).ok_or_else(|| Stop::Refused(uncertain()))?;
@@ -1542,8 +1598,11 @@ impl FlashRunner<'_> {
                 ),
             ))));
         }
+        if let Some(retry) = retry {
+            self.complete_controlled_retry(run, flash, retry, &execution, &binding)?;
+        }
         job.state
-            .require_recovery_completion(&run.record, flash.lane)
+            .require_recovery_completion(&run.record, flash.lane, self.runner.jobs)
             .map_err(Stop::Unknown)?;
         job.state.completion = Some(receipt.clone());
         jobs.persist_arkforge_state(&job_id, &job.state)
@@ -1628,7 +1687,7 @@ impl FlashRunner<'_> {
             )));
         }
         job.state
-            .require_recovery_completion(&run.record, flash.lane)
+            .require_recovery_completion(&run.record, flash.lane, self.runner.jobs)
             .map_err(Stop::Unknown)?;
         let arguments = plan_completion_arguments(id).ok_or_else(|| Stop::Refused(uncertain()))?;
         let workflow = json!({
@@ -1691,7 +1750,7 @@ impl FlashRunner<'_> {
             )));
         }
         job.state
-            .require_recovery_completion(&run.record, flash.lane)
+            .require_recovery_completion(&run.record, flash.lane, self.runner.jobs)
             .map_err(Stop::Unknown)?;
         let facts: BTreeMap<String, String> = receipt.facts.iter().cloned().collect();
         let confirmed = run.clock()?;

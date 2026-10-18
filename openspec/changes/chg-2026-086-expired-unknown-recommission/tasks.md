@@ -17,3 +17,19 @@
 - [x] Verify positive and fail-closed paths and record local checks.
 - [ ] Record selected PR CI results.
 - [ ] Obtain maintainer review before publication and same-board acceptance.
+
+## Revision 2 — one controlled retry and complete readback
+
+The maintainer's 2026-10-18 instruction authorizes this scoped policy change and
+completion of PR, required CI and merge. It does not waive any identity, coverage,
+readback or immutable-history requirement, or itself constitute hardware evidence.
+
+- [x] Add an explicit failed-Job reference and one bounded second allocation;
+  preserve both histories and every field of the first allocation.
+- [x] Materialize full preboot overwrite and original 4 MiB ramdisk restoration
+  before admission; execute both under the same new deadline.
+- [x] Require independent full primary measurements and full restored-ramdisk
+  verification before supersession; preserve Loader typed-skip receipts.
+- [x] Complete targeted positive, failure, restart and compatibility checks.
+- [ ] Record required CI and protected-main publication for revision 2.
+- [ ] Complete current-Catalog real-device acceptance through published Runtime.

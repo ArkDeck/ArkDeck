@@ -49,6 +49,7 @@ impl<'a> JobPlanner<'a> {
             "providerID": descriptor.provider, "steps": steps});
         Ok(Materialized {
             recommission: None,
+            recommission_retry_program_sha256: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts: BTreeMap::new(),

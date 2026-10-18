@@ -131,6 +131,24 @@ pub enum Terminal {
 
 /// Swift `RuntimeJobEngine.ArkForgeLane`.
 pub trait FlashLane: Send + Sync {
+    fn recommission_plan(
+        &self,
+        _artifact: &LaneArtifact,
+        _binding: &DeviceBinding,
+    ) -> Result<arkforge_ipc::messages::ExecutablePlan, String> {
+        Err("recommission plan materialization is unavailable".into())
+    }
+    fn prepare_recommission(
+        &self,
+        _job_id: &str,
+        _plan: &arkforge_ipc::messages::ExecutablePlan,
+        _artifact: &LaneArtifact,
+        _binding: &DeviceBinding,
+    ) -> Result<Execution, LaneFailure> {
+        Err(LaneFailure::Other(
+            "sealed recommission execution is unavailable".into(),
+        ))
+    }
     /// Fresh read-only census of the owned Provider. Unknown/missing support
     /// is a blocker, never evidence that an earlier writer has stopped.
     fn recommission_quiescent(&self, _source: &Execution) -> Result<(), String> {

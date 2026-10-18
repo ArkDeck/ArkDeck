@@ -393,9 +393,9 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
     assert digest in catalog_test_views.CATALOGS, "unknown Catalog view"
     assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
     additions = []
-    if digest in (catalog_test_views.MAINTENANCE, catalog_test_views.RECOMMISSION):
+    if digest in {catalog_test_views.MAINTENANCE} | catalog_test_views.RECOMMISSION_CATALOGS:
         additions = [("flash.verify@1", "readOnly"), ("flash.restore-boot-loop@1", "destructive")]
-    if digest == catalog_test_views.RECOMMISSION:
+    if digest in catalog_test_views.RECOMMISSION_CATALOGS:
         additions.append(("flash.recommission@1", "destructive"))
     if name == 'operations' and additions:
         document = json.loads(data)

@@ -394,6 +394,7 @@ pub(crate) struct Materialized<'a> {
     pub(crate) identity: Option<String>,
     pub(crate) binding_revision: Option<i64>,
     pub(crate) recommission: Option<crate::job_owner::flash_recommission::IdentityChain>,
+    pub(crate) recommission_retry_program_sha256: Option<String>,
 }
 
 /// Swift's Job lifecycle `requestJSON()`: exactly one non-empty `requestJson`
@@ -584,6 +585,7 @@ impl<'a> JobPlanner<'a> {
         };
         Ok(Materialized {
             recommission: None,
+            recommission_retry_program_sha256: None,
             _import_use: hold,
             _workspace_use: workspace_use,
             digest,
@@ -799,6 +801,7 @@ impl<'a> JobPlanner<'a> {
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(Materialized {
             recommission: None,
+            recommission_retry_program_sha256: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts: BTreeMap::new(),

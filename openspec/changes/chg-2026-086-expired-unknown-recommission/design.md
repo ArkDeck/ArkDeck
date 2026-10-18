@@ -36,7 +36,7 @@ chain and cannot publish an early alias.
 ## Independent allocation and completion
 
 The private allocation ledger serializes reservation and consumption. It records
-one allocation per original Normal identity, pinning the unchanged source record,
+one initial allocation per original Normal identity, pinning the unchanged source record,
 Journal and Provider-state bytes, new request/Job/plan/Artifact, coverage and identity
 chain. The deadline is fixed at reservation plus 1,800 seconds. Changing IDs,
 restarting, cancelling, archiving or encountering another unknown never refunds
@@ -55,6 +55,45 @@ projections, with no device dispatch. Ordinary mutation continuity recognizes th
 retained Session only after that successful supersession, never from allocation
 or consumed authority alone.
 
+## Controlled retry after the first unknown
+
+Revision 2 adds two optional typed references to the same operation:
+`failedRecommissionJobId` and `restorationArtifactLease`. They must appear
+together. An ordinary request does not become a retry when an earlier run fails.
+The first allocation must be consumed and expired; its exact failed Job must
+remain a durable unknown with no resident writer. Runtime checks both historical
+Provider joins, the unchanged root archive and the whole fresh identity chain.
+The coverage census includes exactly both source Jobs and rejects any other open
+Job or unbounded effect. The second ledger entry pins both history digests and
+the first allocation digest without changing any field of that first entry.
+There can be at most two entries for the original Normal identity.
+
+Before allocation, Runtime validates two immutable full bundles, permitting only
+the ramdisk bytes to differ. The primary ramdisk must match the pinned ArkForge
+preboot construction and encode a fresh nonce; the restoration image must match
+the pinned original 4 MiB image. Both sealed Provider plans, immutable artifact
+hashes, identity chain and request fingerprint are stored in the private Runtime
+program cache and included in the materialized plan digest. No proof-import or
+capability-management input is added.
+
+The primary plan writes all nine partitions. Loader read-window skips remain in
+their original receipts. Runtime first fetches the nonce-bound RAM report for
+the complete userdata range measured before stock init mounts it. The closed
+reader checks the RAM-backed descriptor, root-only ownership, bounded length,
+current boot ID, storage CID, exact range and unmounted preboot observation; it
+never supplies the expected hash to the device. Runtime independently hashes the
+eight static ranges with before/after metadata checks and rejects writable mounts.
+Every measurement is compared to the sealed effect and immutable image digest.
+
+Only after all nine primary ranges verify does Runtime run the already sealed
+restoration plan under a distinct child correlation, the same consumed authority
+and the same absolute deadline. It writes the entire original 4 MiB ramdisk,
+reboots, verifies that complete range and repeats the full identity chain. Durable
+primary measurement, restoration intent/execution/completion and final proof
+records must agree. Passive reconciliation validates these records and both
+Provider plans/receipt sets; it never resumes a missing phase. Failure keeps both
+old unknowns and the new unknown, and cannot allocate a third budget.
+
 ## Compatibility and validation
 
 Catalog generators, the Swift durable-record reader, the Rust lifecycle/result
@@ -66,9 +105,14 @@ exact additive Catalog digest and retains mandatory frozen c6/e4 input views;
 oracles carrying those Catalogs' authority run in their original view. New
 operation cases execute only where that operation exists.
 Historical request, authority and result fixture bytes are not rewritten.
+The original recommission Catalog remains a separate view. Only the new exact
+Catalog runs controlled-retry cases; deleting its two optional fields recovers
+the original recommission Catalog digest. Import retention can read the old
+recommission input schema but cannot add the new fields to an old request.
 
 Synthetic owner/Provider tests cover success, immutable history, one-use allocation,
 expiry/clock rollback, concurrency, restart, another unknown, changed archives,
 identity drift and delayed binding publication. They do not constitute hardware
-acceptance. The proposed Constitution delta and implementation require maintainer
-review and protected-main publication before this board is exercised.
+acceptance. The maintainer explicitly authorized the scoped revision-2 policy
+change, PR/CI/merge and continued acceptance on 2026-10-18. Required CI and
+protected-main publication still precede any device execution.

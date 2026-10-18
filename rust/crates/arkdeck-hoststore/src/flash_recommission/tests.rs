@@ -1,4 +1,6 @@
 use super::*;
+#[path = "retry_tests.rs"]
+mod retry_tests;
 use crate::test_private::{create_private_directory, temporary_root};
 use std::path::PathBuf;
 
@@ -155,6 +157,7 @@ fn candidate() -> Allocation {
         uncertain_effect_set_sha256: "5".repeat(64),
         reserved_at_epoch_ms: 0,
         expires_at_epoch_ms: 0,
+        controlled_retry: None,
         identity_chain: IdentityChain {
             target_id: "TGT-test".into(),
             binding_revision: 1,

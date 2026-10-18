@@ -123,6 +123,7 @@ dependencies = [
  "arkdeck-provider-hdc",
  "arkdeck-provider-workspace",
  "arkdeck-rockchip-binding",
+ "arkforge-artifact",
  "arkforge-ipc",
  "arkforge-platform",
  "libc",
@@ -214,6 +215,15 @@ dependencies = [
  "arkforge-authority-api",
  "arkforge-core",
  "arkforge-ipc",
+]
+
+[[package]]
+name = "arkforge-artifact"
+version = "0.1.0"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=0445530207ac5e6689e61e7b51c0edd4de7f2aec#0445530207ac5e6689e61e7b51c0edd4de7f2aec"
+dependencies = [
+ "arkforge-core",
+ "arkforge-platform",
 ]
 
 [[package]]

@@ -19,6 +19,22 @@ pub(crate) fn is_maintenance(reference: &str) -> bool {
 }
 
 pub trait MaintenanceReads: Send + Sync {
+    fn recommission_facts(
+        &self,
+        _target: &str,
+        _deadline: Instant,
+    ) -> Result<crate::flash_facts::RockchipFacts, String> {
+        Err("controlled retry identity reads are unavailable".into())
+    }
+    fn recommission_read(
+        &self,
+        _key: &str,
+        _effect: &m::Effect,
+        _nonce: Option<&str>,
+        _deadline: Instant,
+    ) -> Result<(String, Option<arkdeck_provider_hdc::PrebootHash>), String> {
+        Err("controlled retry full readback is unavailable".into())
+    }
     fn observe(
         &self,
         execution: &Execution,
@@ -78,6 +94,56 @@ impl HdcDispatch for BoundedHdc<'_> {
     }
 }
 impl MaintenanceReads for NativeMaintenanceReads {
+    fn recommission_facts(
+        &self,
+        target: &str,
+        deadline: Instant,
+    ) -> Result<crate::flash_facts::RockchipFacts, String> {
+        let hdc = (self.hdc)()?;
+        let bounded = BoundedHdc {
+            hdc: &*hdc,
+            deadline,
+        };
+        self.facts
+            .operation_facts(&self.targets, Some(&bounded), target, true)
+    }
+    fn recommission_read(
+        &self,
+        key: &str,
+        effect: &m::Effect,
+        nonce: Option<&str>,
+        deadline: Instant,
+    ) -> Result<(String, Option<arkdeck_provider_hdc::PrebootHash>), String> {
+        let hdc = (self.hdc)()?;
+        if let Some(nonce) = nonce {
+            if effect.target != "userdata"
+                || effect.range_start != arkforge_artifact::preboot::USERDATA_START
+                || effect.range_length != arkforge_artifact::preboot::USERDATA_BYTES
+            {
+                return Err("preboot range differs from sealed userdata effect".into());
+            }
+            let proof = arkdeck_provider_hdc::read_preboot_hash(&*hdc, key, nonce, deadline)
+                .map_err(str::to_owned)?;
+            return Ok((proof.digest.clone(), Some(proof)));
+        }
+        match arkdeck_provider_hdc::read_flash_partition(
+            &*hdc,
+            key,
+            &arkdeck_provider_hdc::PartitionRange {
+                target: effect.target.clone(),
+                range_start: effect.range_start,
+                range_length: effect.range_length,
+            },
+            deadline,
+        )
+        .map_err(str::to_owned)?
+        {
+            arkdeck_provider_hdc::PartitionHash::Full(hash) => Ok((hash, None)),
+            arkdeck_provider_hdc::PartitionHash::MountedWritable => {
+                Err("controlled retry cannot count a writable mounted partition as verified".into())
+            }
+        }
+    }
     fn observe(
         &self,
         execution: &Execution,
@@ -338,6 +404,7 @@ pub(crate) fn materialize<'a>(
             identity: Some(prepared.execution.stable_identity_sha256),
             binding_revision: Some(prepared.execution.binding_revision),
             recommission: None,
+            recommission_retry_program_sha256: None,
         },
         None,
     ))

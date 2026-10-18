@@ -2,6 +2,9 @@
 use super::*;
 use arkdeck_hoststore::JobArchiver;
 
+#[path = "controlled_retry.rs"]
+mod controlled_retry;
+
 fn expired() -> Option<String> {
     Some("2026-09-25T05:00:00Z".into())
 }

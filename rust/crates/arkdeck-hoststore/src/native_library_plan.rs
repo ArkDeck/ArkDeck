@@ -58,6 +58,7 @@ impl<'a> JobPlanner<'a> {
         let now = (hdc.now)().ok_or_else(internal_failure)?;
         Ok(Materialized {
             recommission: None,
+            recommission_retry_program_sha256: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts,
@@ -394,6 +395,7 @@ mod tests {
                     "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
                         | "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c"
                         | "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080"
+                        | "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a"
                 ));
                 assert_ne!(
                     current_digest, historical_digest,

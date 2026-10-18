@@ -40,6 +40,7 @@ use std::fs::{self, File, OpenOptions};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use support::OracleProbe;
 use support::flash_lane::{FakeHost, FakeLane, Fakes, Script, TOOLCHAIN};
@@ -251,21 +252,21 @@ struct Owners {
     targets: TargetStore,
     artifacts: ArtifactReadStore,
     imports: ImportUploadStore,
-    jobs: JobStore,
+    jobs: Arc<JobStore>,
     capabilities: CapabilityStore,
     sessions: SessionStore,
     claims: StorageClaims,
     probe: OracleProbe,
     holds: DeviceHolds,
     flash: FlashPlanning,
-    lane: FakeLane,
+    lane: Arc<FakeLane>,
     host: FakeHost,
 }
 
 impl Owners {
     fn open(root: &Path, fakes: &Fakes) -> Self {
         let store = root.join("store");
-        let jobs = JobStore::open_owner(&store).unwrap();
+        let jobs = Arc::new(JobStore::open_owner(&store).unwrap());
         let provenance = support::document(&fixture(), "provenance.json");
         Self {
             root: root.to_owned(),
@@ -273,7 +274,7 @@ impl Owners {
             provenance,
             targets: TargetStore::open(&root.join("targets-state")).unwrap(),
             claims: StorageClaims::default(),
-            lane: FakeLane::new(fakes),
+            lane: Arc::new(FakeLane::new(fakes)),
             host: FakeHost(fakes.clone()),
             artifacts: ArtifactReadStore::open(&root.join("artifacts")).unwrap(),
             imports: ImportUploadStore::open(&root.join("artifacts")).unwrap(),
@@ -399,7 +400,7 @@ impl Owners {
                     flash: Some(FlashExecution {
                         planning: &self.flash,
                         facts: &facts,
-                        lane: &self.lane,
+                        lane: &*self.lane,
                         profile_id: self.provenance["profileId"].as_str().unwrap(),
                         host: &self.host,
                         targets: &self.targets,
@@ -429,7 +430,7 @@ impl Owners {
                         capabilities: Some(&self.capabilities),
                         runner: None,
                     },
-                    lane: Some(&self.lane),
+                    lane: Some(&*self.lane),
                 };
                 match reconciler.handle(params) {
                     Ok(result) => json!({"ok": true, "result": result}),

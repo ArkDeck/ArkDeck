@@ -52,6 +52,16 @@
         "type": "string",
         "required": true,
         "description": "One completed retained-risk archive. Runtime validates its unchanged history, expiry and complete uncertain-effect coverage; callers provide no proof or budget."
+      },
+      "failedRecommissionJobId": {
+        "type": "string",
+        "required": false,
+        "description": "Explicit reference to the first consumed, expired and durably unknown recommission. Runtime may allocate exactly one controlled retry, preserving both histories and requiring their complete coverage. Requires restorationArtifactLease and the closed preboot verification plan."
+      },
+      "restorationArtifactLease": {
+        "type": "artifactLease",
+        "required": false,
+        "description": "Immutable original-ramdisk restoration bundle for a controlled retry. Runtime pins the complete 4 MiB restoration and its verification into the same 1800-second budget before dispatch."
       }
     }
   },

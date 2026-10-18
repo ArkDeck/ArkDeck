@@ -331,6 +331,12 @@
                 "retainedJobId": {
                   "type": "string"
                 },
+                "failedRecommissionJobId": {
+                  "type": "string"
+                },
+                "restorationArtifactLease": {
+                  "type": "string"
+                },
                 "signingPresetRef": {
                   "type": "string"
                 },

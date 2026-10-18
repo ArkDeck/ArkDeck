@@ -344,51 +344,37 @@ impl FlashLane for LaneHost {
         artifact: &LaneArtifact,
         binding: &DeviceBinding,
     ) -> Result<Execution, LaneFailure> {
-        let job = self.job(job_id)?;
-        let mut state = job
-            .lock()
-            .map_err(|_| unknown("lane Job lock was poisoned"))?;
-        if state.purpose.is_some() || state.execution.is_some() {
-            return Err(unknown("a restoration start cannot be replayed"));
-        }
-        state.purpose = Some("primaryFlash".into());
-        self.connections
-            .retain_plan(plan)
-            .map_err(LaneFailure::Other)?;
-        let mut controller = self.connections.controller().map_err(LaneFailure::Other)?;
-        let observations = controller.discover().map_err(LaneFailure::Other)?;
-        let observed = crate::select_with_resolver(
-            &observations,
-            &binding.usb_topology,
+        self.prepare_sealed_plan(job_id, plan, artifact, binding, "primaryFlash")
+    }
+    fn prepare_recommission(
+        &self,
+        job_id: &str,
+        plan: &arkforge_ipc::messages::ExecutablePlan,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+    ) -> Result<Execution, LaneFailure> {
+        self.prepare_sealed_plan(job_id, plan, artifact, binding, "supersedingRecovery")
+    }
+    fn recommission_plan(
+        &self,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+    ) -> Result<arkforge_ipc::messages::ExecutablePlan, String> {
+        let mut controller = self.connections.controller()?;
+        lane_plan::ensure_artifact(&mut *controller, artifact)?;
+        let mut public = self.connections.public()?;
+        let (plan, _) = lane_plan::materialize(
+            &mut *controller,
+            &mut *public,
+            artifact,
+            binding,
+            "supersedingRecovery",
+            &self.support,
             self.connections.topology_resolver(),
         )
-        .map_err(|e| LaneFailure::Other(e.to_string()))?;
-        let mut client = self.connections.execution().map_err(LaneFailure::Other)?;
-        let daemon_job_id = client
-            .start(
-                &plan.plan_id,
-                &plan.plan_sha256,
-                "primaryFlash",
-                CONTROLLER_SESSION,
-            )
-            .map_err(LaneFailure::Other)?;
-        let execution = Execution {
-            arkdeck_job_id: job_id.into(),
-            daemon_job_id,
-            plan_id: plan.plan_id.clone(),
-            plan_sha256: plan.plan_sha256.clone(),
-            execution_purpose: "primaryFlash".into(),
-            artifact_sha256: artifact.sha256.clone(),
-            artifact_profile_id: artifact.profile_id.clone(),
-            target_id: binding.target_id.clone(),
-            binding_revision: binding.binding_revision,
-            stable_identity_sha256: binding.stable_identity_sha256.clone(),
-            usb_topology: binding.usb_topology.clone(),
-            observation_mode: observed.mode.clone(),
-            toolchain_sha256: self.toolchain_sha256.clone(),
-        };
-        state.execution = Some(execution.clone());
-        Ok(execution)
+        .map_err(|e| e.detail)?;
+        self.connections.retain_plan(&plan)?;
+        Ok(plan)
     }
 
     fn toolchain_sha256(&self) -> &str {
@@ -587,6 +573,74 @@ pub(crate) fn action_receipt(receipt: &ActionReceiptSummary) -> ActionReceipt {
 mod tests;
 
 impl LaneHost {
+    fn prepare_sealed_plan(
+        &self,
+        job_id: &str,
+        plan: &arkforge_ipc::messages::ExecutablePlan,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+        purpose: &str,
+    ) -> Result<Execution, LaneFailure> {
+        if plan.execution_purpose != purpose
+            || plan.plan_id.is_empty()
+            || digest_bytes(&plan.plan_sha256).is_none()
+            || SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| unknown("Runtime clock unavailable"))?
+                .as_millis()
+                >= u128::from(plan.expires_at_epoch_ms)
+        {
+            return Err(LaneFailure::ConfirmedNotExecuted(
+                "sealed plan expired or differs from admitted purpose".into(),
+            ));
+        }
+        let job = self.job(job_id)?;
+        let mut state = job
+            .lock()
+            .map_err(|_| unknown("lane Job lock was poisoned"))?;
+        if state.purpose.is_some() || state.execution.is_some() {
+            return Err(unknown("a restoration start cannot be replayed"));
+        }
+        state.purpose = Some(plan.execution_purpose.clone());
+        self.connections
+            .retain_plan(plan)
+            .map_err(LaneFailure::Other)?;
+        let mut controller = self.connections.controller().map_err(LaneFailure::Other)?;
+        let observations = controller.discover().map_err(LaneFailure::Other)?;
+        let observed = crate::select_with_resolver(
+            &observations,
+            &binding.usb_topology,
+            self.connections.topology_resolver(),
+        )
+        .map_err(|e| LaneFailure::Other(e.to_string()))?;
+        let mut client = self.connections.execution().map_err(LaneFailure::Other)?;
+        let daemon_job_id = client
+            .start(
+                &plan.plan_id,
+                &plan.plan_sha256,
+                &plan.execution_purpose,
+                CONTROLLER_SESSION,
+            )
+            .map_err(LaneFailure::Other)?;
+        let execution = Execution {
+            arkdeck_job_id: job_id.into(),
+            daemon_job_id,
+            plan_id: plan.plan_id.clone(),
+            plan_sha256: plan.plan_sha256.clone(),
+            execution_purpose: plan.execution_purpose.clone(),
+            artifact_sha256: artifact.sha256.clone(),
+            artifact_profile_id: artifact.profile_id.clone(),
+            target_id: binding.target_id.clone(),
+            binding_revision: binding.binding_revision,
+            stable_identity_sha256: binding.stable_identity_sha256.clone(),
+            usb_topology: binding.usb_topology.clone(),
+            observation_mode: observed.mode.clone(),
+            toolchain_sha256: self.toolchain_sha256.clone(),
+        };
+        state.execution = Some(execution.clone());
+        Ok(execution)
+    }
+
     fn perform_until(
         &self,
         step_id: &str,

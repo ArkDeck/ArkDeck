@@ -176,7 +176,9 @@ impl JobReconciler<'_> {
                 held.persist(self.jobs)?;
                 return Ok(None);
             }
-            if let Err(reason) = state.require_recovery_completion(&held.run.record, lane) {
+            if let Err(reason) =
+                state.require_recovery_completion(&held.run.record, lane, self.jobs)
+            {
                 held.run.record.timeline.push(reason);
                 held.persist(self.jobs)?;
                 return Ok(None);

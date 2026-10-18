@@ -108,11 +108,34 @@ pub(crate) struct Allocation {
     pub(crate) identity_chain: IdentityChain,
     pub(crate) reserved_at_epoch_ms: u64,
     pub(crate) expires_at_epoch_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) controlled_retry: Option<ControlledRetry>,
+}
+
+/// Runtime-derived link to the first consumed, expired, unsuccessful allocation.
+/// It never changes the source entry or turns either historical unknown into success.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ControlledRetry {
+    pub(crate) failed_job_id: String,
+    pub(crate) failed_source_sha256: String,
+    pub(crate) first_allocation_sha256: String,
+    pub(crate) program_sha256: String,
 }
 
 impl Allocation {
     pub(crate) fn validate(&self) -> Result<(), String> {
         self.identity_chain.validate()?;
+        if let Some(retry) = &self.controlled_retry
+            && (!super::identifier(&retry.failed_job_id)
+                || retry.failed_job_id == self.source_job_id
+                || retry.failed_job_id == self.recovery_job_id
+                || !digest(&retry.failed_source_sha256)
+                || !digest(&retry.first_allocation_sha256)
+                || !digest(&retry.program_sha256))
+        {
+            return Err("recommission.controlledRetryMalformed".into());
+        }
         if !super::identifier(&self.source_job_id)
             || !super::identifier(&self.recovery_job_id)
             || self.source_job_id == self.recovery_job_id
@@ -198,7 +221,7 @@ fn load(root: &HostDirectory) -> Result<Ledger, String> {
     if ledger.schema_version != "1.0.0" {
         return Err("recommission.allocationLedgerVersionUnsupported".into());
     }
-    let mut identities = std::collections::BTreeSet::new();
+    let mut identities = std::collections::BTreeMap::<&str, Vec<&Entry>>::new();
     for entry in &ledger.allocations {
         entry.allocation.validate()?;
         if entry.last_observed_epoch_ms < entry.allocation.reserved_at_epoch_ms {
@@ -213,11 +236,30 @@ fn load(root: &HostDirectory) -> Result<Ledger, String> {
         {
             return Err("recommission.postflightProofMalformed".into());
         }
-        if !identities.insert(&entry.allocation.identity_chain.normal_identity_sha256) {
-            return Err("recommission.duplicateAllocation".into());
+        let prior = identities
+            .entry(&entry.allocation.identity_chain.normal_identity_sha256)
+            .or_default();
+        match (prior.as_slice(), &entry.allocation.controlled_retry) {
+            ([], None) => (),
+            ([first], Some(retry)) if retry_matches(first, &entry.allocation, retry) => (),
+            _ => return Err("recommission.duplicateAllocation".into()),
         }
+        prior.push(entry);
     }
     Ok(ledger)
+}
+
+fn retry_matches(first: &Entry, next: &Allocation, retry: &ControlledRetry) -> bool {
+    first.consumed
+        && first.postflight.is_none()
+        && first.allocation.controlled_retry.is_none()
+        && first.allocation.recovery_job_id == retry.failed_job_id
+        && first.allocation.sha256() == retry.first_allocation_sha256
+        && first.allocation.source_job_id == next.source_job_id
+        && first.allocation.source_sha256 == next.source_sha256
+        && first.allocation.identity_chain == next.identity_chain
+        && first.allocation.expires_at_epoch_ms <= next.reserved_at_epoch_ms
+        && first.last_observed_epoch_ms <= next.reserved_at_epoch_ms
 }
 
 fn persist(root: &HostDirectory, ledger: &Ledger) -> Result<(), String> {
@@ -235,6 +277,103 @@ fn persist(root: &HostDirectory, ledger: &Ledger) -> Result<(), String> {
 }
 
 impl JobStore {
+    pub(crate) fn require_controlled_retry_proof(
+        &self,
+        record: &crate::job_record::JobRecord,
+        execution: &arkdeck_provider_arkforge::Execution,
+        lane: &dyn arkdeck_provider_arkforge::FlashLane,
+    ) -> Result<serde_json::Value, String> {
+        crate::flash_recommission_retry::require_proof(self, &self.path, record, execution, lane)
+    }
+
+    pub(crate) fn check_active_recommission(
+        &self,
+        allocation: &Allocation,
+        now: &str,
+    ) -> Result<(), String> {
+        let time = clock_millis(now).ok_or("recommission.clockUnavailable")?;
+        self.require_recommission_history(allocation)?;
+        let _guard = self
+            .root
+            .wait_lock(LOCK, false)
+            .map_err(|_| "recommission.ledgerBusy")?;
+        let mut ledger = load(&self.root)?;
+        let entry = ledger
+            .allocations
+            .iter_mut()
+            .find(|entry| entry.allocation == *allocation && entry.consumed)
+            .ok_or("recommission.consumedAllocationMissing")?;
+        let budget = entry.check_budget(time);
+        persist(&self.root, &ledger)?;
+        budget
+    }
+    pub(crate) fn recommission_retry_source(
+        &self,
+        source: &str,
+        failed: &str,
+        chain: &IdentityChain,
+        now: &str,
+        program_sha256: &str,
+    ) -> Result<ControlledRetry, String> {
+        let time = clock_millis(now).ok_or("recommission.clockUnavailable")?;
+        let _guard = self
+            .root
+            .wait_lock(LOCK, false)
+            .map_err(|_| "recommission.ledgerBusy")?;
+        let ledger = load(&self.root)?;
+        let first = ledger
+            .allocations
+            .iter()
+            .find(|entry| {
+                entry.allocation.recovery_job_id == failed
+                    && entry.allocation.source_job_id == source
+                    && entry.allocation.identity_chain == *chain
+            })
+            .ok_or("recommission.firstAllocationMissing")?;
+        if !first.consumed
+            || first.postflight.is_some()
+            || first.allocation.controlled_retry.is_some()
+            || time < first.allocation.expires_at_epoch_ms
+            || time < first.last_observed_epoch_ms
+            || self.holds_resident(failed)
+        {
+            return Err("recommission.failedAllocationNotEligible".into());
+        }
+        let record = self
+            .read_snapshot(failed)
+            .map_err(|_| "recommission.failedSourceUnreadable")?;
+        let (facts, _) = crate::rockchip_startup::journal(&self.jobs_path().join(failed))?;
+        if record.operation() != OPERATION
+            || record.state != "waitingForRecovery"
+            || !record.outcome_unknown()
+            || record.materialized_identity() != Some(chain.normal_identity_sha256.as_str())
+            || record.materialized_binding() != Some(chain.binding_revision)
+            || record.request["inputs"]["retainedJobId"] != source
+            || record
+                .admission_evidence()
+                .and_then(super::flash_recovery::RecoveryContext::from_evidence)
+                .and_then(|context| context.recommission)
+                .as_ref()
+                != Some(&first.allocation)
+            || facts.has_torn_tail
+            || facts.pending_abandonment.is_some()
+            || facts.finalized
+            || (facts.outstanding_intents.is_empty() && facts.unknown_outcomes.is_empty())
+        {
+            return Err("recommission.failedSourceNotDurableUnknown".into());
+        }
+        self.recommission_source_execution(failed)?;
+        Ok(ControlledRetry {
+            failed_job_id: failed.into(),
+            failed_source_sha256: source_digest(&self.root, failed)?,
+            first_allocation_sha256: first.allocation.sha256(),
+            program_sha256: program_sha256.into(),
+        })
+    }
+
+    fn require_recommission_history(&self, allocation: &Allocation) -> Result<(), String> {
+        require_history(&self.root, allocation)
+    }
     /// A retained unknown Session is continuous only when it is the exact
     /// published copy owned by the source Job. Admission may account for that
     /// one source; ordinary mutations require its completed supersession.
@@ -295,10 +434,18 @@ impl JobStore {
         let record = self
             .read_snapshot(id)
             .map_err(|_| "recommission.sourceUnreadable")?;
+        let recovery = record
+            .admission_evidence()
+            .and_then(super::flash_recovery::RecoveryContext::from_evidence)
+            .and_then(|context| context.recommission);
+        let expected_identity = recovery.as_ref().map_or_else(
+            || record.materialized_identity(),
+            |allocation| Some(allocation.identity_chain.loader_serial_sha256.as_str()),
+        );
         if state.completion.is_some()
             || execution.arkdeck_job_id != id
             || execution.daemon_job_id.is_empty()
-            || Some(execution.stable_identity_sha256.as_str()) != record.materialized_identity()
+            || Some(execution.stable_identity_sha256.as_str()) != expected_identity
             || Some(execution.binding_revision) != record.materialized_binding()
             || record.request["target"]["targetId"] != execution.target_id
             || !digest(&execution.plan_sha256)
@@ -307,6 +454,17 @@ impl JobStore {
             return Err("recommission.sourceProviderCorrelationInvalid".into());
         }
         Ok(execution)
+    }
+
+    pub(crate) fn recommission_source_executions(
+        &self,
+        source: &str,
+        failed: Option<&str>,
+    ) -> Result<Vec<arkdeck_provider_arkforge::Execution>, String> {
+        std::iter::once(source)
+            .chain(failed)
+            .map(|id| self.recommission_source_execution(id))
+            .collect()
     }
     pub(crate) fn publish_recommission_binding(
         &self,
@@ -387,10 +545,11 @@ impl JobStore {
             .wait_lock(LOCK, false)
             .map_err(|_| "recommission.ledgerBusy")?;
         let mut ledger = load(&self.root)?;
-        if let Some(entry) = ledger.allocations.iter_mut().find(|entry| {
-            entry.allocation.identity_chain.normal_identity_sha256
-                == candidate.identity_chain.normal_identity_sha256
-        }) {
+        if let Some(entry) = ledger
+            .allocations
+            .iter_mut()
+            .find(|entry| entry.allocation.recovery_job_id == candidate.recovery_job_id)
+        {
             candidate.reserved_at_epoch_ms = entry.allocation.reserved_at_epoch_ms;
             candidate.expires_at_epoch_ms = entry.allocation.expires_at_epoch_ms;
             if entry.allocation != candidate || entry.consumed {
@@ -401,6 +560,21 @@ impl JobStore {
             persist(&self.root, &ledger)?;
             budget?;
             return Ok(allocation);
+        }
+        let prior: Vec<_> = ledger
+            .allocations
+            .iter()
+            .filter(|entry| {
+                entry.allocation.identity_chain.normal_identity_sha256
+                    == candidate.identity_chain.normal_identity_sha256
+            })
+            .collect();
+        match (prior.as_slice(), &candidate.controlled_retry) {
+            ([], None) => (),
+            ([first], Some(retry)) if retry_matches(first, &candidate, retry) => {
+                self.require_recommission_history(&candidate)?;
+            }
+            _ => return Err("recommission.independentEpochAlreadyAllocated".into()),
         }
         ledger.allocations.push(Entry {
             allocation: candidate.clone(),
@@ -422,6 +596,9 @@ impl JobStore {
     ) -> Result<(), String> {
         let now = clock_millis(now).ok_or("recommission.clockUnavailable")?;
         allocation.validate()?;
+        if allocation.controlled_retry.is_some() {
+            self.require_recommission_history(allocation)?;
+        }
         let _guard = self
             .root
             .wait_lock(LOCK, false)
@@ -453,6 +630,7 @@ impl JobStore {
         now: &str,
     ) -> Result<(), String> {
         let time = clock_millis(now).ok_or("recommission.clockUnavailable")?;
+        self.require_recommission_history(allocation)?;
         let chain = IdentityChain::from_facts(facts)?;
         if chain != allocation.identity_chain
             || self.recommission_source(
@@ -497,9 +675,7 @@ impl JobStore {
         &self,
         allocation: &Allocation,
     ) -> Result<(), String> {
-        if source_digest(&self.root, &allocation.source_job_id)? != allocation.source_sha256 {
-            return Err("recommission.historicalBytesDrifted".into());
-        }
+        self.require_recommission_history(allocation)?;
         let _guard = self
             .root
             .wait_lock(LOCK, false)
@@ -512,6 +688,18 @@ impl JobStore {
         }
         Ok(())
     }
+}
+
+fn require_history(root: &HostDirectory, allocation: &Allocation) -> Result<(), String> {
+    if source_digest(root, &allocation.source_job_id)? != allocation.source_sha256
+        || allocation.controlled_retry.as_ref().is_some_and(|retry| {
+            source_digest(root, &retry.failed_job_id).ok().as_deref()
+                != Some(retry.failed_source_sha256.as_str())
+        })
+    {
+        return Err("recommission.historicalBytesDrifted".into());
+    }
+    Ok(())
 }
 
 fn source_digest(root: &HostDirectory, id: &str) -> Result<String, String> {
@@ -628,8 +816,10 @@ pub(crate) fn verified_identity_chain(
             .map_err(|_| "recommission.ledgerBusy")?;
         load(&root)?
     };
-    let Some(entry) = ledger.allocations.into_iter().find(|entry| {
-        entry.allocation.identity_chain.target_id == target
+    let Some(entry) = ledger.allocations.into_iter().rev().find(|entry| {
+        entry.consumed
+            && entry.postflight.is_some()
+            && entry.allocation.identity_chain.target_id == target
             && (entry.allocation.identity_chain.normal_identity_sha256 == identity
                 || entry.allocation.identity_chain.loader_serial_sha256 == identity)
     }) else {
@@ -639,9 +829,7 @@ pub(crate) fn verified_identity_chain(
         return Ok(None);
     }
     let allocation = &entry.allocation;
-    if source_digest(&root, &allocation.source_job_id)? != allocation.source_sha256 {
-        return Err("recommission.historicalBytesDrifted".into());
-    }
+    require_history(&root, allocation)?;
     let epochs = crate::recovery_epoch::list_recovery_epochs(&root)
         .map_err(|_| "recommission.recoveryEpochUnreadable")?;
     let established = epochs.iter().any(|epoch| {
@@ -656,10 +844,23 @@ pub(crate) fn verified_identity_chain(
             && draft.provider_executable_sha256 == allocation.identity_chain.provider_sha256
             && draft.uncertain_effect_set_sha256 == allocation.uncertain_effect_set_sha256
             && !draft.covered_intents.is_empty()
-            && draft
-                .covered_intents
-                .iter()
-                .all(|intent| intent.job_id == allocation.source_job_id)
+            && draft.covered_intents.iter().all(|intent| {
+                intent.job_id == allocation.source_job_id
+                    || allocation
+                        .controlled_retry
+                        .as_ref()
+                        .is_some_and(|retry| intent.job_id == retry.failed_job_id)
+            })
+            && allocation.controlled_retry.as_ref().is_none_or(|retry| {
+                draft
+                    .covered_intents
+                    .iter()
+                    .any(|intent| intent.job_id == retry.failed_job_id)
+                    && draft
+                        .covered_intents
+                        .iter()
+                        .any(|intent| intent.job_id == allocation.source_job_id)
+            })
     });
     Ok(established.then_some(entry.allocation.identity_chain))
 }
@@ -701,7 +902,12 @@ pub(crate) fn verified_recovery_job(
     load(&root)?
         .allocations
         .into_iter()
-        .find(|entry| entry.allocation.identity_chain == *chain)
+        .rev()
+        .find(|entry| {
+            entry.consumed
+                && entry.postflight.is_some()
+                && entry.allocation.identity_chain == *chain
+        })
         .map(|entry| entry.allocation.recovery_job_id)
         .ok_or_else(|| "recommission.consumedAllocationMissing".into())
 }

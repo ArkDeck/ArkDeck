@@ -1523,8 +1523,11 @@ mod tests {
             .iter()
             .filter(|entry| entry["feature"] == "flash.recommission@1")
             .collect();
-        let added = arkdeck_contract::CATALOG_DIGEST
-            == "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
+        let added = matches!(
+            arkdeck_contract::CATALOG_DIGEST,
+            "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080"
+                | "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a"
+        );
         assert_eq!(recommission.len(), usize::from(added));
         if let [entry] = recommission.as_slice() {
             assert_eq!(entry["source"], "catalog:flash.recommission@1");

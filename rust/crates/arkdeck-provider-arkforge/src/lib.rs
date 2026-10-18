@@ -34,6 +34,7 @@ mod loader;
 pub mod maintenance;
 pub mod managed_control;
 mod recovery_completion;
+pub use recovery_completion::{FullReadback, validate_recommission_readback};
 
 pub use lane_client::{NativeLaneConnections, NativePlanConnections};
 

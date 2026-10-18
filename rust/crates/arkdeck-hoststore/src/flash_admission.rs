@@ -386,14 +386,22 @@ impl FlashAdmitter<'_> {
                 .get("retainedJobId")
                 .and_then(Value::as_str)
                 .ok_or_else(|| refused("admissionDenied", "recommission.sourceRequired"))?;
-            let execution = admitter
+            let executions = admitter
                 .jobs
-                .recommission_source_execution(source)
+                .recommission_source_executions(
+                    source,
+                    request
+                        .inputs
+                        .get("failedRecommissionJobId")
+                        .and_then(Value::as_str),
+                )
                 .map_err(|reason| refused("admissionDenied", reason))?;
-            self.flash
-                .ok_or_else(unserved)?
-                .require_recommission_quiescence(&execution)
-                .map_err(|reason| refused("admissionDenied", reason))?;
+            for execution in executions {
+                self.flash
+                    .ok_or_else(unserved)?
+                    .require_recommission_quiescence(&execution)
+                    .map_err(|reason| refused("admissionDenied", reason))?;
+            }
         }
         let recovery = match recovery {
             Some(recovery) => recovery,

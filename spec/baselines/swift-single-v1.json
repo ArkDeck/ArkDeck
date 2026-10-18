@@ -1,5 +1,5 @@
 {
-  "catalogDigest": "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080",
+  "catalogDigest": "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a",
   "contractIdentity": "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2",
   "corpusFileCount": 110,
   "corpusMethodCounts": {
@@ -560,16 +560,16 @@
     "successes": 608
   },
   "directoryDigests": {
-    "Catalog/operations": "2cf3873a73e2dde1875674abf9de6fcd053dc4a74a4e577c2d4bac93dcf5876f",
+    "Catalog/operations": "5a321482d644a921aca4c306ad665d6463e50a8b9f54cd6da94095807eaa4373",
     "Catalog/profiles": "b15c4106c7c80fb02c7c2b93787455c130ccf1e9edcb677b8ce2c02b87940d0a",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "0620896cf60b26c367b62219d4c0eede7e029ef42e66612366820747539eb410",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "19aa4de8c4cbe3c4f6f399561b37d61c7e5e76d4df7d1b6aeb908163b43a45e4"
+    "spec/control/methods": "e9bf44bd8680398599accb772db9fb4d97ac9834aa2eb0a348d174bd4bfde9ed"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
-      "blob": "3331f641ca66549d3e7febcd1cd886515c9b9d1f",
-      "sha256": "1c421f64a5e1182ad94f820e9cc83c6309c4883c1d11d8f1795ed333f152dad7"
+      "blob": "d0502add497ececd7217871dde4921eeaf3e407a",
+      "sha256": "e2e3a3cfa254185600b15dbb7bbfa83ef149bdfe08ff20e73e7cb9562a635ca2"
     },
     "Catalog/operations/analyzer.analyze-trace.v1.json": {
       "blob": "0a12b2f04854bc18c4b98381d4cc0bc1a6115c3e",
@@ -620,8 +620,8 @@
       "sha256": "3b0f2a3b97926d52c99bbcbac9bddfd5d41c2eb76fb0fb30da442d509e55b783"
     },
     "Catalog/operations/flash.recommission.v1.json": {
-      "blob": "37100a6821e8b826803e85da597f36ad0a71836b",
-      "sha256": "9a456d3569d6fcb007a6b811f263918e2a0c48feb02299111a50201c334a1275"
+      "blob": "fbfdebc673e7ab6f6d560aead01674202ec060ac",
+      "sha256": "acbdc25b447c1fee65b7f510c4203e817f67830b06b2ca4d405000fdd1cb2eb2"
     },
     "Catalog/operations/flash.restore-boot-loop.v1.json": {
       "blob": "9aa74a9201ff1257d38a8fbe7dfc5b7fa8077541",
@@ -1628,8 +1628,8 @@
       "sha256": "05e9959917e601ac46f2303a873b9910b04e0e1da9cc6393c7e0d4d33c33ed42"
     },
     "spec/control/methods/operation.describe.json": {
-      "blob": "5e016ec29c476f81afb4c8e982bd959181709346",
-      "sha256": "00d9f6b73ecb6dd6dcfb46408d5fa8a7a2198e93cf4a2f2a521ce74a26611ee0"
+      "blob": "43e9e741cc56d9a66102d67a8e590ffbac847514",
+      "sha256": "40eff3563512de15ba8b30919516de839f89b27681053e26c6e95c2b6b682626"
     },
     "spec/control/methods/operation.list.json": {
       "blob": "c5ea9305384c22622c8f6e92d1d20dee6dd293a2",
@@ -1812,7 +1812,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "2ac662c732cf36a5eb1cacbb876c8bb59250556d88aee421f7a1120c319dfaef",
+  "inputDigest": "335d493e90b828174a405f7fad658d693d67dcf869dc95763b526094b50f0b45",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

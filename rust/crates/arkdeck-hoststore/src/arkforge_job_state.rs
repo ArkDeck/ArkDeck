@@ -36,6 +36,7 @@ impl ArkForgeJobState {
         &self,
         record: &JobRecord,
         lane: &dyn FlashLane,
+        jobs: &JobStore,
     ) -> Result<(), String> {
         let recovery = record.operation() == "flash.recommission@1"
             || record
@@ -56,11 +57,21 @@ impl ArkForgeJobState {
                     && execution.execution_purpose == "supersedingRecovery"
             })
             .ok_or("flash.recoveryFullReadbackMissing: recovery execution correlation is absent")?;
+        if record
+            .admission_evidence()
+            .and_then(super::flash_recovery::RecoveryContext::from_evidence)
+            .and_then(|context| context.recommission)
+            .is_some_and(|allocation| allocation.controlled_retry.is_some())
+        {
+            return jobs
+                .require_controlled_retry_proof(record, execution, lane)
+                .map(|_| ());
+        }
         lane.require_recovery_completion(execution)
     }
 }
 
-fn execution_value(execution: &Execution) -> Value {
+pub(crate) fn execution_value(execution: &Execution) -> Value {
     json!({
         "arkDeckJobID": execution.arkdeck_job_id,
         "daemonJobID": execution.daemon_job_id,

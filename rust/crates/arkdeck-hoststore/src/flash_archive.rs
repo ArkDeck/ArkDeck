@@ -107,12 +107,29 @@ pub(crate) struct Summary {
 /// input, as Swift's `try? fileHandle.read(upToCount:)` does; `path` names
 /// the archive in `unreadableFile`.
 pub(crate) fn summarize(input: &mut dyn Read, path: &str) -> Result<Summary, ArchiveError> {
+    summarize_with_preboot(input, path, false)
+}
+
+/// The controlled retry additionally recognizes the closed 4 MiB initramfs.
+/// Ordinary import and its captured metadata remain unchanged.
+pub(crate) fn summarize_preboot(input: &mut dyn Read, path: &str) -> Result<Summary, ArchiveError> {
+    summarize_with_preboot(input, path, true)
+}
+
+fn summarize_with_preboot(
+    input: &mut dyn Read,
+    path: &str,
+    preboot: bool,
+) -> Result<Summary, ArchiveError> {
     let mut archive = Sha256::new();
     let mut archive_size: i64 = 0;
     let mut pending: Vec<u8> = Vec::new();
     let mut header_consumed = false;
     let mut inflate = RawInflate::new().ok_or(ArchiveError::DecompressionFailed)?;
-    let mut tar = TarSummarizer::default();
+    let mut tar = TarSummarizer {
+        preboot,
+        ..Default::default()
+    };
     let mut chunk = vec![0; INFLATE_WINDOW_BYTES];
     loop {
         let count = fill(input, &mut chunk);
@@ -248,6 +265,7 @@ enum TarState {
 /// Swift `TarStreamSummarizer`, with the board's derivation.
 #[derive(Default)]
 struct TarSummarizer {
+    preboot: bool,
     state: TarState,
     header: Vec<u8>,
     member_name: String,
@@ -285,7 +303,12 @@ impl TarSummarizer {
                         let slice = &input[offset..offset + take];
                         self.member.update(slice);
                         if let Some(capturing) = &mut self.capturing {
-                            if capturing.len() + take <= CAPTURE_BYTE_LIMIT {
+                            let limit = if self.preboot && self.member_name == "ramdisk.img" {
+                                4 * 1024 * 1024
+                            } else {
+                                CAPTURE_BYTE_LIMIT
+                            };
+                            if capturing.len() + take <= limit {
                                 capturing.extend_from_slice(slice);
                             } else {
                                 self.capturing_overflowed = true;
@@ -427,7 +450,9 @@ impl TarSummarizer {
     /// Swift `beginDerivation(for:)` with the board's request: the partition
     /// table is kept and the system image scanned.
     fn begin_derivation(&mut self) {
-        if self.member_name == PARTITION_TABLE {
+        if self.member_name == PARTITION_TABLE
+            || (self.preboot && self.member_name == "ramdisk.img")
+        {
             self.capturing = Some(Vec::new());
         }
         if self.member_name == system_image() {

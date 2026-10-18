@@ -16,10 +16,12 @@ import tomllib
 OLD = 'c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036'
 CURRENT = 'e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7'
 RECOMMISSION = '9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080'
+CONTROLLED_RETRY = '9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a'
+RECOMMISSION_CATALOGS = {RECOMMISSION, CONTROLLED_RETRY}
 MAINTENANCE = '0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c'
 MAINTENANCE_REFERENCES = {'flash.verify@1', 'flash.restore-boot-loop@1'}
 ADDITIONAL_REFERENCES = MAINTENANCE_REFERENCES | {'flash.recommission@1'}
-CATALOGS = [OLD, CURRENT, MAINTENANCE, RECOMMISSION]
+CATALOGS = [OLD, CURRENT, MAINTENANCE, RECOMMISSION, CONTROLLED_RETRY]
 PACKET_SHA = 'd1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab'
 MANIFEST = 'scripts/catalog-test-views.json'
 
@@ -158,9 +160,9 @@ def classified_catalog(actual: dict, old: dict, current: dict) -> str:
         raise ValueError('unclassified complete Catalog')
     rows = sorted(actual.values(), key=lambda row: (row['id'], row.get('version', 0)))
     digest = sha(json.dumps(rows, ensure_ascii=True, sort_keys=True, separators=(',', ':')).encode())
-    expected = MAINTENANCE if additions == MAINTENANCE_REFERENCES else RECOMMISSION
-    if digest != expected:
-        raise ValueError('maintenance Catalog descriptor drift' if expected == MAINTENANCE
+    expected = {MAINTENANCE} if additions == MAINTENANCE_REFERENCES else RECOMMISSION_CATALOGS
+    if digest not in expected:
+        raise ValueError('maintenance Catalog descriptor drift' if expected == {MAINTENANCE}
                          else 'recommission Catalog descriptor drift')
     return digest
 
@@ -212,11 +214,11 @@ def load(rust: Path, metadata: dict) -> dict:
     custom = custom_harnesses(metadata)
     for key, row in value['targets'].items():
         fields = set(row) - {'platformFunctions', 'customCases', 'childEntries', 'optionalMaterial', 'modulePlatforms'}
-        if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'recommission', 'lineage', 'mixed'):
+        if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'recommission', 'retry', 'lineage', 'mixed'):
             raise ValueError('unknown test target route')
         if (row['route'] == 'mixed') != bool(row['functions']):
             raise ValueError('mixed target requires explicit function routes')
-        if any(not re.fullmatch(r'[A-Za-z0-9_:]+', name) or route not in ('both', 'current', 'historical', 'recommission', 'lineage') for name, route in row['functions'].items()):
+        if any(not re.fullmatch(r'[A-Za-z0-9_:]+', name) or route not in ('both', 'current', 'historical', 'recommission', 'retry', 'lineage') for name, route in row['functions'].items()):
             raise ValueError('unknown test function route')
         if not isinstance(row['ignored'], list) or len(row['ignored']) != len(set(row['ignored'])) or any(
                 not re.fullmatch(r'[A-Za-z0-9_:]+', name) for name in row['ignored']):
@@ -262,8 +264,10 @@ def listed(text: str) -> list[str]:
 def selected(row: dict, names: list[str], digest: str) -> list[str]:
     if digest not in CATALOGS:
         raise ValueError('unknown test execution Catalog')
-    view = {OLD: 'historical', CURRENT: 'current', MAINTENANCE: 'maintenance', RECOMMISSION: 'recommission'}[digest]
+    view = {OLD: 'historical', CURRENT: 'current', MAINTENANCE: 'maintenance', RECOMMISSION: 'recommission', CONTROLLED_RETRY: 'retry'}[digest]
     routes = {view, 'both'} | ({'lineage'} if digest in (OLD, CURRENT) else set())
+    if digest == CONTROLLED_RETRY:
+        routes.add('recommission')
     if row['route'] == 'mixed':
         if set(row['functions']) != set(names):
             raise ValueError('unclassified mixed-target function')

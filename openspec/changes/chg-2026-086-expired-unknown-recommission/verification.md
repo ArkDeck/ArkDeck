@@ -1,6 +1,103 @@
 # Verification
 
-> Change:CHG-2026-086-expired-unknown-recommission@r1
+> Change:CHG-2026-086-expired-unknown-recommission@r2
+
+## Revision 2: controlled retry
+
+The 2026-10-18 scoped change preserves the original retained unknown, the failed
+first recommission and every first-allocation field. Only Runtime may allocate
+one second epoch after validating both histories, both terminal Provider joins,
+the whole fresh identity chain and complete uncertain-effect coverage. Both
+Provider plans and immutable bundles are pinned before allocation. Independent
+preboot/static readback and complete original-ramdisk restoration are required
+before any new supersession or binding lineage is published.
+
+The exact new Catalog digest is
+`9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a`.
+Only its two optional input fields differ from the original recommission
+descriptor; removing them recovers the original `9c1d24df...` Catalog. All 6,499
+frozen fixture files remain unchanged. Synthetic Runtime-owned program fixtures
+exercise the orchestration and never constitute actual preboot or hardware proof.
+
+### Local targeted checks
+
+Windows, 2026-10-18. Logs use
+`D:/src/ArkDeck-wt/tools/recommission-windows-hdc-controlled-retry-*-20261018.log`.
+Cargo retains this chat's fixed external cache and two build jobs. No local
+unified gate or candidate device execution is performed.
+
+- `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --lib
+  flash_recommission`: exit 0, 10 cases; `unit-1`. This includes exact second
+  allocation linkage, old-entry preservation, restart/third-allocation refusal,
+  identity drift and changed-history refusal.
+- `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --test flash_run
+  controlled_retry -- --nocapture`: exit 0, both cases; `flow-2`. The success case
+  covers both unknowns, nine independent measurements, one restoration and its
+  full hash. The failure case covers missing preboot proof, bad hash, identity
+  drift, failed write receipt, unknown restoration and unavailable restoration
+  readback. The first test attempt (`flow-1`) exposed two test setup errors:
+  replaying an already committed fixture import and asserting unrelated Target
+  revisions. These were corrected without changing production checks.
+- `python rust/scripts/run-cargo.py clippy -p arkdeck-contract
+  -p arkdeck-provider-hdc -p arkdeck-provider-arkforge -p arkdeck-hoststore
+  -p arkdeck-agentd -p arkdeck-soak -p arkdeck-control -p arkdeck-cli
+  -p arkdeck-bootstrap -p arkdeck-rockchip-binding --all-targets -- -D warnings`:
+  exit 0; `clippy-3`.
+- Catalog generator unit tests and exact historical-view routing tests: exit 0;
+  `generators` and `routing`. The routing check retains the old recommission view
+  and selects the controlled-retry cases only for the new Catalog.
+- `python rust/scripts/generate-contract.py --check`,
+  `python windows/scripts/generate-clientkit.py --check` and
+  `python rust/scripts/check-arkforge-pin.py`: each exit 0; `contract-check`,
+  `clientkit-check` and `pin-check`. The added Artifact library uses the existing
+  exact SDK revision; unrelated lockfile packages are unchanged.
+- `python rust/scripts/run-cargo.py fmt --all --check` could not run because
+  Windows rejected the workspace rustfmt argument list with OS error 206;
+  `format-1`. Changed Rust files are formatted individually; CI retains the
+  workspace check. The initial SDD attempt (`sdd`) correctly rejected the stale
+  verification revision marker, now updated to r2 without relabeling old results.
+- The affected-library batch for the same ten crates with `test --lib`: exit 0,
+  806 passed and 4 existing ignored; `libraries`. This includes the closed
+  preboot parser and target/deadline/truncation tests.
+- Final `test -p arkdeck-hoststore --test flash_run recommission`: exit 0,
+  10 passed; `flow-final`. Each controlled-retry failure also survives passive
+  reconciliation when the Provider later reports completed; missing proof causes
+  no new dispatch, supersession or budget allocation.
+- `test -p arkdeck-hoststore --test terminal_publication_retry --test
+  catalog_lineage`: exit 0, 22 passed; `history-consumers`.
+- `test -p arkdeck-control --test read_only`: exit 0, 30 passed;
+  `control-consumers`.
+- `test -p arkdeck-cli --test machine_contracts --test maintainer_contracts`:
+  final exit 0, 14 passed; `cli-consumers-final`. The earlier `cli-consumers`
+  attempt found stale published Catalog digests. The current CLI exported 244
+  products to an isolated directory; only the command-registry and feature-
+  coverage Catalog digests differed, and those two generated files were updated.
+- Historical Catalog view tests: final exit 0, 14 passed;
+  `historical-routing-2`. The earlier attempt retained an r1-only projection
+  expectation; the corrected check still proves the single exact digest change.
+- CLI read-only machine-output tests: exit 0, 9 passed; `machine-contracts`.
+- Runtime App-review generator build: exit 0; `review-generator`. Its output
+  matches both the Swift and Windows presentation projections. Native Swift/App
+  checks require macOS CI and are not claimed on this host.
+- Per-file Rust formatting, Catalog/contract/ClientKit generation and diff checks:
+  exit 0; `final-static` and `final-static-2`. SDD exits 0 with no errors or
+  warnings (`final-static-2`). The source census contains 954 files and 335
+  integration targets; all 6,499 frozen fixture files remain exact.
+- The extra `copy-command-registry.py --check` exits 1 on an inherited textual
+  difference: the committed JSON escapes the section sign as `\u00a7`, while the
+  Python generator emits the character. Parsed objects are identical, and the
+  same difference exists against HEAD's original registry. This change leaves
+  that unrelated copy untouched; the current CLI bundle tests above pass.
+
+### CI
+
+Revision-2 PR and required `guard`/`swift` results are pending. No revision-2
+publication or real-device pass is claimed by these software tests.
+
+## Revision 1 verification history
+
+The following entries retain the original revision-1 checks, CI and device
+outcomes. They are not current-Catalog evidence for revision 2.
 
 All cases use synthetic identities, isolated stores and scripted Providers.
 They establish software behavior, not hardware evidence, approval or publication.

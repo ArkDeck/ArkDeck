@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-086-expired-unknown-recommission
-revision: 1
+revision: 2
 status: proposed
 class: core
 core_change_level: major
@@ -11,6 +11,22 @@ platforms: [macos, windows]
 
 # Controlled recommissioning of an expired, archived unknown board
 
+Revision 2 implements the maintainer's explicit 2026-10-18 request for one
+controlled retry after the failed first recommissioning. The original unknowns,
+capability consumption and allocation remain immutable. Runtime must account for
+both the archived source and the failed recovery, prove both writers quiescent,
+and cover every old and new uncertain effect before reserving one additional
+1,800-second allocation. Explicitly naming the failed Job is only a reference;
+it is not authority or a supplied proof. A third allocation remains forbidden.
+
+The first real execution also demonstrated that Loader readback cannot verify
+seven ranges outside its read window. The retry therefore requires a complete
+pre-materialized verification path, including pre-mount userdata measurement and
+full original-ramdisk restoration. Earlier typed skips remain skips. The scoped
+delta, implementation and checks are delivered together before device dispatch;
+the user's authorization includes completing the PR, CI and protected-main merge.
+This does not claim hardware acceptance or mark this change verified.
+
 GJ-4 currently leaves an expired unknown Flash blocked even after its retained-risk
 archive has completed. A revision-1 Normal-only adoption also cannot identify its
 Loader using the historical CID. Ordinary complete-overwrite recovery must retain
@@ -20,9 +36,10 @@ The protected-main Runtime proves the published retained archive, the unchanged
 historical binding and all outstanding effects. A fresh CPU/CID/factory-SN/USB
 chain connects that binding to the actual Loader before writing. One separately
 recorded recovery allocation permits one serial complete overwrite within 1,800
-seconds. It cannot renew the original budget or be reallocated by changing a
-request ID, restarting, abandoning or archiving the new recovery. Another unknown
-hard-stops with all old and new uncertainty retained.
+seconds. It cannot renew the original budget or be reallocated merely by changing
+a request ID, restarting, abandoning or archiving the new recovery. Only the
+explicitly scoped controlled retry above may append a second allocation; another
+unknown retains all uncertainty and cannot obtain a third.
 
 Every mapped partition, immutable Artifact, Provider coverage declaration,
 readback, reboot, rebind and postflight proof remains mandatory. Only a verified

@@ -128,7 +128,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertTrue(runner.historical_workspace_covers(observed, observed))
         self.assertEqual(runner.historical_catalog_inputs(observed, views.CURRENT), observed)
         projected = runner.historical_review_projection(self.projection, views.CURRENT)
-        self.assertEqual(projected, self.projection.replace(views.RECOMMISSION.encode(), views.CURRENT.encode()))
+        self.assertEqual(projected, self.projection.replace(self.projection_digest.encode(), views.CURRENT.encode()))
         with self.assertRaises(ValueError):
             runner.historical_catalog_inputs(self.inputs, views.RECOMMISSION)
 
@@ -228,6 +228,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertEqual(result, self.projection.replace(self.projection_digest.encode(), views.OLD.encode()))
         self.assertEqual(result.count(views.OLD.encode()), 1)
         self.assertNotIn(views.RECOMMISSION.encode(), result)
+        self.assertNotIn(views.CONTROLLED_RETRY.encode(), result)
         self.assertEqual(runner.historical_review_projection(result), result)
 
     def test_unknown_missing_duplicate_or_mixed_projection_catalog_refuses(self):
