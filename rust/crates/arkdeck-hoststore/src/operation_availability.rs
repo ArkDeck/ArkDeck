@@ -149,7 +149,11 @@ fn flash_unavailability(
 ) -> Vec<(&'static str, String)> {
     if !matches!(
         reference,
-        "flash.full-restore@1" | "flash.dayu200" | "flash.recommission@1"
+        "flash.full-restore@1"
+            | "flash.dayu200"
+            | "flash.recommission@1"
+            | "flash.verify@1"
+            | "flash.restore-boot-loop@1"
     ) {
         return vec![(
             "operation_not_supported",
@@ -168,7 +172,10 @@ fn flash_unavailability(
     }
     for (present, reason) in [
         (context.flash_execution, "runtime.flashExecutorUnavailable"),
-        (context.mutation_owner, "runtime.mutationOwnerUnavailable"),
+        (
+            context.mutation_owner || reference == "flash.verify@1",
+            "runtime.mutationOwnerUnavailable",
+        ),
         (context.job_owner, "runtime.jobOwnerUnavailable"),
     ] {
         if !present {
@@ -262,7 +269,12 @@ mod tests {
         c.flash_planning = Some(&flash);
         c.flash_execution = true;
         c.mutation_owner = true;
-        for reference in ["flash.full-restore@1", "flash.dayu200"] {
+        for reference in [
+            "flash.full-restore@1",
+            "flash.dayu200",
+            "flash.verify@1",
+            "flash.restore-boot-loop@1",
+        ] {
             assert_eq!(
                 operation_unavailability(reference, "arkforge", &c),
                 Some(vec![])
@@ -301,6 +313,45 @@ mod tests {
         assert_eq!(
             operation_unavailability("flash.full-restore@1", "arkforge", &c),
             None
+        );
+    }
+
+    #[test]
+    fn flash_maintenance_discovery_preserves_read_only_and_missing_owner_boundaries() {
+        let flash = crate::FlashPlanning::new(None, || None, Some("a".repeat(64)));
+        let mut c = context();
+        c.flash_planning = Some(&flash);
+        c.flash_execution = true;
+        assert_eq!(
+            operation_unavailability("flash.verify@1", "arkforge", &c),
+            Some(vec![])
+        );
+        assert_eq!(
+            operation_unavailability("flash.restore-boot-loop@1", "arkforge", &c),
+            Some(vec![(
+                "provider_tool_unavailable",
+                "runtime.mutationOwnerUnavailable".into()
+            )])
+        );
+        c.flash_execution = false;
+        c.job_owner = false;
+        c.artifacts = false;
+        assert_eq!(
+            operation_unavailability("flash.verify@1", "arkforge", &c),
+            Some(vec![
+                (
+                    "provider_tool_unavailable",
+                    "runtime.flashExecutorUnavailable".into()
+                ),
+                (
+                    "provider_tool_unavailable",
+                    "runtime.jobOwnerUnavailable".into()
+                ),
+                (
+                    "artifact_store_unavailable",
+                    "runtime.artifactStoreUnavailable".into()
+                ),
+            ])
         );
     }
 
