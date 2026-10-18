@@ -10,11 +10,10 @@ use crate::job_plan::JobPlanner;
 use crate::operation_request::OperationRequest;
 use arkdeck_contract::sha256_hex;
 use arkdeck_platform::HostDirectory;
-use arkdeck_provider_arkforge::{DeviceBinding, LaneArtifact, maintenance as m};
+use arkdeck_provider_arkforge::{DeviceBinding, LaneArtifact, maintenance as m, preboot};
 use arkdeck_provider_arkforge::{
     Execution, FlashLane, FullReadback, validate_recommission_readback,
 };
-use arkforge_artifact::preboot;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;

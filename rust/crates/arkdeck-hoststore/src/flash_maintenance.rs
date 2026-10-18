@@ -117,8 +117,8 @@ impl MaintenanceReads for NativeMaintenanceReads {
         let hdc = (self.hdc)()?;
         if let Some(nonce) = nonce {
             if effect.target != "userdata"
-                || effect.range_start != arkforge_artifact::preboot::USERDATA_START
-                || effect.range_length != arkforge_artifact::preboot::USERDATA_BYTES
+                || effect.range_start != arkdeck_provider_arkforge::preboot::USERDATA_START
+                || effect.range_length != arkdeck_provider_arkforge::preboot::USERDATA_BYTES
             {
                 return Err("preboot range differs from sealed userdata effect".into());
             }

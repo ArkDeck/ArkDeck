@@ -147,8 +147,10 @@ def assert_boundaries() -> None:
     # authority API whose StepPermit the lane signs; and the typed ids and
     # digests that permit is made of (协调会话 2026-09-26). The maintenance
     # adapter exports pure typed maintenance contracts over those same crates.
+    # The Artifact crate contributes only bounded, in-memory preboot inspection;
+    # the provider re-exports that closed API without its store or builders.
     arkforge = {"arkdeck-provider-arkforge": {
-        "arkforge-arkdeck-adapter", "arkforge-authority-api", "arkforge-client",
+        "arkforge-arkdeck-adapter", "arkforge-artifact", "arkforge-authority-api", "arkforge-client",
         "arkforge-core", "arkforge-ipc"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"

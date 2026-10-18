@@ -94,6 +94,22 @@ unified gate or candidate device execution is performed.
   The first SDD launcher could not locate `sh`; using the installed Git shell
   succeeded. `cargo-deny` is not installed on this Windows host, so CI runs the
   full unchanged dependency-policy check.
+- Provider-boundary correction: Clippy with `--all-targets -- -D warnings` and
+  `test --lib` for `arkdeck-provider-arkforge`, `arkdeck-hoststore`,
+  `arkdeck-agentd` and `arkdeck-soak` each exit 0; the library batch has 515 passed
+  and 4 existing ignored. Logs: `provider-boundary-clippy` and
+  `provider-boundary-libraries`. The exact `check-readonly.py` dependency-graph
+  assertion, pinned SDK check, per-file Rust formatting and SDD pass.
+- Historical Catalog tests after the dependency move: exit 0, 14 passed;
+  `provider-boundary-history`. The first sandbox attempt failed only because its
+  temporary directory was inaccessible; the native-host rerun passed. Cargo
+  regenerated the lock graph with all 67 package identities and versions
+  preserved: only the Artifact dependency edge moves to the Provider. Log:
+  `provider-boundary-lock-pins`.
+- Final boundary-fix regression: `test -p arkdeck-hoststore --test flash_run
+  recommission` exits 0, all 10 cases pass; `provider-boundary-flow`. Complete
+  primary/restoration proof, both retained unknowns and third-budget refusal
+  remain covered after moving the inspection dependency.
 
 ### CI
 
@@ -105,6 +121,15 @@ The follow-up adds only that crate, at the unchanged pinned ArkForge source and
 revision, with no third-party dependency, cargo-vet exemption or trust change.
 The remaining required CI results are pending. No revision-2 publication or
 real-device pass is claimed by these software tests.
+
+Run `39082802181` passed host-independent checks, including dependency policy,
+Swift/App/Windows ClientKit and the Linux workspace tests. Its Linux contract
+parity job `117543316024` then correctly rejected the new direct
+`arkdeck-hoststore -> arkforge-artifact` edge. The correction keeps the existing
+boundary: only `arkdeck-provider-arkforge` directly depends on ArkForge. That
+provider exposes just the pinned pure preboot inspector and constants; Runtime
+calls it through the existing provider dependency. The exact graph assertion
+still rejects all other direct ArkForge edges.
 
 ## Revision 1 verification history
 
