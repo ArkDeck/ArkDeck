@@ -15,6 +15,9 @@ mod unix;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(windows)]
+pub use windows::{WindowsCodeNamespace, validate_windows_private_file, verify_windows_publisher};
+
 #[cfg(any(target_os = "macos", windows))]
 pub use process::ToolLaunchIdentity;
 #[cfg(target_os = "macos")]

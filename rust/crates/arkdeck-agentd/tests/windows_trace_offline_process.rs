@@ -1,8 +1,6 @@
 //! The offline Trace surface of the Windows daemon (TASK-XPA-021, decision
 //! 5), as the real daemon serves it over an isolated development root with
-//! no ArkTrace distribution, which is every Windows host today: this
-//! repository pins only a macOS arm64 `trace_streamer`
-//! (`Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx`).
+//! no selected ArkTrace distribution, plus an explicitly invalid descriptor.
 //!
 //! * `trace.inspect` is Swift's owner composed without a Trace inspector:
 //!   every request of the recorded oracle
@@ -19,9 +17,8 @@
 //!   arktrace-absent`): `provider_tool_unavailable` from the
 //!   `host_configuration`, `analyzer.arktraceNotFound` (TASK-XPA-011: the
 //!   Windows analyzer provider composes no ArkTrace profile);
-//! * a development root that names an ArkTrace descriptor is refused before
-//!   anything is opened, read or started: the Windows daemon loads no
-//!   distribution, pinned or not.
+//! * an invalid descriptor keeps the daemon available and leaves both Trace
+//!   analyzers unavailable with the loader's descriptor refusal.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! the ones named here; nothing installed is read or written and no HDC is
@@ -98,7 +95,11 @@ struct Daemon {
 
 impl Daemon {
     fn start(root: &Path) -> Self {
-        let mut child = daemon(root).spawn().unwrap();
+        Self::start_command(daemon(root))
+    }
+
+    fn start_command(mut command: Command) -> Self {
+        let mut child = command.spawn().unwrap();
         let stdout = child.stdout.take().unwrap();
         let (sender, lines) = mpsc::channel();
         std::thread::spawn(move || {
@@ -299,32 +300,100 @@ fn the_windows_daemon_answers_the_offline_trace_surface_without_a_distribution()
 }
 
 #[test]
-fn a_development_root_naming_an_arktrace_descriptor_starts_nothing() {
+fn an_invalid_arktrace_descriptor_keeps_both_analyzers_unavailable() {
     let _turn = turn();
     let root = Root::new();
-    // An existing file, the macOS loader oracle's inputs: the Windows daemon
-    // refuses the setting by name, before it opens the root or reads what
-    // the setting names.
-    let refused = daemon(&root.0)
-        .env(
-            "ARKDECK_ARKTRACE_DESCRIPTOR",
-            fixture("arktrace-profile-loader/inputs.json"),
-        )
-        .output()
+    let mut command = daemon(&root.0);
+    command.env(
+        "ARKDECK_ARKTRACE_DESCRIPTOR",
+        fixture("arktrace-profile-loader/inputs.json"),
+    );
+    let mut daemon = Daemon::start_command(command);
+    let mut connection = Connection::open(&daemon.serving());
+    assert_eq!(connection.exchange("health", "health", None)["ok"], true);
+    let operations = connection.exchange("operations", "operation.list", None);
+    for reference in ["analyzer.summarize-trace@1", "analyzer.analyze-trace@1"] {
+        let operation = operations["result"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|operation| operation["reference"] == reference)
+            .unwrap();
+        assert_eq!(operation["availability"], "unavailable");
+        assert_eq!(
+            operation["reasonCodes"],
+            json!(["provider_tool_unavailable"])
+        );
+        assert_eq!(
+            operation["reasons"],
+            json!(["analyzer.arktraceDescriptorInvalid"])
+        );
+    }
+    drop(connection);
+    daemon.stop(&root.0);
+}
+
+/// Native qualification only: the inputs are a real signed distribution and
+/// an independently qualified private ancestor, never synthetic PE fixtures.
+#[test]
+#[ignore = "requires a real signed Windows ArkTrace distribution and private root"]
+fn a_reviewed_windows_distribution_composes_both_analyzers_and_trace_inspection() {
+    let _turn = turn();
+    let parent = PathBuf::from(
+        std::env::var_os("ARKDECK_WINDOWS_TRACE_TEST_STATE").expect("private test root"),
+    );
+    let descriptor =
+        std::env::var_os("ARKDECK_WINDOWS_TRACE_TEST_DESCRIPTOR").expect("reviewed descriptor");
+    let nonce = u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap());
+    let name = format!("daemon-qualification-{nonce:016x}");
+    arkdeck_platform::HostDirectory::open(&parent)
+        .unwrap()
+        .private_child(&name)
         .unwrap();
-    assert!(!refused.status.success(), "{refused:?}");
-    let stderr = String::from_utf8_lossy(&refused.stderr);
-    assert!(
-        stderr.contains(
-            "ARKDECK_ARKTRACE_DESCRIPTOR is not composed by the Windows development root yet; \
-             nothing was started"
-        ),
-        "{stderr}"
-    );
-    assert!(refused.stdout.is_empty(), "{refused:?}");
+    let root = Root(parent.join(name));
+    assert_eq!(root.0.parent(), Some(parent.as_path()));
+    let mut command = daemon(&root.0);
+    command.env("ARKDECK_ARKTRACE_DESCRIPTOR", descriptor);
+    let mut daemon = Daemon::start_command(command);
+    let mut connection = Connection::open(&daemon.serving());
+    let operations = connection.exchange("operations", "operation.list", None);
+    assert_eq!(operations["ok"], true, "{operations}");
+    for reference in ["analyzer.summarize-trace@1", "analyzer.analyze-trace@1"] {
+        let operation = operations["result"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|operation| operation["reference"] == reference)
+            .unwrap();
+        if operation["availability"] != "available" {
+            let mut stderr = daemon.child.as_mut().unwrap().stderr.take().unwrap();
+            drop(connection);
+            daemon.stop(&root.0);
+            let mut diagnostic = String::new();
+            stderr.read_to_string(&mut diagnostic).unwrap();
+            panic!("{operation}; stderr={diagnostic}");
+        }
+    }
+    let params = json!({"owner":{"kind":"job","id":"job-absent-qualification"},
+        "artifactId":"ART-00000000000000000000000000000000","allowSensitive":true,"timeoutMs":30000});
+    let missing = connection.answer("missing", "trace.inspect", Some(&params));
+    assert_eq!(missing["error"]["code"], "resourceNotFound", "{missing}");
+    arkdeck_contract::validate_method_value(
+        "trace.inspect",
+        "errorCode",
+        &missing["error"]["code"],
+    )
+    .unwrap();
     assert_eq!(
-        std::fs::read_dir(&root.0).unwrap().count(),
-        0,
-        "the refused start created nothing in its root"
+        missing["error"]["details"],
+        json!({"phase":"traceInspectionOwner","newDispatchCount":0,"deviceEvidenceCreated":false})
     );
+    let mut denied = params;
+    denied["allowSensitive"] = json!(false);
+    assert_eq!(
+        connection.answer("denied", "trace.inspect", Some(&denied))["error"]["code"],
+        "invalidInput"
+    );
+    drop(connection);
+    daemon.stop(&root.0);
 }

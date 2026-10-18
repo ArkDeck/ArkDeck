@@ -18,6 +18,7 @@ use windows_sys::Win32::System::Pipes::*;
 use windows_sys::Win32::System::Threading::*;
 
 mod account;
+mod arktrace;
 mod bootstrap_tree;
 mod code_signature;
 mod console_origin;
@@ -45,6 +46,7 @@ mod system_tool;
 mod tool;
 mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
+pub use arktrace::{WindowsCodeNamespace, validate_windows_private_file, verify_windows_publisher};
 pub use bootstrap_tree::{
     BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
     BootstrapBundlePublishError, BootstrapEntry, BootstrapToolCapture, BootstrapToolCaptureError,

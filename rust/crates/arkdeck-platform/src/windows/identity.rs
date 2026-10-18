@@ -684,6 +684,18 @@ pub(crate) fn authenticode_chain(
     file: &File,
     path: &std::path::Path,
 ) -> io::Result<Result<Vec<Vec<u8>>, i32>> {
+    Ok(authenticode_evidence(file, path)?.map(|(chain, _)| chain))
+}
+
+type AuthenticodeEvidence = (Vec<Vec<u8>>, bool);
+
+/// The accepted embedded signer chain and whether the trust provider verified
+/// a countersigner. Timestamp presence is evidence from the same trust state,
+/// never a claim taken from the distribution manifest.
+pub(crate) fn authenticode_evidence(
+    file: &File,
+    path: &std::path::Path,
+) -> io::Result<Result<AuthenticodeEvidence, i32>> {
     let path = wide(path.as_os_str())?;
     let mut file_info = WINTRUST_FILE_INFO {
         cbStruct: size_of::<WINTRUST_FILE_INFO>() as u32,
@@ -704,7 +716,7 @@ pub(crate) fn authenticode_chain(
         ..Default::default()
     };
     // SAFETY: `file_info` and `path`, which `data` points to, outlive the call.
-    Ok(unsafe { verified_signer_chain(&mut data) })
+    Ok(unsafe { verified_signer_evidence(&mut data) })
 }
 
 /// `WinVerifyTrust`'s answer for an image signed through a system catalog
@@ -831,16 +843,24 @@ pub(crate) fn catalog_chain(
 /// # Safety
 /// Every pointer `data` holds must stay valid for the call.
 unsafe fn verified_signer_chain(data: &mut WINTRUST_DATA) -> Result<Vec<Vec<u8>>, i32> {
+    // SAFETY: the caller guarantees the trust input pointers stay valid.
+    unsafe { verified_signer_evidence(data) }.map(|(chain, _)| chain)
+}
+
+/// # Safety
+/// Every pointer `data` holds must stay valid for the call.
+unsafe fn verified_signer_evidence(data: &mut WINTRUST_DATA) -> Result<AuthenticodeEvidence, i32> {
     let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
     // SAFETY: guaranteed by the caller; the certificates are copied out
     // before the state is closed.
-    let (status, chain) = unsafe {
+    let (status, chain, timestamped) = unsafe {
         let status = WinVerifyTrust(
             INVALID_HANDLE_VALUE,
             &mut action,
             std::ptr::from_mut(data).cast(),
         );
         let mut chain = Vec::new();
+        let mut timestamped = false;
         if status == 0 {
             let provider = WTHelperProvDataFromStateData(data.hWVTStateData);
             let signer = if provider.is_null() {
@@ -853,6 +873,11 @@ unsafe fn verified_signer_chain(data: &mut WINTRUST_DATA) -> Result<Vec<Vec<u8>>
             } else {
                 (*signer).csCertChain
             };
+            if !signer.is_null() && (*signer).csCounterSigners > 0 {
+                let counter = WTHelperGetProvSignerFromChain(provider, 0, 1, 0);
+                timestamped =
+                    !counter.is_null() && (*counter).dwError == 0 && (*counter).csCertChain > 0;
+            }
             for index in 0..count {
                 let certificate = WTHelperGetProvCertFromChain(signer, index);
                 if certificate.is_null() || (*certificate).pCert.is_null() {
@@ -875,13 +900,13 @@ unsafe fn verified_signer_chain(data: &mut WINTRUST_DATA) -> Result<Vec<Vec<u8>>
             &mut action,
             std::ptr::from_mut(data).cast(),
         );
-        (status, chain)
+        (status, chain, timestamped)
     };
     if status != 0 || chain.is_empty() {
         // An accepted image with no readable chain is not accepted.
         return Err(if status != 0 { status } else { -1 });
     }
-    Ok(chain)
+    Ok((chain, timestamped))
 }
 
 #[cfg(test)]

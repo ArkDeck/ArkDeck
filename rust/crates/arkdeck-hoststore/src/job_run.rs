@@ -1039,8 +1039,8 @@ impl JobRunner<'_> {
     /// On Windows: the same dispatch of a crash-ledger or HiLog summary
     /// analyzer. The source is held by the Windows `VerifiedSource`, which
     /// hands the child its canonical path, and the pinned executable is
-    /// spawned by `VerifiedTool`. No ArkTrace profile loads on Windows
-    /// (TASK-XPA-021), so one is refused before anything is spawned.
+    /// spawned by `VerifiedTool`. ArkTrace also holds its complete reviewed
+    /// private snapshot and uses this Runtime's isolated invocation storage.
     #[cfg(windows)]
     fn dispatch(
         &self,
@@ -1051,7 +1051,7 @@ impl JobRunner<'_> {
     ) -> Result<Exited, Dispatch> {
         let profile = invocation.profile;
         if profile.arktrace_summary.is_some() || profile.arktrace_analysis.is_some() {
-            return Err(Dispatch::Failed("analyzer process identity refused".into()));
+            return dispatch_windows_arktrace(invocation, path, source, cancelled);
         }
         let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
             .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
@@ -1088,6 +1088,49 @@ impl JobRunner<'_> {
                 AnalyzerTermination::Cancelled { drained } => Err(Dispatch::Cancelled { drained }),
             },
         }
+    }
+}
+
+#[cfg(windows)]
+fn dispatch_windows_arktrace(
+    invocation: &Invocation<'_>,
+    path: &Path,
+    source: &Source<'_>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Exited, Dispatch> {
+    const REFUSED: &str = "analyzer process identity refused";
+    const UNKNOWN: &str = "analyzer process outcome unknown";
+    let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
+        .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
+    let Some((_, leading)) = invocation.arguments.split_last() else {
+        return Err(Dispatch::Failed(REFUSED.into()));
+    };
+    let mut arguments: Vec<_> = leading.iter().map(OsString::from).collect();
+    arguments.push(verified.inode_path().into());
+    let execution = crate::arktrace_windows::run_profile(
+        invocation.profile,
+        &arguments,
+        Duration::from_secs(invocation.timeout_seconds.max(1) as u64),
+        CAPTURE_BYTES,
+        cancelled,
+    );
+    match execution {
+        Err(arkdeck_platform::ToolRunError::Refused(_)) => Err(Dispatch::Failed(REFUSED.into())),
+        Err(arkdeck_platform::ToolRunError::Unobservable(_)) => {
+            Err(Dispatch::OutcomeUnknown(UNKNOWN.into()))
+        }
+        Ok(result) => match result.termination {
+            arkdeck_platform::ToolTermination::Exited(status) => Ok(Exited {
+                status,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                truncated: result.truncated,
+            }),
+            arkdeck_platform::ToolTermination::Cancelled { drained } => {
+                Err(Dispatch::Cancelled { drained })
+            }
+            _ => Err(Dispatch::OutcomeUnknown(UNKNOWN.into())),
+        },
     }
 }
 

@@ -147,6 +147,18 @@ mod analyzer_composition;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod arktrace_pins;
+#[cfg(windows)]
+mod arktrace_windows;
+#[cfg(windows)]
+mod arktrace_windows_manifest;
+#[cfg(windows)]
+pub use arktrace_windows::WindowsArkTraceProfileLoader;
+#[cfg(windows)]
+mod arktrace_inspection;
+#[cfg(windows)]
+pub use arktrace_inspection::{inspect_trace_artifact, trace_inspection_unavailable};
+#[cfg(any(target_os = "macos", windows))]
+mod arktrace_doctor_envelope;
 // The analyzer operations' fixed facts, read on every host.
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

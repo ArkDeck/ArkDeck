@@ -86,13 +86,12 @@ const DOCUMENT_LIMIT: u64 = 64 * 1024;
 /// Inputs from which the isolated macOS owner composes an owner that this
 /// composition does not compose yet: each one set refuses the start. The
 /// development HDC is decided by the tuple gate instead (`windows_hdc_gate`).
-const NOT_COMPOSED: [&str; 6] = [
+const NOT_COMPOSED: [&str; 5] = [
     "ARKDECK_DEVELOPMENT_USB_RELATIONS",
     "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC",
     "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER",
     "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY",
     "ARKDECK_APP_INGRESS",
-    "ARKDECK_ARKTRACE_DESCRIPTOR",
 ];
 
 /// Swift `AgentDaemonInstance`: who holds the instance lock. The same
@@ -469,6 +468,8 @@ impl Authority {
             std::env::var_os("ARKDECK_ANALYZER_PATH")
                 .as_deref()
                 .map(Path::new),
+            std::env::var_os("ARKDECK_ARKTRACE_DESCRIPTOR").as_deref(),
+            self.root.path(),
         )
         .map_err(|error| {
             format!("ARKDECK_ANALYZER_PATH is unusable: {error}; nothing was started")

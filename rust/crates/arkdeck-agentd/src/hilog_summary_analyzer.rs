@@ -23,7 +23,6 @@ use arkdeck_hoststore::{AnalyzerProfile, AnalyzerProfiles};
 use arkdeck_hoststore::{
     ArkTraceProfileLoader, ProductionDistributionTrust, ProductionDoctorProbe,
 };
-#[cfg(target_os = "macos")]
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fs::File;
@@ -87,11 +86,13 @@ pub(crate) fn own_stdout() -> io::Result<File> {
 
 /// On Windows: the host's analyzers from `ARKDECK_ANALYZER_PATH`, as the
 /// macOS composition below composes them, and the two ArkTrace analyzers
-/// unavailable as `analyzer.arktraceNotFound`: no ArkTrace distribution is
-/// reviewed for Windows (TASK-XPA-021), and `ARKDECK_ARKTRACE_DESCRIPTOR`
-/// refuses the start.
+/// from the reviewed Windows distribution when a descriptor is selected.
 #[cfg(windows)]
-pub(crate) fn composed(path: Option<&Path>) -> io::Result<AnalyzerProfiles> {
+pub(crate) fn composed(
+    path: Option<&Path>,
+    arktrace_descriptor: Option<&OsStr>,
+    state: &Path,
+) -> io::Result<AnalyzerProfiles> {
     let profiles = match path {
         None => AnalyzerProfiles::default(),
         Some(path) => {
@@ -103,7 +104,15 @@ pub(crate) fn composed(path: Option<&Path>) -> io::Result<AnalyzerProfiles> {
             AnalyzerProfiles::for_daemon_analyzer(analyzer, own.as_deref())
         }
     };
-    Ok(profiles.without_arktrace())
+    Ok(match arktrace_descriptor {
+        None => profiles.without_arktrace(),
+        Some(descriptor) => match (arkdeck_hoststore::WindowsArkTraceProfileLoader { state })
+            .load_profiles(Path::new(descriptor))
+        {
+            Ok(loaded) => profiles.with_arktrace(loaded),
+            Err(error) => profiles.with_arktrace_unavailable(error.reason()),
+        },
+    })
 }
 
 /// Swift's daemon composition of its analyzers from `ARKDECK_ANALYZER_PATH`:
