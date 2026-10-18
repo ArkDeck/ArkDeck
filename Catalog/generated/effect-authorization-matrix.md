@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a`
+Catalog digest: `88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ Catalog digest: `9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319
 | `flash.dayu200` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.full-restore@1` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.recommission@1` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
-| `flash.restore-boot-loop@1` | arkforge | destructive | destructive: runtimeCapability | disabled | confirmedDevice | device-exclusive | 600 | 1048576 |
+| `flash.restore-boot-loop@1` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 600 | 1048576 |
 | `flash.verify@1` | arkforge | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-exclusive | 600 | 1048576 |
 | `input.keyboard@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 60 | 1048576 |
 | `input.long-press@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 60 | 1048576 |

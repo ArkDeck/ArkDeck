@@ -22,5 +22,18 @@
   administration, no replay, no historical receipt changes, no hardware claims.
 
 - Remaining authorization boundaries: destructive default policy issuance stays
-  disabled; plan-only failures do not create stopped records. No production
+  disabled in revision 1; revision 2's candidate awaits its separate approval.
+  Plan-only failures do not create stopped records. No production
   support or hardware acceptance is inferred from fake checks.
+
+## TASK-AFM-003 — Prepare the default ramdisk-restoration policy
+
+- Status: in-progress; candidate implementation and focused host verification prepared;
+  maintainer review pending.
+- Hardware required: no for candidate preparation and host tests.
+- Scope: propose enabling only `flash.restore-boot-loop@1`'s existing exact-plan
+  Runtime-owned capability policy; retain its source, Artifact, identity, budget,
+  exclusion, durable-intent and no-replay checks. Preserve all old input schemas
+  and immutable Catalog views when adding the candidate digest.
+- Completion of this Repo change does not establish positive hardware acceptance
+  or authorize a new nine-partition source Flash that overwrites userdata.

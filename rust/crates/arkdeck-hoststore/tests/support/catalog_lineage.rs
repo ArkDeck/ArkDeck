@@ -16,6 +16,8 @@ pub const CURRENT: &str = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e8
 pub const RECOMMISSION: &str = "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
 pub const CONTROLLED_RETRY: &str =
     "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a";
+pub const RESTORATION_POLICY: &str =
+    "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195";
 pub const MAINTENANCE: &str = "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const PACKET_SHA: &str = "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab";
@@ -201,7 +203,15 @@ impl HapPlans {
         let catalog = actual["result"]["catalogDigest"]
             .as_str()
             .ok_or("HAP Catalog missing")?;
-        if ![CURRENT, MAINTENANCE, RECOMMISSION, CONTROLLED_RETRY].contains(&catalog) {
+        if ![
+            CURRENT,
+            MAINTENANCE,
+            RECOMMISSION,
+            CONTROLLED_RETRY,
+            RESTORATION_POLICY,
+        ]
+        .contains(&catalog)
+        {
             return Err("unknown HAP Catalog".into());
         }
         // The frozen capsule proves every old field before the exact additive
@@ -421,13 +431,15 @@ impl Lineage {
     ) -> Result<(), String> {
         if matches!(
             catalog_digest,
-            MAINTENANCE | RECOMMISSION | CONTROLLED_RETRY
+            MAINTENANCE | RECOMMISSION | CONTROLLED_RETRY | RESTORATION_POLICY
         ) {
             let mut observed = Self::read_sources(directory)?;
             let complete: Vec<_> = observed.values().cloned().collect();
             if sha256_hex(&catalog_bytes(&complete)?) != catalog_digest
-                || (matches!(catalog_digest, RECOMMISSION | CONTROLLED_RETRY)
-                    && observed.remove("flash.recommission@1").is_none())
+                || (matches!(
+                    catalog_digest,
+                    RECOMMISSION | CONTROLLED_RETRY | RESTORATION_POLICY
+                ) && observed.remove("flash.recommission@1").is_none())
                 || observed.remove("flash.verify@1").is_none()
                 || observed.remove("flash.restore-boot-loop@1").is_none()
                 || observed != self.operations
@@ -495,9 +507,15 @@ impl Lineage {
             .as_str()
             .ok_or("plan operation")?;
         self.operation(name)?;
-        if ![CURRENT, MAINTENANCE, RECOMMISSION, CONTROLLED_RETRY]
-            .iter()
-            .any(|digest| current_plan["catalogDigest"] == *digest)
+        if ![
+            CURRENT,
+            MAINTENANCE,
+            RECOMMISSION,
+            CONTROLLED_RETRY,
+            RESTORATION_POLICY,
+        ]
+        .iter()
+        .any(|digest| current_plan["catalogDigest"] == *digest)
         {
             return Err("unknown plan Catalog".into());
         }
@@ -528,9 +546,15 @@ impl Lineage {
             || expected["ok"] != true
             || actual["result"]["schemaVersion"] != "arkdeck.job-plan/1"
             || expected["result"]["catalogDigest"] != OLD
-            || ![CURRENT, MAINTENANCE, RECOMMISSION, CONTROLLED_RETRY]
-                .iter()
-                .any(|digest| actual["result"]["catalogDigest"] == *digest)
+            || ![
+                CURRENT,
+                MAINTENANCE,
+                RECOMMISSION,
+                CONTROLLED_RETRY,
+                RESTORATION_POLICY,
+            ]
+            .iter()
+            .any(|digest| actual["result"]["catalogDigest"] == *digest)
             || actual["result"]["operation"] != current_plan["operationReference"]
             || expected["result"]["operation"] != current_plan["operationReference"]
         {

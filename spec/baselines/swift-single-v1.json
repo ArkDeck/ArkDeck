@@ -1,5 +1,5 @@
 {
-  "catalogDigest": "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a",
+  "catalogDigest": "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195",
   "contractIdentity": "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2",
   "corpusFileCount": 110,
   "corpusMethodCounts": {
@@ -560,7 +560,7 @@
     "successes": 608
   },
   "directoryDigests": {
-    "Catalog/operations": "5a321482d644a921aca4c306ad665d6463e50a8b9f54cd6da94095807eaa4373",
+    "Catalog/operations": "3cd70b9c0338bcae88fc2b0318505102613a09ae7a7e78cd23a3a705bc6d9c73",
     "Catalog/profiles": "b15c4106c7c80fb02c7c2b93787455c130ccf1e9edcb677b8ce2c02b87940d0a",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "09b90f7b27e0644f8f6a937eb72d20f439dfa718ead3e92f06c7f55499e450c2",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
@@ -568,8 +568,8 @@
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
-      "blob": "d0502add497ececd7217871dde4921eeaf3e407a",
-      "sha256": "e2e3a3cfa254185600b15dbb7bbfa83ef149bdfe08ff20e73e7cb9562a635ca2"
+      "blob": "91090bcb143d6932cacd6f37b2702ae02c68e8eb",
+      "sha256": "ce943eb347178d6507221f74ace8b0998369d1dce97966637915cb4afeaeb773"
     },
     "Catalog/operations/analyzer.analyze-trace.v1.json": {
       "blob": "0a12b2f04854bc18c4b98381d4cc0bc1a6115c3e",
@@ -624,8 +624,8 @@
       "sha256": "acbdc25b447c1fee65b7f510c4203e817f67830b06b2ca4d405000fdd1cb2eb2"
     },
     "Catalog/operations/flash.restore-boot-loop.v1.json": {
-      "blob": "9aa74a9201ff1257d38a8fbe7dfc5b7fa8077541",
-      "sha256": "718570cbf9655d7add35bcd68066f80ff864d2b1717171cff14879e5bc0c8541"
+      "blob": "c946743e6d36807135f84b54bdce87229fad6324",
+      "sha256": "40acc3b3d8ed743931d04dd427f23f7e841cb6f147cb7c915004bd7d623ad45e"
     },
     "Catalog/operations/flash.verify.v1.json": {
       "blob": "34cb9f4df0149cd1fadc38f1b0751009daacede2",
@@ -1812,7 +1812,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "304a491bbd0ded8fe00f4511d8b6537b53523e1deb110e215d06031725f8a198",
+  "inputDigest": "35e32d056af3cdeb49ceba2586103f2d45da8e84dc2ec1f688cea9599664139c",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a"
+  public static let catalogDigest = "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -614,7 +614,7 @@ extension RuntimeOperationCatalog {
       minimumEffect: .destructive,
       permittedEffects: [.destructive],
       authorization: [.destructive: .runtimeCapability],
-      defaultPolicyIssuanceEnabled: false,
+      defaultPolicyIssuanceEnabled: true,
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [

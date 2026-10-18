@@ -1,8 +1,12 @@
 # Verification — CHG-2026-084
 
-> Change:CHG-2026-084-arkforge-maintenance-contract@r1
+> Change:CHG-2026-084-arkforge-maintenance-contract@r2
+
+Revision 2 is proposed and awaits maintainer review.
 
 All checks below are host/fake tests, not hardware acceptance.
+The sections preceding the revision-2 candidate retain the original revision-1
+results; only the final section links the new candidate's focused checks.
 
 ## Local targeted checks
 
@@ -80,3 +84,12 @@ The [2026-10-19 run](independent-acceptance-20261019.md) records the production
 discovery defect, its focused fix and independent published-Runtime refusal
 checks. Positive hardware acceptance and the separate destructive policy decision
 remain incomplete; the recommission result is not substituted for either entry.
+
+## Revision-2 default restoration policy candidate
+
+The [2026-10-19 candidate checks](restoration-policy-candidate-20261019.md)
+cover the proposed exact original-ramdisk default policy, its immutable Catalog
+lineage, real-owner synthetic-port integration and standard failure-code repair.
+Revision 1's published policy remains disabled until separate maintainer review
+and protected-main publication. This proposed revision is not approved or verified,
+and its host checks do not complete either independent hardware acceptance.

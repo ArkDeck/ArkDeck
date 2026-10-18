@@ -329,6 +329,33 @@ struct RuntimeOperationCatalogTests {
     #expect(alias.completeOverwriteRecovery == canonical.completeOverwriteRecovery)
   }
 
+  @Test func maintenancePolicyKeepsRestorationDestructiveAndVerificationReadOnly() throws {
+    let restoration = try #require(
+      RuntimeOperationCatalog.descriptor(reference: "flash.restore-boot-loop@1"))
+    #expect(restoration.defaultPolicyIssuanceEnabled)
+    #expect(restoration.minimumEffect == .destructive)
+    #expect(restoration.permittedEffects == [.destructive])
+    #expect(restoration.authorization == [.destructive: .runtimeCapability])
+    #expect(restoration.binding == .confirmedDevice)
+    #expect(restoration.concurrencyKey == .deviceExclusive)
+    #expect(Set(restoration.inputs.map(\.name)) == ["sourceJobId", "budgetMs", "artifactLease"])
+    #expect(restoration.inputs.allSatisfy { $0.isRequired })
+    let budget = try #require(restoration.inputs.first { $0.name == "budgetMs" })
+    #expect(budget.minimum == 1_000)
+    #expect(budget.maximum == 600_000)
+    #expect(restoration.steps.map(\.stepID) == ["restore-ramdisk", "verify-restored-ramdisk"])
+    #expect(restoration.steps.map(\.effect) == [.destructive, .readOnly])
+    #expect(restoration.completeOverwriteRecovery == nil)
+
+    let verification = try #require(
+      RuntimeOperationCatalog.descriptor(reference: "flash.verify@1"))
+    #expect(verification.minimumEffect == .readOnly)
+    #expect(verification.permittedEffects == [.readOnly])
+    #expect(verification.authorization == [.readOnly: .defaultReadOnly])
+    #expect(verification.steps.allSatisfy { $0.effect == .readOnly })
+    #expect(Set(verification.inputs.map(\.name)) == ["sourceJobId", "budgetMs"])
+  }
+
   /// Restated, not relaxed (CHG-2026-055, TASK-HFA-009 r2).
   ///
   /// What this test was written to forbid is a mutation that reaches a device

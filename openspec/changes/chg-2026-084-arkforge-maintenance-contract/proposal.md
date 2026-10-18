@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-084-arkforge-maintenance-contract
-revision: 1
+revision: 2
 status: proposed
 class: capability
 core_change_level: none
@@ -47,14 +47,29 @@ Job. Results include each range/hash/strength/reason and the source plan identit
 Discovery examples declare the typed `sourceJobId` and `budgetMs` input fields
 in the closed `operation.describe` result contract.
 
-The destructive operation retains `defaultPolicyIssuance: disabled`. Enabling
-its default capability issuance remains a separate explicit approval decision.
+Revision 1 published the destructive operation with `defaultPolicyIssuance:
+disabled`. Revision 2 proposes the separate explicit decision to enable its
+existing Runtime-owned issuance policy. This candidate is not approved: maintainer
+review and protected-main publication are required before it can issue authority.
+The only operation-policy change is this descriptor's `disabled` to `enabled` flag.
+The operation remains destructive, device-exclusive and limited to the pinned
+original ramdisk's complete 4 MiB range. It does not write userdata.
+
+Runtime must still load the eligible latest primary Flash source, validate the
+immutable original-image lease, materialize the exact ramdisk plan, obtain fresh
+target/binding/tool facts and reserve one exact capability use before dispatch.
+Caller-supplied capabilities, unknown source outcomes, stale plans, drift and
+replay remain refused. Ramdisk restoration is not complete-overwrite recovery.
 No frontend creates or edits capabilities. A refused admission has a durable
 stopped record; a refused `job.plan` stays read-only and creates no record. Thus
 exit 1 before submission does not imply a durable stopped record exists. Changing
 that plan-only rule requires a separate decision; the clients retain plan review.
 
-No tag, release, device write or new hardware acceptance is part of this change.
+Candidate preparation performs no device operation and makes no hardware claim.
+Positive acceptance follows publication through the existing typed Runtime entry
+points. Establishing a new ordinary nine-partition Flash source, including userdata,
+is a separate device-write scope decision; approval of this policy alone does not
+authorize that setup. No tag or release is part of this change.
 
 ## Client usage
 

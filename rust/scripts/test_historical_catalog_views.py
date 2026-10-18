@@ -103,7 +103,9 @@ class HistoricalCatalogInputs(unittest.TestCase):
         path = next(path for path, row in paths.items() if row['id'] == 'flash.restore-boot-loop')
         changed = copy.deepcopy(self.inputs)
         row = copy.deepcopy(paths[path])
-        row['defaultPolicyIssuance'] = 'enabled'
+        # Both policy flags now name closed Catalogs. Perturb the timeout to
+        # keep this case about an unknown descriptor under the declared view.
+        row['timeoutSeconds'] -= 1
         changed.files[path] = json.dumps(row).encode()
         with self.assertRaisesRegex(ValueError, 'Catalog descriptor drift'):
             runner.historical_catalog_inputs(changed)
@@ -229,6 +231,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertEqual(result.count(views.OLD.encode()), 1)
         self.assertNotIn(views.RECOMMISSION.encode(), result)
         self.assertNotIn(views.CONTROLLED_RETRY.encode(), result)
+        self.assertNotIn(views.RESTORATION_POLICY.encode(), result)
         self.assertEqual(runner.historical_review_projection(result), result)
 
     def test_unknown_missing_duplicate_or_mixed_projection_catalog_refuses(self):
