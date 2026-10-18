@@ -88,6 +88,8 @@ Logs are retained under
 | Real current CLI → signer-verified named pipe → fixture inspection and export; scoped stop of its own daemon | 0; both results pass, source/Job/index unchanged, owned daemon stopped | `arkdeck-final-signed-cli-pass.log` |
 | `python Packages/ArkDeckKit/Scripts/generate-control-contract.py --check`; `python rust/scripts/generate-contract.py --check` | 0; 110 methods, 1085 frames | Terminal check; generated baseline committed with the two native refusal frames |
 | `python -m unittest discover -s rust/scripts -p test_catalog_test_views.py -v` | 0; 35/35 pass | `arkdeck-final-catalog-views-tests.log` |
+| Snapshot copy/concurrent-edit regressions plus the actual Windows `include_bytes!` dependency closure | 0; 2 + 1 pass | `arkdeck-ci-fix-contract-input-regressions.log`, `arkdeck-ci-fix-embedded-input-closure.log` |
+| `python rust/scripts/test_contract_checks.py`, native broad attempt before the final closure-only test was added | 1; 75 pass, 1 POSIX-mode failure, 1 skip | `arkdeck-ci-fix-contract-isolation-tests.log` |
 | Closed routing manifest against native `run-cargo.py metadata --format-version 1 --no-deps` | 0; 960 sources, 6502 fixtures, 335 targets | `arkdeck-final-inventory-validation-pass.log` |
 | `sh scripts/check-sdd.sh` (`PYTHONUTF8=1`, native Git Bash) | 0; 0 errors/warnings, 121 acceptance IDs | `arkdeck-final-sdd.log` |
 | `python rust/scripts/run-cargo.py fmt --all --check` | 1; native Windows command length, OS error 206, before formatting | `arkdeck-final-fmt-all-check.log` |
@@ -100,6 +102,11 @@ The native clippy command selected `arkdeck-agentd`, `arkdeck-bootstrap`,
 and `arkdeck-soak`, using one `-p` argument per crate. The session reused its
 fixed external Cargo mirror/target and `CARGO_BUILD_JOBS=2`. No complete local
 unified gate, macOS Swift/App build, or performance acceptance ran.
+
+The broad isolation-test attempt's existing `RunDirectoryTests` expects POSIX
+mode `0700`; native Windows reports `0777`. That assertion is unchanged. The
+three new snapshot regressions pass directly; the complete script also runs in
+the host-independent Linux CI lane.
 
 The smoke covers extensionless htrace Artifact IDs for inspect/summary/analysis,
 an extensionless systrace summary, a still-refused explicit unsupported suffix,
@@ -138,3 +145,20 @@ for `trace.inspect` stale. `python windows/scripts/generate-clientkit.py --write
 regenerated its single changed method fingerprint; `--check` then passed (exit
 0). No wire fields or error assertions changed in that correction. The current
 CI outcome is recorded on the PR without amending a green head.
+
+Producer full PR CI `39127507036` and push CI `39127502829` passed at
+`207f21a89b8eab98530f0cd7cba3ec25d10c5794`. ArkTrace #37 merged on 2026-10-18
+as `c6138a9d6725313fe40866b32c6031151831eba7`.
+
+Consumer run `39127518840` then passed ClientKit, Swift and Linux Rust checks,
+but Windows contract parity could not compile its isolated views: their copy
+omitted the four package-side ArkTrace metadata files embedded by the current
+implementation. Each view now receives the same frozen bytes at the original
+repository paths, with their hashes recorded and concurrent edits refused.
+Regression tests verify the actual embedded dependency closure, exact copying,
+and identical bytes across all four views despite a concurrent source edit.
+
+The same run records `a_cold_server_becomes_ready_and_is_bound_to_its_launch`
+refusing an already occupied fixture endpoint on macOS. That HDC test and its
+implementation are unchanged by this increment; the failure remains in the
+retained CI log. The new head must pass the selected checks before merging.

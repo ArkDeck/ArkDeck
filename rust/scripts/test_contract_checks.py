@@ -652,6 +652,51 @@ class ContractChecksTests(unittest.TestCase):
                          b'{"registryId": "OPENHARMONY-HDC-WINDOWS-PROBES"}\n')
         self.assertEqual((view / lock).read_bytes(), b"lock: INTEGRATION-PROFILES-0.8.0\n")
 
+    def test_arktrace_build_inputs_cover_the_actual_windows_embedded_dependencies(self):
+        repository = SCRIPT.resolve().parents[2]
+        source = repository / "rust/crates/arkdeck-hoststore/src/arktrace_windows_manifest.rs"
+        embedded = {
+            (source.parent / path).resolve().relative_to(repository).as_posix()
+            for path in re.findall(r'include_bytes!\(\s*"([^"]+)"', source.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(embedded)
+        self.assertEqual(set(runner.ARKTRACE_BUILD_INPUTS), embedded)
+
+    def test_views_carry_exact_arktrace_build_inputs_from_the_current_implementation(self):
+        expected = {path: f"compiled ArkTrace metadata {index}\n".encode()
+                    for index, path in enumerate(runner.ARKTRACE_BUILD_INPUTS)}
+        for path, data in expected.items():
+            self.write(path, data)
+        current = contract.working_inputs()
+        candidate = contract.candidate(current, self.commit, self.commit)
+        for name, inputs, info in (("published", self.published, self.published_info),
+                                  ("candidate", current, candidate)):
+            view = self.root / f"arktrace-{name}"
+            runner.materialize(view, inputs, info, self.published_info)
+            for path, data in expected.items():
+                self.assertEqual((view / path).read_bytes(), data)
+                self.assertEqual((self.root / path).read_bytes(), data)
+
+    def test_views_freeze_arktrace_inputs_and_report_concurrent_edits(self):
+        self.drift_and_regenerate()
+        expected = {path: f"compiled ArkTrace metadata {index}\n".encode()
+                    for index, path in enumerate(runner.ARKTRACE_BUILD_INPUTS)}
+        for path, data in expected.items():
+            self.write(path, data)
+        calls = []
+
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append(view.name)
+            for path, data in expected.items():
+                self.assertEqual((view / path).read_bytes(), data)
+            if len(calls) == 1:
+                self.write(runner.ARKTRACE_BUILD_INPUTS[0], b"concurrently changed metadata\n")
+
+        with patch.object(runner, "run_view", check_view):
+            with self.assertRaisesRegex(ValueError, "ArkTrace build inputs changed during validation"):
+                runner.check(self.root / "outputs")
+        self.assertEqual(calls, ["published", "candidate", "historical", "observed"])
+
     def test_candidate_new_keywords_stay_isolated_from_the_published_baseline(self):
         before_pin = contract.BASELINE.read_bytes()
         before_generated = contract.GENERATED.read_bytes()

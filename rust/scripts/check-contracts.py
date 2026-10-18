@@ -35,6 +35,19 @@ CODE_SIGN_HELPER = "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkd
 # arkdeck-provider-hdc's registration tests read (CHG-2026-078): checked-in
 # integration inputs beside rust/, not protocol inputs.
 INTEGRATIONS = "openspec/integrations"
+# Embedded by the current Windows ArkTrace implementation, independently of
+# which published/candidate/historical protocol and Catalog inputs it consumes.
+ARKTRACE_BUILD_INPUTS = (
+    "Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-x86_64/manifest.json",
+    "Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json",
+    "Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-license-inventory.json",
+    "Packages/ArkDeckKit/ThirdParty/ArkTraceRust/dependency-licenses.json",
+)
+
+
+def arktrace_build_inputs() -> dict[str, bytes]:
+    return {path: (ROOT / path).read_bytes() for path in ARKTRACE_BUILD_INPUTS
+            if (ROOT / path).is_file()}
 
 
 def review_projection() -> bytes:
@@ -206,7 +219,8 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
                 rust_source: Path | None = None, catalog_source: str | None = None,
                 review_source: bytes | None = None,
                 catalog_companions: dict[str, tuple[bytes, int]] | None = None,
-                catalog_generator_source: bytes | None = None) -> None:
+                catalog_generator_source: bytes | None = None,
+                arktrace_sources: dict[str, bytes] | None = None) -> None:
     """All fixture readers and include_str! consumers see the same input view."""
     copy_rust(rust_source or ROOT / "rust", destination / "rust")
     # Test-view proof uses the same current source generator, including when
@@ -257,6 +271,13 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
     integrations = ROOT / INTEGRATIONS
     if integrations.is_dir():
         shutil.copytree(integrations, destination / INTEGRATIONS, dirs_exist_ok=True)
+    # include_bytes! resolves these beside rust/. Every view uses the same
+    # frozen implementation inputs; no Catalog authority is copied between views.
+    for path, contents in (arktrace_build_inputs() if arktrace_sources is None
+                           else arktrace_sources).items():
+        target = destination / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(contents)
     # A development view embeds its own complete selected input baseline.
     # The reconstructed historical JSON bytes may differ from the merge-base's
     # spelling even when every descriptor value is identical. Candidate views
@@ -546,6 +567,7 @@ def check(output_root: Path) -> Path:
     failures = []
     source_digest = rust_digest(ROOT / "rust")
     review_source = review_projection()
+    arktrace_sources = arktrace_build_inputs()
     # When the working inputs are byte-identical to the published base (the
     # merge-base with origin/main), the published view would be the checkout
     # this lane already linted and tested at top level. Building the same
@@ -589,7 +611,8 @@ def check(output_root: Path) -> Path:
                           if name in ('historical', 'observed') else review_source)
                 materialize(view, inputs, info, published_info, rust_source, catalogs[name], review,
                             catalog_companions=published_companions if name == "published" else None,
-                            catalog_generator_source=catalog_bytes)
+                            catalog_generator_source=catalog_bytes,
+                            arktrace_sources=arktrace_sources)
                 if os.environ.get("ARKDECK_RUST_STABLE_VIEWS") == "1":
                     stable = temporary_root / name
                     ci_workspace.sync_tree(view, stable, preserve=(("rust", "target"),))
@@ -613,6 +636,8 @@ def check(output_root: Path) -> Path:
         failures.append({"view": "source", "error": "App review projection changed during validation"})
     if catalog_path.read_bytes() != catalog_bytes:
         failures.append({"view": "source", "error": "Catalog generator changed during validation"})
+    if arktrace_build_inputs() != arktrace_sources:
+        failures.append({"view": "source", "error": "ArkTrace build inputs changed during validation"})
     contract.verify_checkout()
     write_json(output / "summary.json", {
         "schemaVersion": "arkdeck.rust-dual-contract-check/1", "kind": "host-test",
@@ -620,6 +645,8 @@ def check(output_root: Path) -> Path:
         "sourceRustDigest": source_digest,
         "appReviewProjectionSHA256": contract.sha(review_source),
         "catalogGeneratorSHA256": contract.sha(catalog_bytes),
+        "arkTraceBuildInputSHA256": {path: contract.sha(data)
+                                    for path, data in sorted(arktrace_sources.items())},
         "candidateInputDigest": current_info["inputDigest"],
         "publishedView": "covered-by-candidate" if published_covered else "run",
         "historicalCatalogDigest": historical_info['catalogDigest'],
