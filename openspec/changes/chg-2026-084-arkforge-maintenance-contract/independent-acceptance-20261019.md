@@ -88,6 +88,12 @@ recovery. This setup has not been executed under an old recommission allocation.
 
 ## CI
 
-Pending the discovery fix PR's current-head `guard` and `swift` checks. Required
-protected-main contexts were read back as both `guard` and `swift`. CI success
-will not establish either operation's hardware acceptance or approve a policy change.
+Discovery fix [PR #2673](https://github.com/ArkDeck/ArkDeck/pull/2673) merged as
+`c1835996e0954cd453a233047c4a92e97fe3ef57`. Its final head
+`bfad43b9b7573dc57a73c6fe8897154fd8e946de` passed both required contexts:
+[SDD Guard 39150465613](https://github.com/ArkDeck/ArkDeck/actions/runs/39150465613)
+and [Swift CI 39146136060](https://github.com/ArkDeck/ArkDeck/actions/runs/39146136060).
+All six Linux, macOS and Windows workspace/contract-parity lanes passed, along with
+the host-independent checks and `swift` aggregate. Swift/App/client lanes were
+skipped by the Rust-only diff selection. This is software validation; neither
+positive maintenance hardware acceptance nor policy enablement is established.
