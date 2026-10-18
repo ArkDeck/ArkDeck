@@ -89,6 +89,7 @@ Logs are retained under
 | `python Packages/ArkDeckKit/Scripts/generate-control-contract.py --check`; `python rust/scripts/generate-contract.py --check` | 0; 110 methods, 1085 frames | Terminal check; generated baseline committed with the two native refusal frames |
 | `python -m unittest discover -s rust/scripts -p test_catalog_test_views.py -v` | 0; 35/35 pass | `arkdeck-final-catalog-views-tests.log` |
 | Snapshot copy/concurrent-edit regressions plus the actual Windows `include_bytes!` dependency closure | 0; 2 + 1 pass | `arkdeck-ci-fix-contract-input-regressions.log`, `arkdeck-ci-fix-embedded-input-closure.log` |
+| Exact native SQLite replay diagnostic, `test -p arkdeck-hoststore --lib job_index_tests::recorded_swift_indexes_replay_on_the_linked_sqlite -- --exact --nocapture` | 0; 1 pass in 8.50 s, 156 indexes and 408 rows | `arkdeck-ci-sqlite-replay-native.log` |
 | `python rust/scripts/test_contract_checks.py`, native broad attempt before the final closure-only test was added | 1; 75 pass, 1 POSIX-mode failure, 1 skip | `arkdeck-ci-fix-contract-isolation-tests.log` |
 | Closed routing manifest against native `run-cargo.py metadata --format-version 1 --no-deps` | 0; 960 sources, 6502 fixtures, 335 targets | `arkdeck-final-inventory-validation-pass.log` |
 | `sh scripts/check-sdd.sh` (`PYTHONUTF8=1`, native Git Bash) | 0; 0 errors/warnings, 121 acceptance IDs | `arkdeck-final-sdd.log` |
@@ -161,4 +162,24 @@ and identical bytes across all four views despite a concurrent source edit.
 The same run records `a_cold_server_becomes_ready_and_is_bound_to_its_launch`
 refusing an already occupied fixture endpoint on macOS. That HDC test and its
 implementation are unchanged by this increment; the failure remains in the
-retained CI log. The new head must pass the selected checks before merging.
+retained CI log. The unchanged test and complete macOS workspace passed on the
+final head.
+
+Final consumer [Swift CI 39129290717](https://github.com/ArkDeck/ArkDeck/actions/runs/39129290717)
+passed at `05472650ce818eef3bc504ab355eb4f8f3ff977e`: Swift tests, Windows
+ClientKit, host-independent checks, all three Rust workspaces, all three
+contract-parity lanes and the required `swift` aggregate. The Linux isolation
+suite passed 78/78. The Windows parity log contains successful execution
+receipts for published, candidate, historical and observed views; its index
+replay test completed normally in every view. The earlier in-progress log
+download was a delayed snapshot, not evidence of a hung test. App build was
+skipped by the diff planner.
+
+[SDD Guard 39129290687](https://github.com/ArkDeck/ArkDeck/actions/runs/39129290687)
+and the final PR-description guard
+[39135757326](https://github.com/ArkDeck/ArkDeck/actions/runs/39135757326) passed.
+After rechecking the exact head and protected main's required `guard`/`swift`
+contexts, ArkDeck #2671 merged on 2026-10-18 as
+`7ca8b97b76f2b3120c6457ecd40727a9f6db55f3`. This follow-up records final results
+without changing the validated functional head. Production signing, clean-host
+and device acceptance remain unqualified.
