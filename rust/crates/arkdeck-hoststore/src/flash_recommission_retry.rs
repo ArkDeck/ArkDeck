@@ -406,7 +406,8 @@ pub(crate) fn observe(
     let facts = context
         .reads
         .recommission_facts(&allocation.identity_chain.target_id, deadline)?;
-    if IdentityChain::from_facts(&facts)? != allocation.identity_chain || Instant::now() >= deadline
+    if !IdentityChain::from_facts(&facts)?.same_identity_as(&allocation.identity_chain)
+        || Instant::now() >= deadline
     {
         return Err("recommission.retryIdentityOrBudgetDrifted".into());
     }
@@ -481,6 +482,32 @@ pub(crate) fn write_once(
         .map_err(|_| "recommission.retryRecordPersistenceFailed".into())
 }
 
+fn restoration_identity(
+    intent: &Value,
+    mut expected: Value,
+    admitted: &IdentityChain,
+) -> Result<IdentityChain, String> {
+    admitted.validate()?;
+    // Older durable intents could only use the exact admission attachment.
+    // They remain readable, but cannot authorize a different restoration route.
+    if intent == &expected {
+        return Ok(admitted.clone());
+    }
+    let chain: IdentityChain = serde_json::from_value(intent["identityChain"].clone())
+        .map_err(|_| "recommission.restorationIdentityMissing")?;
+    let observation = intent["identityObservationSHA256"]
+        .as_str()
+        .filter(|value| crate::job_record::digest(value))
+        .ok_or("recommission.restorationIdentityObservationMissing")?;
+    expected["schema"] = json!("arkdeck.recommission-restoration-intent/v2");
+    expected["identityChain"] = json!(chain);
+    expected["identityObservationSHA256"] = json!(observation);
+    if intent != &expected || !chain.same_identity_as(admitted) {
+        return Err("recommission.restorationIdentityDrifted".into());
+    }
+    Ok(chain)
+}
+
 pub(crate) fn require_proof(
     jobs: &crate::JobStore,
     record: &crate::job_record::JobRecord,
@@ -515,17 +542,20 @@ pub(crate) fn require_proof(
             .ok_or("recommission.retryPhaseMissing")?;
         serde_json::from_slice(&bytes).map_err(|_| "recommission.retryPhaseMalformed".into())
     };
+    let restoration_chain = restoration_identity(
+        &phase("recommission-restoration-intent.json")?,
+        json!({
+            "schema": "arkdeck.recommission-restoration-intent/v1", "childId": format!("{}-restore", record.job_id),
+            "allocationSHA256": allocation.sha256(), "programSHA256": program.sha256(),
+            "planSHA256": restoration_plan.plan_sha256, "artifactSHA256": program.restoration_sha256,
+        }),
+        &allocation.identity_chain,
+    )?;
     if phase("recommission-primary-readback.json")?
         != json!({
             "schema": "arkdeck.recommission-primary-readback/v1", "programSHA256": program.sha256(),
             "execution": execution_value(execution), "measurements": proof.primary_reads, "preboot": proof.preboot,
         })
-        || phase("recommission-restoration-intent.json")?
-            != json!({
-                "schema": "arkdeck.recommission-restoration-intent/v1", "childId": format!("{}-restore", record.job_id),
-                "allocationSHA256": allocation.sha256(), "programSHA256": program.sha256(),
-                "planSHA256": restoration_plan.plan_sha256, "artifactSHA256": program.restoration_sha256,
-            })
         || phase("recommission-restoration-completion.json")? != proof.restoration_state
     {
         return Err("recommission.retryPhaseDrifted".into());
@@ -577,7 +607,7 @@ pub(crate) fn require_proof(
         || restored_execution.target_id != chain.target_id
         || restored_execution.binding_revision != chain.binding_revision
         || restored_execution.stable_identity_sha256 != chain.loader_serial_sha256
-        || restored_execution.usb_topology != chain.usb_topology
+        || restored_execution.usb_topology != restoration_chain.usb_topology
         || restored_execution.toolchain_sha256 != execution.toolchain_sha256
         || restored_execution.toolchain_sha256 != lane.toolchain_sha256()
         || restored.completion.as_ref().is_none_or(|receipt| {
@@ -597,4 +627,78 @@ pub(crate) fn require_proof(
         true,
     )?;
     Ok(json!(proof))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn restoration_keeps_legacy_routes_and_requires_full_proof_for_new_attachments() {
+        let admitted = IdentityChain {
+            target_id: "TGT-synthetic".into(),
+            binding_revision: 1,
+            normal_identity_sha256: "1".repeat(64),
+            hardware_serial_sha256: "2".repeat(64),
+            loader_serial_sha256: "3".repeat(64),
+            connector_sha256: "4".repeat(64),
+            usb_topology: "42".into(),
+            provider_sha256: "5".repeat(64),
+            binding_snapshot_sha256: "6".repeat(64),
+        };
+        let old = json!({
+            "schema":"arkdeck.recommission-restoration-intent/v1", "childId":"job-synthetic-restore",
+            "allocationSHA256":"a".repeat(64), "programSHA256":"b".repeat(64),
+            "planSHA256":"c".repeat(64), "artifactSHA256":"d".repeat(64),
+        });
+        assert_eq!(
+            restoration_identity(&old, old.clone(), &admitted).unwrap(),
+            admitted
+        );
+        let mut fresh = admitted.clone();
+        fresh.usb_topology = "84".into();
+        let mut new = old.clone();
+        new["schema"] = json!("arkdeck.recommission-restoration-intent/v2");
+        new["identityChain"] = json!(fresh);
+        new["identityObservationSHA256"] = json!("e".repeat(64));
+        assert_eq!(
+            restoration_identity(&new, old.clone(), &admitted).unwrap(),
+            fresh
+        );
+        for field in [
+            "identityChain",
+            "identityObservationSHA256",
+            "allocationSHA256",
+            "programSHA256",
+            "planSHA256",
+            "artifactSHA256",
+        ] {
+            let mut missing = new.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(
+                restoration_identity(&missing, old.clone(), &admitted).is_err(),
+                "{field}"
+            );
+        }
+        for field in [
+            "hardwareSerialSha256",
+            "normalIdentitySha256",
+            "loaderSerialSha256",
+            "connectorSha256",
+            "providerSha256",
+            "bindingSnapshotSha256",
+        ] {
+            let mut changed = new.clone();
+            changed["identityChain"][field] = json!("0".repeat(64));
+            assert!(
+                restoration_identity(&changed, old.clone(), &admitted).is_err(),
+                "{field}"
+            );
+        }
+        new["schema"] = old["schema"].clone();
+        assert!(restoration_identity(&new, old.clone(), &admitted).is_err());
+        let mut changed = old.clone();
+        changed["childId"] = json!("job-other-restore");
+        assert!(restoration_identity(&changed, old, &admitted).is_err());
+    }
 }

@@ -25,6 +25,12 @@ binding digest enter the materialized plan; varying observation timestamps do no
 The retained binding's USB topology remains historical evidence. Recommissioning
 uses the freshly proved attachment for its plan and execution route; that route
 must match the identity chain, and subsequent connector drift still refuses.
+Windows location-path topology identifies only one attachment and can change
+between the USB 2/3 endpoints of the same physical connector. Cross-allocation
+and post-reboot checks compare every stable identity field, including the
+independently observed connector and original binding digest. Each materialized
+plan still pins its exact current attachment; a readback's before/after chains
+must also match that attachment exactly.
 
 The Provider receives the proved Loader SN while Runtime history remains anchored
 to the original CID and revision. Managed transition controls carry the consumed
@@ -93,6 +99,11 @@ primary measurement, restoration intent/execution/completion and final proof
 records must agree. Passive reconciliation validates these records and both
 Provider plans/receipt sets; it never resumes a missing phase. Failure keeps both
 old unknowns and the new unknown, and cannot allocate a third budget.
+The restoration intent records its fresh complete identity chain and observation
+digest before dispatch, and its exact attachment must match the restoration
+execution. Version-1 intents remain readable only with the original admission
+attachment; version 2 carries this fresh proof. Neither form changes an old
+allocation or substitutes a route string for the physical connector proof.
 
 ## Compatibility and validation
 

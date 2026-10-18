@@ -444,6 +444,16 @@ impl FlashLane for FakeLane {
                 if self.fakes.current().perform == "postflightIdentityDrift" {
                     self.fakes.shared().script.cross_mode = "cpuDrift".into();
                 }
+                if self.fakes.current().perform == "retryAttachmentChanges" {
+                    self.fakes.shared().script.alias_topology = Some(
+                        if step_id == "restore-ramdisk" {
+                            "168"
+                        } else {
+                            "126"
+                        }
+                        .into(),
+                    );
+                }
                 Ok(completed)
             }
         }

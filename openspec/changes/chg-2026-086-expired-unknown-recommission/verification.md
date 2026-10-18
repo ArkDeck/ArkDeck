@@ -180,7 +180,73 @@ Windows, 2026-10-18. Logs use
 
 ### CI
 
-The owner-directory fix will be checked on its own PR head before publication.
+PR [#2668](https://github.com/ArkDeck/ArkDeck/pull/2668), head
+`f912a855ddf9a6a5ec52a4c2041ce6c1569aaad6`, passed Swift CI
+[39090127581](https://github.com/ArkDeck/ArkDeck/actions/runs/39090127581) and
+SDD Guard [39090216182](https://github.com/ArkDeck/ArkDeck/actions/runs/39090216182).
+All selected Linux, macOS and Windows workspace and contract checks passed,
+including complete formatting and the original Windows parity run. Both required
+`guard` and aggregate `swift` reported success. The PR merged normally to protected
+`main` as `d56d153500c6c691499969f7c5cdd8a00ff429c9`. These are software and
+publication results, not hardware evidence.
+
+## Stable connector identity across Windows attachments
+
+The Windows platform contract defines location-path topology as an attachment
+locator, not long-term identity. A USB 2/3 re-enumeration at the same independently
+proved physical connector can change that locator. Whole-chain equality treated
+the change as missing first-allocation identity and also blocked post-reboot
+readback, restoration routing and archived-session continuity.
+
+Cross-attachment comparisons now retain all stable target, binding, CPU, CID,
+factory-SN, connector, Provider and original-binding pins. Exact immutable
+plan/allocation comparisons remain, and a readback requires identical before/after
+attachment chains. Restoration uses the freshly proved route and durably records
+the complete chain and observation digest before dispatch. Its proof checks that
+exact route against the child execution. Legacy version-1 intents retain their
+original-attachment check; version-2 intents require the new complete proof.
+
+The synthetic full-flow regression changes attachments before the retry and after
+both writes, while preserving the physical connector. It requires all nine
+primary reads, complete original-ramdisk restoration, postflight, both unchanged
+unknown histories and the exact first allocation. The negative matrix retains
+every stable identity pin, invalid topology, changed histories and third-budget
+refusal; changing attachment during a readback still refuses.
+
+### Local targeted checks
+
+Windows, 2026-10-18. Logs use
+`D:/src/ArkDeck-wt/tools/recommission-attachment-identity-*-20261018.log`.
+
+- The new full-flow regression reproduces `recommission.firstAllocationMissing`
+  on the previous implementation (`red`, exit 101), before any synthetic dispatch.
+- The first focused repair run passes 11 cases and exposes the remaining
+  restoration-proof comparison (`flow`, exit 101). The correction records the
+  fresh restoration identity before dispatch and preserves legacy intent reads.
+- `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --test flash_run
+  recommission` passes all 12 selected integration tests, including the complete
+  attachment-change flow and seven fail-closed retry variants (`flow-2`, exit 0).
+- `python rust/scripts/run-cargo.py clippy -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak --all-targets -- -D warnings` passes (`clippy`, exit 0).
+- `python rust/scripts/run-cargo.py test -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak --lib` passes 425 tests with four existing ignored tests
+  (`libraries`, exit 0).
+- `python -m unittest test_catalog_test_views test_historical_catalog_views
+  test_catalog_execution` passes all 68 routing tests from `rust/scripts`
+  (`routing`, exit 0). Fresh Cargo metadata validates 954 sources and 335 targets;
+  all 6,499 frozen fixture pins remain unchanged (`inventory-check`, exit 0).
+- `python rust/scripts/run-cargo.py fmt --all --check` hits the existing Windows
+  command-line length limit, OS error 206 (`fmt`, exit 1). All seven changed files
+  pass `rustfmt --edition 2024 --config skip_children=true --check`
+  (`fmt-files`, exit 0); complete formatting remains a CI check.
+- `sh scripts/check-sdd.sh` and `git diff --check` pass (`sdd`, exit 0).
+  No complete local unified gate, Swift tests or App UI checks were run for this
+  Rust-only behavior change.
+
+### CI
+
+The attachment-identity repair will be checked on its own PR head before
+publication. No device result is claimed from the synthetic checks.
 
 ## Revision 1 verification history
 

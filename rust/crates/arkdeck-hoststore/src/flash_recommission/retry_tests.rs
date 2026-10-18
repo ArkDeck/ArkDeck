@@ -49,7 +49,10 @@ fn explicit_second_allocation_preserves_first_history_and_never_allows_a_third()
     let first = first(&jobs, true);
     let before: serde_json::Value =
         serde_json::from_slice(&jobs.root.read(DOCUMENT, LIMIT).unwrap()).unwrap();
-    let retry = next(&jobs, &first);
+    let mut retry = next(&jobs, &first);
+    // A new Windows attachment may use the companion USB 2/3 route at the
+    // same independently proved connector. Historical allocation bytes stay exact.
+    retry.identity_chain.usb_topology = "84".into();
     assert!(
         jobs.reserve_recommission(retry.clone(), "2026-10-01T00:29:59Z")
             .is_err()
@@ -93,7 +96,7 @@ fn explicit_second_allocation_preserves_first_history_and_never_allows_a_third()
 
 #[test]
 fn controlled_retry_rejects_unconsumed_first_allocation_and_every_link_or_identity_drift() {
-    for fault in 0..9 {
+    for fault in 0..16 {
         let root = Root::new();
         let jobs = JobStore::open_owner(&root.0).unwrap();
         let first = first(&jobs, fault != 0);
@@ -112,7 +115,7 @@ fn controlled_retry_rejects_unconsumed_first_allocation_and_every_link_or_identi
             3 => retry.controlled_retry.as_mut().unwrap().failed_job_id = "job-different".into(),
             4 => retry.source_sha256 = "0".repeat(64),
             5 => retry.identity_chain.hardware_serial_sha256 = "0".repeat(64),
-            6 => retry.identity_chain.usb_topology = "84".into(),
+            6 => retry.identity_chain.connector_sha256 = "0".repeat(64),
             7 => {
                 retry
                     .controlled_retry
@@ -120,12 +123,19 @@ fn controlled_retry_rejects_unconsumed_first_allocation_and_every_link_or_identi
                     .unwrap()
                     .failed_source_sha256 = "0".repeat(64)
             }
-            _ => retry
+            8 => retry
                 .controlled_retry
                 .as_mut()
                 .unwrap()
                 .program_sha256
                 .clear(),
+            9 => retry.identity_chain.target_id = "TGT-different".into(),
+            10 => retry.identity_chain.normal_identity_sha256 = "0".repeat(64),
+            11 => retry.identity_chain.loader_serial_sha256 = "0".repeat(64),
+            12 => retry.identity_chain.provider_sha256 = "0".repeat(64),
+            13 => retry.identity_chain.binding_snapshot_sha256 = "0".repeat(64),
+            14 => retry.identity_chain.binding_revision = 2,
+            _ => retry.identity_chain.usb_topology.clear(),
         }
         assert!(
             jobs.reserve_recommission(retry, "2026-10-01T01:00:00Z")

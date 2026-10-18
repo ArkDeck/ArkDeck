@@ -21,8 +21,9 @@ pub(crate) fn clock_millis(now: &str) -> Option<u64> {
         .or_else(|| crate::format_time::plain_utc_seconds(now)?.checked_mul(1000))
 }
 
-/// Stable material only. Observation timestamps and read-receipt hashes are
-/// preserved separately and cannot make a fresh identical plan drift.
+/// The complete identity and current attachment used by a plan. Windows USB
+/// topology is an attachment locator; the separately proved connector is the
+/// stable cross-attachment identity. Exact plan/allocation pins keep both.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct IdentityChain {
@@ -38,6 +39,33 @@ pub(crate) struct IdentityChain {
 }
 
 impl IdentityChain {
+    /// Across reboot or a later allocation, require every stable identity pin.
+    /// The Provider still proves each current attachment and its connector;
+    /// an old Windows location-path hash cannot route a new USB attachment.
+    pub(crate) fn same_identity_as(&self, other: &Self) -> bool {
+        let Self {
+            target_id,
+            binding_revision,
+            normal_identity_sha256,
+            hardware_serial_sha256,
+            loader_serial_sha256,
+            connector_sha256,
+            usb_topology: _,
+            provider_sha256,
+            binding_snapshot_sha256,
+        } = self;
+        self.validate().is_ok()
+            && other.validate().is_ok()
+            && target_id == &other.target_id
+            && binding_revision == &other.binding_revision
+            && normal_identity_sha256 == &other.normal_identity_sha256
+            && hardware_serial_sha256 == &other.hardware_serial_sha256
+            && loader_serial_sha256 == &other.loader_serial_sha256
+            && connector_sha256 == &other.connector_sha256
+            && provider_sha256 == &other.provider_sha256
+            && binding_snapshot_sha256 == &other.binding_snapshot_sha256
+    }
+
     pub(crate) fn validate(&self) -> Result<(), String> {
         if self.target_id.is_empty()
             || self.normal_identity_sha256 == self.loader_serial_sha256
@@ -257,7 +285,10 @@ fn retry_matches(first: &Entry, next: &Allocation, retry: &ControlledRetry) -> b
         && first.allocation.sha256() == retry.first_allocation_sha256
         && first.allocation.source_job_id == next.source_job_id
         && first.allocation.source_sha256 == next.source_sha256
-        && first.allocation.identity_chain == next.identity_chain
+        && first
+            .allocation
+            .identity_chain
+            .same_identity_as(&next.identity_chain)
         && first.allocation.expires_at_epoch_ms <= next.reserved_at_epoch_ms
         && first.last_observed_epoch_ms <= next.reserved_at_epoch_ms
 }
@@ -333,7 +364,7 @@ impl JobStore {
             .find(|entry| {
                 entry.allocation.recovery_job_id == failed
                     && entry.allocation.source_job_id == source
-                    && entry.allocation.identity_chain == *chain
+                    && entry.allocation.identity_chain.same_identity_as(chain)
             })
             .ok_or("recommission.firstAllocationMissing")?;
         if !first.consumed
@@ -417,8 +448,9 @@ impl JobStore {
                     .iter()
                     .find(|entry| entry.allocation.source_job_id == id)?;
                 let chain = &entry.allocation.identity_chain;
-                if verified_identity_chain(&self.path, &chain.target_id, identity).ok()?? != *chain
-                {
+                let verified =
+                    verified_identity_chain(&self.path, &chain.target_id, identity).ok()??;
+                if !verified.same_identity_as(chain) {
                     return None;
                 }
             }
@@ -638,7 +670,7 @@ impl JobStore {
         let time = clock_millis(now).ok_or("recommission.clockUnavailable")?;
         self.require_recommission_history(allocation)?;
         let chain = IdentityChain::from_facts(facts)?;
-        if chain != allocation.identity_chain
+        if !chain.same_identity_as(&allocation.identity_chain)
             || self.recommission_source(
                 &allocation.source_job_id,
                 &chain.normal_identity_sha256,
@@ -668,7 +700,9 @@ impl JobStore {
         }
         if entry.postflight.is_none() {
             entry.postflight = Some(Postflight {
-                identity_chain_sha256: chain.sha256(),
+                // Pin the admitted chain. The independent observation receipt
+                // retains the fresh attachment after its stable identity check.
+                identity_chain_sha256: allocation.identity_chain.sha256(),
                 observation_sha256: observation.clone(),
                 confirmed_at_epoch_ms: time,
             });
