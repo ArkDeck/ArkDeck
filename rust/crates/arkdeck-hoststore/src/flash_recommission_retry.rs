@@ -50,12 +50,6 @@ fn request_sha(request: &OperationRequest) -> String {
     request.fingerprint()
 }
 
-fn program_root(state: &std::path::Path) -> Result<HostDirectory, String> {
-    HostDirectory::open(state)
-        .and_then(|root| root.private_child("recommission-retry-plans"))
-        .map_err(|_| "recommission.retryProgramStoreUnavailable".into())
-}
-
 impl Program {
     pub(crate) fn value(&self) -> Value {
         json!(self)
@@ -297,7 +291,9 @@ pub(crate) fn prepare(
     let primary_artifact = artifact(primary_lease)?;
     let restoration_artifact = artifact(&restoration_lease)?;
     let key = request_sha(request);
-    let root = program_root(planner.state_root)?;
+    // The Runtime parent and Job store are distinct in production. Use the
+    // same owner-held directory that completion and reconciliation read.
+    let root = context.jobs.controlled_retry_program_root()?;
     let _lock = root
         .lock_document(".programs.lock")
         .map_err(|_| "recommission.retryProgramBusy")?;
@@ -384,11 +380,11 @@ pub(crate) fn prepare(
 }
 
 pub(crate) fn load(
-    state: &std::path::Path,
+    jobs: &crate::JobStore,
     request: &OperationRequest,
     allocation: &Allocation,
 ) -> Result<Program, String> {
-    let root = program_root(state)?;
+    let root = jobs.controlled_retry_program_root()?;
     let bytes = root
         .read_owner_only(&format!("{}.json", request_sha(request)), LIMIT)
         .map_err(|_| "recommission.retryProgramUnreadable")?
@@ -487,7 +483,6 @@ pub(crate) fn write_once(
 
 pub(crate) fn require_proof(
     jobs: &crate::JobStore,
-    state: &std::path::Path,
     record: &crate::job_record::JobRecord,
     execution: &Execution,
     lane: &dyn FlashLane,
@@ -501,7 +496,7 @@ pub(crate) fn require_proof(
         &serde_json::to_vec(&record.request).map_err(|_| "recommission.retryRequestMalformed")?,
     )
     .map_err(|_| "recommission.retryRequestMalformed")?;
-    let program = load(state, &request, &allocation)?;
+    let program = load(jobs, &request, &allocation)?;
     let (primary_plan, restoration_plan) = program.plans()?;
     let path = jobs
         .job_directory(&record.job_id)

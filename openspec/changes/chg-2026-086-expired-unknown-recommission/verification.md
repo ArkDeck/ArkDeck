@@ -119,8 +119,8 @@ failed its host-independent `cargo deny --locked check`: the newly used
 first-party `arkforge-artifact@0.1.0` was missing from the exact version allowlist.
 The follow-up adds only that crate, at the unchanged pinned ArkForge source and
 revision, with no third-party dependency, cargo-vet exemption or trust change.
-The remaining required CI results are pending. No revision-2 publication or
-real-device pass is claimed by these software tests.
+These initial software results did not establish revision-2 publication or
+hardware acceptance.
 
 Run `39082802181` passed host-independent checks, including dependency policy,
 Swift/App/Windows ClientKit and the Linux workspace tests. Its Linux contract
@@ -130,6 +130,57 @@ boundary: only `arkdeck-provider-arkforge` directly depends on ArkForge. That
 provider exposes just the pinned pure preboot inspector and constants; Runtime
 calls it through the existing provider dependency. The exact graph assertion
 still rejects all other direct ArkForge edges.
+
+Final head `5f28f556646da475aa24157f4804ab4afb2772e2` passed Swift CI
+[39083887324](https://github.com/ArkDeck/ArkDeck/actions/runs/39083887324) and SDD
+Guard [39083887386](https://github.com/ArkDeck/ArkDeck/actions/runs/39083887386),
+including the original Windows parity run. Both required `guard` and aggregate
+`swift` reported success; no failed assertion was waived or relaxed. PR
+[#2667](https://github.com/ArkDeck/ArkDeck/pull/2667) merged as
+`ea7ee0f7708853b28531de2651e118c6a526837c` on protected `main`. These are software
+and publication results, not hardware evidence.
+
+## Retry program ownership in separated Runtime layouts
+
+Windows keeps the Runtime parent and its private Job store in separate
+directories. Retry planning incorrectly opened the parent as a private store,
+while completion and reconciliation read the program from the Job store. The
+parent's valid account ACL can include SYSTEM, so the stricter private-directory
+check refused it. Even with an owner-only parent, the two phases selected
+different program locations.
+
+The Job owner now supplies the same pinned private directory for preparation and
+proof reads. No account ACL is changed, private-directory validation remains
+strict, and a missing or invalid program still cannot authorize dispatch.
+
+### Local targeted checks
+
+Windows, 2026-10-18. Logs use
+`D:/src/ArkDeck-wt/tools/recommission-program-owner-*-20261018.log`.
+
+- The new separate-directory regression fails before the fix (`red`, exit 101):
+  planning misses the Job owner's cached program and incorrectly re-enters
+  artifact preparation. With the fix, `test -p arkdeck-hoststore --test flash_run
+  recommission -- --nocapture` exits 0 (`green`), all 11 cases pass. The new case
+  proves planning admits no Job, writes no cache under the unrelated Runtime
+  parent, and preserves both unknown histories and the first allocation.
+- `clippy -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-soak --all-targets
+  -- -D warnings` exits 0 (`clippy`). The same three crates' `test --lib` exits
+  0 (`libraries`): 424 passed and four existing ignored cases.
+- Catalog routing, historical-view and execution-receipt unit tests exit 0
+  (`routing`): 68 cases. The fresh metadata inventory check exits 0 (`inventory`)
+  with 954 sources, 335 targets and all 6,499 frozen fixture files unchanged.
+  The Catalog digest is unchanged; the new regression uses only its retry view.
+- Required `fmt --all --check` exits 1 at the existing Windows OS error 206
+  (`fmt`). Per-file rustfmt checks over all three changed Rust files exit 0
+  (`fmt-files`); CI retains the full workspace formatting check.
+- `ARKDECK_PYTHON=python sh scripts/check-sdd.sh` exits 0 (`sdd`), as does
+  `git diff --check`. No contract inputs, Swift or App code changed; native
+  platform and complete workspace checks remain selected PR CI work.
+
+### CI
+
+The owner-directory fix will be checked on its own PR head before publication.
 
 ## Revision 1 verification history
 
