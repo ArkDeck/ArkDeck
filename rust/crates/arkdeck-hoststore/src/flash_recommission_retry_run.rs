@@ -3,7 +3,7 @@
 use super::*;
 use crate::flash_recommission_retry as retry;
 use crate::job_owner::arkforge_job_state::execution_value;
-use crate::job_owner::flash_recommission::{Allocation, clock_millis};
+use crate::job_owner::flash_recommission::{Allocation, IdentityChain, clock_millis};
 use arkdeck_provider_arkforge::{FullReadback, validate_recommission_readback};
 use std::time::Duration;
 
@@ -80,7 +80,14 @@ impl FlashRunner<'_> {
             .recommission_read(&before.execution_connect_key, effect, nonce, deadline)
             .map_err(Stop::Unknown)?;
         self.retry_budget(run, allocation, deadline)?;
-        retry::observe(context, allocation, deadline).map_err(Stop::Unknown)?;
+        let after = retry::observe(context, allocation, deadline).map_err(Stop::Unknown)?;
+        if IdentityChain::from_facts(&before).map_err(Stop::Unknown)?
+            != IdentityChain::from_facts(&after).map_err(Stop::Unknown)?
+        {
+            return Err(Stop::Unknown(
+                "recommission.retryAttachmentChangedDuringReadback".into(),
+            ));
+        }
         if hash != effect.content_sha256
             || preboot.is_some() != nonce.is_some()
             || preboot.as_ref().is_some_and(|proof| proof.digest != hash)
@@ -175,14 +182,24 @@ impl FlashRunner<'_> {
             .recommission_quiescent(execution)
             .map_err(Stop::Unknown)?;
         let child = format!("{}-restore", run.record.job_id);
+        let restoration_chain = IdentityChain::from_facts(&fresh).map_err(Stop::Unknown)?;
+        let observation = fresh
+            .server_facts
+            .get("dayu200RecommissionObservationSHA256")
+            .filter(|value| crate::job_record::digest(value))
+            .ok_or_else(|| {
+                Stop::Unknown("recommission.restorationIdentityObservationMissing".into())
+            })?;
         // No second capability/epoch is issued. This exact child plan was pinned
         // into the parent's materialized digest before its allocation existed.
         retry::write_once(self.runner.jobs, &run.record.job_id, "recommission-restoration-intent.json", &json!({
-            "schema": "arkdeck.recommission-restoration-intent/v1", "childId": child,
+            "schema": "arkdeck.recommission-restoration-intent/v2", "childId": child,
             "allocationSHA256": allocation.sha256(), "programSHA256": prepared.program.sha256(),
             "planSHA256": prepared.restoration.plan_sha256, "artifactSHA256": prepared.restoration_artifact.sha256,
+            "identityChain": restoration_chain, "identityObservationSHA256": observation,
         })).map_err(Stop::Unknown)?;
         let mut binding = binding.clone();
+        binding.usb_topology = restoration_chain.usb_topology;
         binding.connect_key = fresh.execution_connect_key;
         self.retry_budget(run, &allocation, deadline)?;
         let restored = flash

@@ -156,6 +156,9 @@ impl MaintenanceReads for Fakes {
         if fault == "retryIdentityDrift" && nonce.is_some() {
             self.shared().script.cross_mode = "cpuDrift".into();
         }
+        if fault == "retryAttachmentDuringRead" && nonce.is_some() {
+            self.shared().script.alias_topology = Some("84".into());
+        }
         let hash = if fault == "retryWrongHash" && nonce.is_some() {
             "0".repeat(64)
         } else {

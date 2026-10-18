@@ -191,6 +191,15 @@ fn controlled_retry_plan_uses_the_job_owner_when_runtime_state_is_separate() {
 
 #[test]
 fn explicit_retry_covers_both_unknowns_and_restores_original_ramdisk_before_success() {
+    successful_retry(false);
+}
+
+#[test]
+fn controlled_retry_keeps_the_same_connector_across_new_usb_attachments() {
+    successful_retry(true);
+}
+
+fn successful_retry(attachment_changes: bool) {
     let _lock = exclusive();
     let root = lay_down();
     let fakes = Fakes::default();
@@ -199,7 +208,15 @@ fn explicit_retry_covers_both_unknowns_and_restores_original_ramdisk_before_succ
     let failed = failed_first(&owners, &fakes, &source);
     let originals = [history(&owners, &source), history(&owners, &failed)];
     let first_budget = ledger(&root)["allocations"][0].clone();
-    fakes.begin(Script::default());
+    fakes.begin(if attachment_changes {
+        Script {
+            alias_topology: Some("84".into()),
+            perform: "retryAttachmentChanges".into(),
+            ..Default::default()
+        }
+    } else {
+        Script::default()
+    });
     let params = retry_request(&owners, &fakes, &source, &failed, "controlled-success");
     let submit = call_retry(&owners, &fakes, "job.submit", &params);
     let job = submit["result"]["jobId"]
@@ -269,6 +286,23 @@ fn explicit_retry_covers_both_unknowns_and_restores_original_ramdisk_before_succ
         10,
         "{calls:?}"
     );
+    if attachment_changes {
+        let preparations: Vec<_> = calls
+            .iter()
+            .filter(|call| call.starts_with("prepare "))
+            .collect();
+        assert!(preparations[0].contains(" topology=84 "), "{calls:?}");
+        assert!(preparations[1].contains(" topology=126 "), "{calls:?}");
+        assert_eq!(fakes.current().alias_topology.as_deref(), Some("168"));
+        assert_eq!(
+            first_budget["allocation"]["identityChain"]["usbTopology"],
+            "42"
+        );
+        assert_eq!(
+            ledger(&root)["allocations"][1]["allocation"]["identityChain"]["usbTopology"],
+            "84"
+        );
+    }
     let target_id = record.request["target"]["targetId"].as_str().unwrap();
     let targets = owners.targets.records().unwrap();
     assert_eq!(
@@ -298,6 +332,7 @@ fn controlled_retry_failures_preserve_both_histories_and_never_allocate_a_third_
         "retryMissingPreboot",
         "retryWrongHash",
         "retryIdentityDrift",
+        "retryAttachmentDuringRead",
         "retrySourceWrite",
         "retryRestoreUnknown",
         "retryRestoreRead",
