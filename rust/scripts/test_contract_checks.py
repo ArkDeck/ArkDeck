@@ -278,6 +278,7 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
             else readonly.catalog_test_views.CURRENT
         count = {readonly.catalog_test_views.RECOMMISSION: 35,
                  readonly.catalog_test_views.CONTROLLED_RETRY: 35,
+                 readonly.catalog_test_views.RESTORATION_POLICY: 35,
                  readonly.catalog_test_views.MAINTENANCE: 34}.get(digest, 32)
         for name in ("doctor", "deep", "healthy"):
             for before, after in ((digest.encode(), other.encode()),

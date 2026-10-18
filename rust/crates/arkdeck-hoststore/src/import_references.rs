@@ -18,6 +18,8 @@ const RECOMMISSION_INPUT_CATALOG: &str =
     "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
 const CONTROLLED_RETRY_INPUT_CATALOG: &str =
     "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a";
+const RESTORATION_POLICY_INPUT_CATALOG: &str =
+    "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ImportReference {
@@ -197,13 +199,17 @@ impl JobStore {
                         && matches!(record.catalog_digest(), HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG)
                         // The two new operations never existed in either source Catalog.
                         && !matches!(request.reference().as_str(), "flash.verify@1" | "flash.restore-boot-loop@1"))
-                    || (current == CONTROLLED_RETRY_INPUT_CATALOG
+                    // This policy revision changes no input schema. This is
+                    // read-side retention only, never execution or authority.
+                    || (current == RESTORATION_POLICY_INPUT_CATALOG
+                        && record.catalog_digest() == CONTROLLED_RETRY_INPUT_CATALOG)
+                    || (matches!(current, CONTROLLED_RETRY_INPUT_CATALOG | RESTORATION_POLICY_INPUT_CATALOG)
                         && record.catalog_digest() == RECOMMISSION_INPUT_CATALOG
                         && !request.inputs.contains_key("failedRecommissionJobId")
                         && !request.inputs.contains_key("restorationArtifactLease"))
                     || (matches!(
                         current,
-                        RECOMMISSION_INPUT_CATALOG | CONTROLLED_RETRY_INPUT_CATALOG
+                        RECOMMISSION_INPUT_CATALOG | CONTROLLED_RETRY_INPUT_CATALOG | RESTORATION_POLICY_INPUT_CATALOG
                     ) && request.reference() != "flash.recommission@1"
                         && (record.catalog_digest() == MAINTENANCE_INPUT_CATALOG
                             || (matches!(

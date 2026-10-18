@@ -23,6 +23,8 @@
 //! platform wrote it (`AsSwift`) before it is compared; nothing else is.
 #![cfg(any(target_os = "macos", windows))]
 
+#[path = "flash_run/maintenance_policy.rs"]
+mod maintenance_policy;
 #[path = "flash_run/recommission.rs"]
 mod recommission;
 mod support;

@@ -194,14 +194,19 @@ class ClosedSources(unittest.TestCase):
     def test_recommission_catalog_adds_one_operation_to_maintenance_and_rejects_drift(self):
         rust = Path(__file__).resolve().parents[1]
         rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'Catalog/operations').glob('*.json'))]
-        self.assertEqual(views.catalog_table_digest(rust, rows), views.CONTROLLED_RETRY)
-        original = copy.deepcopy(rows)
+        self.assertEqual(views.catalog_table_digest(rust, rows), views.RESTORATION_POLICY)
+        disabled = copy.deepcopy(rows)
+        restoration = next(row for row in disabled if row['id'] == 'flash.restore-boot-loop')
+        self.assertEqual(restoration['defaultPolicyIssuance'], 'enabled')
+        restoration['defaultPolicyIssuance'] = 'disabled'
+        self.assertEqual(views.catalog_table_digest(rust, disabled), views.CONTROLLED_RETRY)
+        original = copy.deepcopy(disabled)
         fields = next(row for row in original if row['id'] == 'flash.recommission')['inputs']['fields']
         del fields['failedRecommissionJobId']
         del fields['restorationArtifactLease']
         self.assertEqual(views.catalog_table_digest(rust, original), views.RECOMMISSION)
         _, previous = views.catalogs(rust)
-        unchanged = [row for row in rows if row['id'] != 'flash.recommission']
+        unchanged = [row for row in disabled if row['id'] != 'flash.recommission']
         self.assertEqual(views.catalog_table_digest(rust, unchanged), views.MAINTENANCE)
         frozen = {f"{row['id']}@{row.get('version', 0)}": row for row in unchanged
                   if f"{row['id']}@{row.get('version', 0)}" not in views.MAINTENANCE_REFERENCES}
@@ -224,6 +229,11 @@ class ClosedSources(unittest.TestCase):
         names.append('retry')
         self.assertEqual(views.selected(row, names, views.RECOMMISSION), ['new', 'shared'])
         self.assertEqual(views.selected(row, names, views.CONTROLLED_RETRY), ['new', 'shared', 'retry'])
+        row['functions']['policy'] = 'policy'
+        names.append('policy')
+        self.assertEqual(views.selected(row, names, views.RESTORATION_POLICY), ['new', 'shared', 'retry', 'policy'])
+        for digest in views.CATALOGS[:-1]:
+            self.assertNotIn('policy', views.selected(row, names, digest))
 
     def setUp(self):
         self.base = Path(tempfile.mkdtemp(prefix='arkdeck-test-catalog-views-')).resolve()
