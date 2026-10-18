@@ -245,8 +245,20 @@ Windows, 2026-10-18. Logs use
 
 ### CI
 
-The attachment-identity repair will be checked on its own PR head before
-publication. No device result is claimed from the synthetic checks.
+PR [#2669](https://github.com/ArkDeck/ArkDeck/pull/2669), head
+`01270b2524cdf68f6e53881ed3224d5f685f9996`, passed Swift CI
+[39095100980](https://github.com/ArkDeck/ArkDeck/actions/runs/39095100980) and
+SDD Guard [39095100972](https://github.com/ArkDeck/ArkDeck/actions/runs/39095100972).
+All selected Linux, macOS and Windows workspace and contract-parity jobs passed,
+including complete formatting and the original Windows parity run. The planner
+skipped the unselected Swift, App and Windows ClientKit lanes.
+
+The PR-body CI writeback triggered another SDD Guard run,
+[39098932856](https://github.com/ArkDeck/ArkDeck/actions/runs/39098932856), which
+also passed before the normal merge. Both required `guard` and aggregate `swift`
+reported success on the unchanged head. The PR merged to protected `main` as
+`0c36ffe83a9e9147d74a01e609d281326202f70d`. These are software validation and
+publication results; no device result is claimed from the synthetic checks.
 
 ## Revision 1 verification history
 
