@@ -88,11 +88,23 @@ unified gate or candidate device execution is performed.
   Python generator emits the character. Parsed objects are identical, and the
   same difference exists against HEAD's original registry. This change leaves
   that unrelated copy untouched; the current CLI bundle tests above pass.
+- CI dependency-policy correction: `check-arkforge-pin.py`, exact allowlist
+  comparison of all 67 locked packages, and SDD each exit 0. SDD log:
+  `recommission-windows-hdc-controlled-retry-ci-policy-sdd-2-20261018.log`.
+  The first SDD launcher could not locate `sh`; using the installed Git shell
+  succeeded. `cargo-deny` is not installed on this Windows host, so CI runs the
+  full unchanged dependency-policy check.
 
 ### CI
 
-Revision-2 PR and required `guard`/`swift` results are pending. No revision-2
-publication or real-device pass is claimed by these software tests.
+PR #2667's initial head `31e61967127100f6720ce3621b7b44c256f67144` passed
+SDD Guard runs `39082457972` and `39082504097`. Swift CI run `39082458077`
+failed its host-independent `cargo deny --locked check`: the newly used
+first-party `arkforge-artifact@0.1.0` was missing from the exact version allowlist.
+The follow-up adds only that crate, at the unchanged pinned ArkForge source and
+revision, with no third-party dependency, cargo-vet exemption or trust change.
+The remaining required CI results are pending. No revision-2 publication or
+real-device pass is claimed by these software tests.
 
 ## Revision 1 verification history
 
