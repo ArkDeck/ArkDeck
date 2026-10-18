@@ -10,8 +10,9 @@ The published Rust executor implements both maintenance operations, but
 `operation.list` and `operation.describe` reported `operation_not_supported` because
 the Flash availability matcher omitted their references. The fix recognizes both
 references and preserves the existing executor, Job owner, Artifact owner, tool
-identity and platform qualification checks. Read-only verification does not require
-a mutation owner; ramdisk restoration still does.
+identity and platform qualification checks. Both maintenance paths still need the
+shared mutation owner for admission's history and target-hold checks; verification
+then selects its default read-only policy without consuming a capability.
 
 The failing regression was reproduced before the fix. After the fix, all four
 availability tests passed, including missing-owner refusals. No Catalog policy or
@@ -62,10 +63,12 @@ recovery. This setup has not been executed under an old recommission allocation.
 ## Local targeted checks
 
 - Availability regression: baseline exit 101, fixed exit 0; four tests passed.
-  Logs: `D:/src/ArkDeck-wt/tools/flash-maintenance-discovery-{red,green}-20261018.log`.
+  The final regression retains the actual shared admission owner's requirement.
+  Logs: `D:/src/ArkDeck-wt/tools/flash-maintenance-checks-20261018/owners-final/discovery-red.log`
+  and `test-arkdeck-hoststore.log` in that same directory.
 - `run-cargo.py clippy -p <crate> --all-targets -- -D warnings` for hoststore,
   agentd and soak: exit 0. Logs under
-  `D:/src/ArkDeck-wt/tools/flash-maintenance-checks-20261018/clippy-<crate>.log`.
+  `D:/src/ArkDeck-wt/tools/flash-maintenance-checks-20261018/owners-final/clippy-<crate>.log`.
 - `run-cargo.py test -p arkdeck-hoststore --lib`: exit 0, 426 passed, five existing
   ignored. `run-cargo.py test -p arkdeck-agentd --lib`: exit 0, three passed.
   `run-cargo.py test -p arkdeck-soak`: exit 0, five passed and one existing signer

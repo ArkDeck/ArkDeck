@@ -172,10 +172,7 @@ fn flash_unavailability(
     }
     for (present, reason) in [
         (context.flash_execution, "runtime.flashExecutorUnavailable"),
-        (
-            context.mutation_owner || reference == "flash.verify@1",
-            "runtime.mutationOwnerUnavailable",
-        ),
+        (context.mutation_owner, "runtime.mutationOwnerUnavailable"),
         (context.job_owner, "runtime.jobOwnerUnavailable"),
     ] {
         if !present {
@@ -317,22 +314,23 @@ mod tests {
     }
 
     #[test]
-    fn flash_maintenance_discovery_preserves_read_only_and_missing_owner_boundaries() {
+    fn flash_maintenance_discovery_preserves_missing_owner_boundaries() {
         let flash = crate::FlashPlanning::new(None, || None, Some("a".repeat(64)));
         let mut c = context();
         c.flash_planning = Some(&flash);
         c.flash_execution = true;
-        assert_eq!(
-            operation_unavailability("flash.verify@1", "arkforge", &c),
-            Some(vec![])
-        );
-        assert_eq!(
-            operation_unavailability("flash.restore-boot-loop@1", "arkforge", &c),
-            Some(vec![(
-                "provider_tool_unavailable",
-                "runtime.mutationOwnerUnavailable".into()
-            )])
-        );
+        // Both paths enter FlashAdmitter::preauthorize's shared history and
+        // target-hold checks before verify selects the default read-only policy.
+        for reference in ["flash.verify@1", "flash.restore-boot-loop@1"] {
+            assert_eq!(
+                operation_unavailability(reference, "arkforge", &c),
+                Some(vec![(
+                    "provider_tool_unavailable",
+                    "runtime.mutationOwnerUnavailable".into()
+                )])
+            );
+        }
+        c.mutation_owner = true;
         c.flash_execution = false;
         c.job_owner = false;
         c.artifacts = false;
