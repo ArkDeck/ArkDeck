@@ -52,7 +52,8 @@ participated. Local logs are retained outside Git under
 - Catalog generator `--check` and the affected Python suites: exit 0, 77 tests;
   `python-targeted-corrected.log`. The complete real source inventory and all
   335 closed target routes were separately validated with `catalog_test_views.load`.
-  No frozen fixture, old descriptor, receipt or baseline was rewritten.
+  Frozen fixtures, old descriptors, receipts and historical baselines remain
+  unchanged. The current development input manifest is regenerated below.
 - The broader Python run (`python-final.log`) also exercised the unchanged
   contract tooling. Its Unix-mode assertion in
   `RunDirectoryTests.test_a_passing_run_removes_its_directory_without_a_word`
@@ -74,15 +75,25 @@ participated. Local logs are retained outside Git under
   `python rust/scripts/run-cargo.py run -p arkdeck-hoststore --example
   flash_catalog_review`: exit 0; `catalog-review-final.log`. Only their Catalog
   digest changed; all selected full-restore steps and their digest stay exact.
-- No Control protocol inputs changed; `generate-contract.py --check` is not
-  required. A local macOS App build-for-testing is unavailable on this Windows
+- `python rust/scripts/generate-contract.py --write` and `--check`: exit 0;
+  `contract-write-ci-repair.log`, `contract-check-ci-repair.log`. Catalog is a
+  consumed input, so its current development manifest must be regenerated even
+  though protocol identity, Control methods/corpus and Rust bindings are unchanged.
+  A local macOS App build-for-testing is unavailable on this Windows
   host; the selected App and Windows client CI lanes verify generated data use.
 
 ## CI
 
-Pending this candidate PR's current-head `guard`, `swift` aggregate and selected
-platform lanes. Results from the earlier discovery-fix PR do not verify this
-Catalog. CI will be reported on the candidate PR without amending a green head.
+PR #2675, initial head `f161873d8ad85d2e26b98f244efc37bde0d1d91d`, Swift CI
+run `39154903209`: the host-independent job failed its generated-input check
+because the development manifest had not been regenerated. The generator now
+reproduces the manifest exactly; this was a real candidate omission. The seven
+changed fields are the Catalog digest, operations-directory digest, two Catalog
+file blob/hash pairs and aggregate input digest. No assertion was relaxed.
+
+The corrected head's `guard`, `swift` aggregate and selected platform lanes remain
+pending. Results from the earlier discovery-fix PR do not verify this Catalog.
+CI will be reported on the candidate PR without amending a green head.
 
 ## Remaining real-device acceptance
 
