@@ -73,3 +73,10 @@ Default destructive capability issuance remains disabled. Plan-only refusals are
 read-only and produce no stopped record; submitted admission refusals retain their
 own immutable stopped record. No live-device execution, hardware evidence,
 production-support promotion, tag or release was performed.
+
+## Independent entry-point acceptance follow-up
+
+The [2026-10-19 run](independent-acceptance-20261019.md) records the production
+discovery defect, its focused fix and independent published-Runtime refusal
+checks. Positive hardware acceptance and the separate destructive policy decision
+remain incomplete; the recommission result is not substituted for either entry.
