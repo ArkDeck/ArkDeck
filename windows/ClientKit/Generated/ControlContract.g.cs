@@ -235,7 +235,7 @@ public static class ControlContract
         ["target.show"] = "bc693205cc23163886bba05ce83edd7b5b46ff0514171c8d684ba5f92a760e5d",
         ["trace.cache.purge"] = "6b1959abbdbe23b9d3313e2101b207758bacaa667d4b5b2f3ab8ea4238b553d2",
         ["trace.cache.status"] = "acc6c662b2212de688d0d65ec246e0d0879e5a4c57c121ab66a620fab4f2cde6",
-        ["trace.inspect"] = "58626f864ac22fcc2ffe60c3a20216846ae93e93a6b32226a24607879558bdd4",
+        ["trace.inspect"] = "1db07e687f2d6d8d91ccb5681c5e75f2b6220b07782719b713894c8ceed2f4d7",
         ["trace.probe"] = "4e55e422ba93f05edb9a28267ba12740fca42c3326d3e99d038aa17b2ce46e73",
         ["workspace.preset.list"] = "85ed2de1f20f459d10778383e97c4cb0d38c2ac4c4c1b48af449af17d55b6310",
         ["workspace.preset.register"] = "af5a55773a8f53574da0cb3ab80cfc06513c2864437c98db68062187cdac6753",

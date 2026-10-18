@@ -130,7 +130,11 @@ replace it. TASK-XPA-021 and platform conformance are not self-approved here.
 
 ## CI
 
-Not run for this handoff yet. Publishing the ArkTrace branch to
-`ArkDeck/ArkTrace` was rejected by automatic approval review because that
-external destination lacked explicit authorization. The local implementation
-and qualification continue independently; no PR or CI success is claimed.
+[ArkDeck #2671](https://github.com/ArkDeck/ArkDeck/pull/2671) is the consumer of
+[ArkTrace #37](https://github.com/ArkDeck/ArkTrace/pull/37); the producer merges
+first. Initial ArkDeck run `39126998068` passed Swift tests and host-independent
+Rust checks, but the Windows ClientKit check found the generated fingerprint
+for `trace.inspect` stale. `python windows/scripts/generate-clientkit.py --write`
+regenerated its single changed method fingerprint; `--check` then passed (exit
+0). No wire fields or error assertions changed in that correction. The current
+CI outcome is recorded on the PR without amending a green head.
