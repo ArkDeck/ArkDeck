@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080"
+  public static let catalogDigest = "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -565,7 +565,9 @@ extension RuntimeOperationCatalog {
       inputs: [
         CatalogFieldDescriptor(name: "artifactLease", type: .artifactLease, isRequired: true, summary: "Trusted full-restore image bundle lease; Runtime resolves immutable Artifact bytes before authorization."),
         CatalogFieldDescriptor(name: "deviceProfileRef", type: .string, isRequired: true, enumValues: ["dayu200"], summary: "Published device profile reference selected after target admission; DAYU200 is the currently published profile."),
+        CatalogFieldDescriptor(name: "failedRecommissionJobId", type: .string, isRequired: false, summary: "Explicit reference to the first consumed, expired and durably unknown recommission. Runtime may allocate exactly one controlled retry, preserving both histories and requiring their complete coverage. Requires restorationArtifactLease and the closed preboot verification plan."),
         CatalogFieldDescriptor(name: "intent", type: .string, isRequired: true, enumValues: ["fullRestore"], summary: "Closed restore intent. It requests the profile's complete overwrite contract and cannot name partitions, addresses or tools."),
+        CatalogFieldDescriptor(name: "restorationArtifactLease", type: .artifactLease, isRequired: false, summary: "Immutable original-ramdisk restoration bundle for a controlled retry. Runtime pins the complete 4 MiB restoration and its verification into the same 1800-second budget before dispatch."),
         CatalogFieldDescriptor(name: "retainedJobId", type: .string, isRequired: true, summary: "One completed retained-risk archive. Runtime validates its unchanged history, expiry and complete uncertain-effect coverage; callers provide no proof or budget."),
         CatalogFieldDescriptor(name: "verification", type: .string, isRequired: true, enumValues: ["full"], summary: "Full readback, reboot, build and hardware identity-chain verification are mandatory.", defaultValue: .string("full"))
       ],

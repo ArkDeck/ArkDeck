@@ -33,7 +33,17 @@ pub use lane_preview::{LanePlanPreview, LanePreview, LanePreviewHost};
 mod loader;
 pub mod maintenance;
 pub mod managed_control;
+
+/// Pure inspection of the pinned preboot image, behind the ArkForge provider.
+/// Exposes no image builder, Artifact store, transport or daemon authority.
+pub mod preboot {
+    pub use arkforge_artifact::preboot::{
+        MAX_IMAGE_BYTES, RESTORATION_SHA256, USERDATA_BYTES, USERDATA_START, inspect,
+    };
+}
+
 mod recovery_completion;
+pub use recovery_completion::{FullReadback, validate_recommission_readback};
 
 pub use lane_client::{NativeLaneConnections, NativePlanConnections};
 

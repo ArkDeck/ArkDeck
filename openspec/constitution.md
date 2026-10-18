@@ -124,10 +124,23 @@ revision-1 Normal-only unknown Flash 请求一次独立重新接纳。该路径 
 fresh CPU serial、boot-tree 与 vendor-slot SN 双源一致、同一 USB connector、旧执行主体结束、
 无其他未闭合 Job，以及 `POL-RECOVERY-001` 要求的完整覆盖和验证。Runtime SHALL 将源历史
 摘要、新 Job/plan/Artifact 和身份链绑定到不可续期的独立 allocation：一个 epoch、并发一、
-自 reserve 起最多 1,800 秒。同一原 Normal identity 只可分配一次；换请求 ID、重启、归档、
-失败或新 unknown SHALL NOT 再分配。到期后不得签发新 Provider step permit。只有完整写入、
+自 reserve 起最多 1,800 秒。默认同一原 Normal identity 只可分配一次；换请求 ID、重启、归档、
+失败或新 unknown 本身 SHALL NOT 再分配。到期后不得签发新 Provider step permit。只有完整写入、
 readback/reboot/postflight 均成功且身份链不变，才可追加 supersession 与新 binding lineage。
 此窄路径不扩大普通恢复预算，不允许 replay，也不以用户确认代替任何证明。
+
+首次重新接纳已经消费、过期并留下 durable unknown 时，Runtime MAY 按已发布的受控重试
+策略追加一次独立 allocation。请求 SHALL 显式引用该失败 Job；Runtime SHALL 将其与原
+retained archive、首次 allocation 和同一 Normal identity 精确关联，证明两个历史执行主体
+均已结束、没有其他未闭合 Job，并重新证明完整身份链及全部旧与新增 uncertain effects 的覆盖。
+原 Job、unknown、Journal、capability 消费和 allocation 各字段 SHALL 保留，不得续期、退款、
+改写或转移；新 allocation SHALL pin 两份源历史摘要、首次 allocation 摘要以及完整新计划。
+该重试只允许一个串行 recovery epoch，自新 reserve 起最多 1,800 秒；同一原 Normal identity
+累计最多两次 allocation。重试再次失败、unknown、取消、过期或重启均 SHALL NOT 获得第三次。
+挂载前完整测量所需的临时 ramdisk、完整原 ramdisk 恢复和逐项校验 SHALL 在准入前纳入
+materialized plan 与新预算；缺失任何身份、覆盖、完整回读或恢复证明时 SHALL 保留 blocker，
+不得追加 supersession 或把历史 typed skip 当作验证成功。该例外只由 Runtime 执行已发布策略，
+不开放 caller 或 Agent 的预算、capability 或证明管理接口。
 
 只有成功的 `SupersedingRecoveryEpoch` 才可使已覆盖的 uncertain intents 不再阻断 target
 lane；它 SHALL NOT 修改原始 outcome 或声称原 Job succeeded。已有 durable 后续 Flash

@@ -276,7 +276,9 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
             for name in readonly.MACHINE_OUTPUT_LEAVES}
         other = readonly.catalog_test_views.OLD if digest == readonly.catalog_test_views.CURRENT \
             else readonly.catalog_test_views.CURRENT
-        count = {readonly.catalog_test_views.RECOMMISSION: 35, readonly.catalog_test_views.MAINTENANCE: 34}.get(digest, 32)
+        count = {readonly.catalog_test_views.RECOMMISSION: 35,
+                 readonly.catalog_test_views.CONTROLLED_RETRY: 35,
+                 readonly.catalog_test_views.MAINTENANCE: 34}.get(digest, 32)
         for name in ("doctor", "deep", "healthy"):
             for before, after in ((digest.encode(), other.encode()),
                                   (digest.encode(), b"0" * 64),

@@ -14,8 +14,37 @@ pin the complete source record/journal digest, new Job/request/plan/Artifact,
 coverage and fresh identity chain, and allow one epoch, concurrency one and at
 most 1,800 seconds from reservation. Reservation is irreversible. Restart,
 duplicate/new request IDs, cancellation, abandonment, failed verification or a
-new unknown SHALL NOT allocate another budget. No new Provider step permit SHALL
+new unknown alone SHALL NOT allocate another budget. No new Provider step permit SHALL
 be issued after expiry. An already dispatched critical step may settle honestly.
+
+Revision 2 permits exactly one controlled retry after this first allocation is
+consumed, expired and represented by a durable unknown recommission Job. The
+request SHALL explicitly name that Job in `failedRecommissionJobId` and supply
+`restorationArtifactLease`; these are references, never authority or proof.
+Runtime SHALL bind the archived source, the failed Job and the first allocation,
+prove both historical Provider executions terminal and their writers ended, and
+cover all uncertain effects from both Jobs. It SHALL pin both unchanged history
+digests, the first allocation digest, the complete fresh identity chain and the
+whole retry program before reserving another one-epoch, concurrency-one,
+1,800-second allocation. Every field of the first allocation SHALL remain
+unchanged. No third allocation is permitted for the original Normal identity.
+
+The retry program SHALL materialize both Provider plans before reservation:
+the full nine-partition overwrite with the pinned preboot ramdisk, and restoration
+of the pinned original ramdisk over the entire 4 MiB range. Both immutable
+bundles SHALL contain identical non-ramdisk images. Runtime SHALL independently
+measure every complete primary range, reading userdata's nonce-bound RAM report
+from its pre-mount measurement and reading the eight static ranges through the
+bounded Normal Provider. It SHALL then restore the original ramdisk, verify its
+complete 4 MiB range, reboot and repeat the complete identity chain within the
+same allocation. Restoration SHALL NOT allocate another capability or epoch.
+
+The original Provider typed-skip receipts SHALL remain unchanged. A skip is not
+readback evidence; only the separate complete measurements, exact sealed plans,
+all successful write receipts and both canonical postflights can establish the
+retry's completion proof. Every subphase SHALL be durable and bound to the same
+program and allocation. Missing, short, mismatched, stale or substituted proof
+SHALL retain unknown and prohibit replay, including after a Runtime restart.
 
 ## Identity, coverage and publication
 
@@ -55,7 +84,14 @@ SHALL be reconciled from durable proof without device replay or a new allocation
   effects, live/unknown provider activity, or any identity drift refuses before
   capability consumption or device mutation.
 - Duplicate requests are idempotent. New IDs, process restarts, expiry, failed
-  postflight and a new unknown cannot obtain a second allocation.
+  postflight and a new unknown cannot implicitly obtain a second allocation.
+- Only an explicit eligible controlled retry can obtain the second allocation.
+  Its success covers both unknown histories while preserving the first ledger
+  entry and source bytes. Failure, expiry, cancellation and restart cannot obtain
+  a third allocation.
+- A missing preboot report, incorrect range/hash, changed identity, incomplete
+  write receipt, unknown restoration or missing restoration readback leaves the
+  second Job unknown, with no supersession or binding upgrade.
 - Every crash window retains either the old blockers or a mechanically verified
   durable supersession, with zero replay and no manufactured hardware evidence.
 

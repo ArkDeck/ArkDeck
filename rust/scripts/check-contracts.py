@@ -138,7 +138,7 @@ def pinned_catalog_inputs(current, digest):
     expected_matrix = generator.generate_matrix(list(actual.values()), profiles, actual_digest)
     if current.files[matrix_path].decode().replace("\r\n", "\n") != expected_matrix:
         raise ValueError("historical input requires the full official Catalog matrix")
-    if actual_digest == catalog_test_views.RECOMMISSION:
+    if actual_digest in catalog_test_views.RECOMMISSION_CATALOGS:
         for path in list(files):
             if path.startswith('Catalog/profiles/') and path.endswith('.json'):
                 profile = json.loads(files[path])

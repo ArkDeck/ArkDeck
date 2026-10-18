@@ -570,7 +570,10 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
         );
     }
     let mut compiled = by_reference(&compiled);
-    if arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::RECOMMISSION {
+    if matches!(
+        arkdeck_contract::CATALOG_DIGEST,
+        support::catalog_lineage::RECOMMISSION | support::catalog_lineage::CONTROLLED_RETRY
+    ) {
         assert_eq!(compiled.len(), 35);
         assert!(compiled.remove("flash.recommission@1").is_some());
         let complete: Vec<_> = compiled.values().cloned().collect();
@@ -584,7 +587,9 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
     }
     if matches!(
         arkdeck_contract::CATALOG_DIGEST,
-        support::catalog_lineage::MAINTENANCE | support::catalog_lineage::RECOMMISSION
+        support::catalog_lineage::MAINTENANCE
+            | support::catalog_lineage::RECOMMISSION
+            | support::catalog_lineage::CONTROLLED_RETRY
     ) {
         assert_eq!(compiled.len(), 34);
         assert!(compiled.remove("flash.verify@1").is_some());
@@ -594,7 +599,8 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
         support::catalog_lineage::OLD => &old,
         support::catalog_lineage::CURRENT
         | support::catalog_lineage::MAINTENANCE
-        | support::catalog_lineage::RECOMMISSION => &current,
+        | support::catalog_lineage::RECOMMISSION
+        | support::catalog_lineage::CONTROLLED_RETRY => &current,
         _ => panic!("a future Catalog needs an explicit input compatibility review"),
     };
     assert_eq!(&compiled, expected);

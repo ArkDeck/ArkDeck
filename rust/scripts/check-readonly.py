@@ -147,8 +147,10 @@ def assert_boundaries() -> None:
     # authority API whose StepPermit the lane signs; and the typed ids and
     # digests that permit is made of (协调会话 2026-09-26). The maintenance
     # adapter exports pure typed maintenance contracts over those same crates.
+    # The Artifact crate contributes only bounded, in-memory preboot inspection;
+    # the provider re-exports that closed API without its store or builders.
     arkforge = {"arkdeck-provider-arkforge": {
-        "arkforge-arkdeck-adapter", "arkforge-authority-api", "arkforge-client",
+        "arkforge-arkdeck-adapter", "arkforge-artifact", "arkforge-authority-api", "arkforge-client",
         "arkforge-core", "arkforge-ipc"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
@@ -393,9 +395,9 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
     assert digest in catalog_test_views.CATALOGS, "unknown Catalog view"
     assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
     additions = []
-    if digest in (catalog_test_views.MAINTENANCE, catalog_test_views.RECOMMISSION):
+    if digest in {catalog_test_views.MAINTENANCE} | catalog_test_views.RECOMMISSION_CATALOGS:
         additions = [("flash.verify@1", "readOnly"), ("flash.restore-boot-loop@1", "destructive")]
-    if digest == catalog_test_views.RECOMMISSION:
+    if digest in catalog_test_views.RECOMMISSION_CATALOGS:
         additions.append(("flash.recommission@1", "destructive"))
     if name == 'operations' and additions:
         document = json.loads(data)

@@ -151,3 +151,5 @@ pub use windows_registry::{
 
 mod keyboard_input;
 pub use keyboard_input::KeyboardInput;
+mod preboot_verification;
+pub use preboot_verification::{PrebootHash, read_preboot_hash};

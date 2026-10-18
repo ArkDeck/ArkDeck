@@ -13,6 +13,8 @@ use arkdeck_provider_arkforge::{
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, PoisonError};
+#[path = "flash_lane/controlled_retry.rs"]
+pub mod controlled_retry;
 #[path = "flash_lane/recovery_completion.rs"]
 mod recovery_completion;
 
@@ -74,6 +76,7 @@ struct Shared {
     lane_calls: Vec<String>,
     dispatch_calls: Vec<String>,
     executions: u64,
+    retry: Option<controlled_retry::Plans>,
 }
 
 /// The script the fakes read and the calls they received, shared across the
@@ -271,7 +274,36 @@ impl FlashLane for FakeLane {
         &self,
         execution: &Execution,
     ) -> Result<arkdeck_provider_arkforge::maintenance::SourceRecords, String> {
+        if execution.plan_id.starts_with("PLAN-CONTROLLED-") {
+            return controlled_retry::source(&self.fakes, execution);
+        }
         recovery_completion::source(execution, &self.fakes.current().perform)
+    }
+
+    fn prepare_recommission(
+        &self,
+        job_id: &str,
+        plan: &arkdeck_provider_arkforge::maintenance::ExecutablePlan,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+    ) -> Result<Execution, LaneFailure> {
+        let mut execution = self.prepare(job_id, artifact, binding, "supersedingRecovery")?;
+        execution.plan_id = plan.plan_id.clone();
+        execution.plan_sha256 = plan.plan_sha256.clone();
+        Ok(execution)
+    }
+
+    fn prepare_restoration(
+        &self,
+        job_id: &str,
+        plan: &arkdeck_provider_arkforge::maintenance::ExecutablePlan,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+    ) -> Result<Execution, LaneFailure> {
+        let mut execution = self.prepare(job_id, artifact, binding, "primaryFlash")?;
+        execution.plan_id = plan.plan_id.clone();
+        execution.plan_sha256 = plan.plan_sha256.clone();
+        Ok(execution)
     }
 
     fn recommission_quiescent(&self, source: &Execution) -> Result<(), String> {
@@ -387,6 +419,11 @@ impl FlashLane for FakeLane {
             execution.plan_id,
             execution.execution_purpose
         ));
+        if step_id == "restore-ramdisk" && self.fakes.current().perform == "retryRestoreUnknown" {
+            return Err(LaneFailure::OutcomeUnknown(
+                "synthetic restoration interrupted".into(),
+            ));
+        }
         match self.fakes.current().perform.as_str() {
             "failed" => Err(LaneFailure::Failed(
                 "fixture arkforged confirmed the plan failed".into(),

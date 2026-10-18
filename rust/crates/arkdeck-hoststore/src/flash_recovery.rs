@@ -494,6 +494,7 @@ impl JobStore {
             now,
             None,
             None,
+            None,
         )
     }
 
@@ -529,6 +530,20 @@ impl JobStore {
         let source_sha256 = self
             .recommission_source(source, &chain.normal_identity_sha256, now)
             .map_err(blocked)?;
+        let failed = request
+            .inputs
+            .get("failedRecommissionJobId")
+            .and_then(Value::as_str);
+        let controlled_retry = failed
+            .map(|failed| {
+                let program = materialized
+                    .recommission_retry_program_sha256
+                    .as_deref()
+                    .ok_or_else(|| "recommission.completeRetryProgramMissing".to_owned())?;
+                self.recommission_retry_source(source, failed, chain, now, program)
+            })
+            .transpose()
+            .map_err(blocked)?;
         // Exclude only this exact, not-yet-consumed recovery Job from the
         // historical census during its fresh pre-dispatch materialization.
         let mut original = request.clone();
@@ -547,6 +562,7 @@ impl JobStore {
             now,
             Some(source),
             Some(&job),
+            failed,
         )?;
         let OverwriteAdmission::Recovery { mut context } = classified else {
             return Err(OverwriteRefusal::blocked(
@@ -557,7 +573,13 @@ impl JobStore {
             || context
                 .covered_intents
                 .iter()
-                .any(|intent| intent.job_id != source)
+                .any(|intent| intent.job_id != source && Some(intent.job_id.as_str()) != failed)
+            || failed.is_some_and(|failed| {
+                !context
+                    .covered_intents
+                    .iter()
+                    .any(|intent| intent.job_id == failed)
+            })
         {
             return Err(OverwriteRefusal::blocked(
                 "recommission.additionalUncertainEffects",
@@ -582,6 +604,7 @@ impl JobStore {
             identity_chain: chain.clone(),
             reserved_at_epoch_ms: 0,
             expires_at_epoch_ms: 0,
+            controlled_retry,
         };
         context.recommission = Some(
             self.reserve_recommission(allocation, now)
@@ -601,6 +624,7 @@ impl JobStore {
         now: &str,
         retained_source: Option<&str>,
         recommission_job: Option<&str>,
+        failed_recommission: Option<&str>,
     ) -> Result<OverwriteAdmission, OverwriteRefusal> {
         if identity.is_empty() || binding <= 0 {
             return Err(OverwriteRefusal::blocked(
@@ -617,6 +641,7 @@ impl JobStore {
             &epochs,
             retained_source,
             recommission_job,
+            failed_recommission,
         )?;
         if unresolved.is_empty() {
             return Ok(OverwriteAdmission::Ordinary);
@@ -734,6 +759,7 @@ impl JobStore {
     /// such Job names, each as the Flash that took it could have affected
     /// it; none an epoch already covers. What cannot be bound to a Flash's
     /// typed partitions refuses.
+    #[allow(clippy::too_many_arguments)]
     fn unresolved_destructive_intents(
         &self,
         capabilities: &CapabilityStore,
@@ -742,6 +768,7 @@ impl JobStore {
         epochs: &[RecoveryEpoch],
         retained_source: Option<&str>,
         recommission_job: Option<&str>,
+        failed_recommission: Option<&str>,
     ) -> Result<Vec<SupersededIntent>, OverwriteRefusal> {
         let jobs = self.jobs_path();
         let mut unresolved = Vec::new();
@@ -781,6 +808,7 @@ impl JobStore {
             }
             if retained_source.is_some()
                 && retained_source != Some(record.job_id.as_str())
+                && failed_recommission != Some(record.job_id.as_str())
                 && (!crate::job_record::terminal(&record.state)
                     || facts
                         .outstanding_intents

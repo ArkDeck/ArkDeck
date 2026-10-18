@@ -22,6 +22,7 @@ impl<'a> JobPlanner<'a> {
         let now = (self.hdc.ok_or_else(internal_failure)?.now)().ok_or_else(internal_failure)?;
         Ok(Materialized {
             recommission: None,
+            recommission_retry_program_sha256: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts,

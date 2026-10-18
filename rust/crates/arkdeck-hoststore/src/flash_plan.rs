@@ -388,6 +388,28 @@ impl<'a> FlashPlanner<'a> {
             ))
         })?;
         let artifact_facts = primary_facts(&leased)?;
+        let retry = if reference == RECOMMISSION
+            && request.inputs.contains_key("failedRecommissionJobId")
+        {
+            let context = crate::flash_maintenance::context(flash).map_err(preflight)?;
+            Some(
+                crate::flash_recommission_retry::prepare(
+                    &context,
+                    &self.planner,
+                    request,
+                    &facts,
+                    &leased,
+                )
+                .map_err(preflight)?,
+            )
+        } else {
+            if request.inputs.contains_key("restorationArtifactLease") {
+                return Err(preflight(
+                    "recommission.restorationRequiresExplicitControlledRetry".into(),
+                ));
+            }
+            None
+        };
         let mut steps = Vec::new();
         for step in descriptor
             .steps
@@ -453,6 +475,9 @@ impl<'a> FlashPlanner<'a> {
         if let Some(chain) = &recommission {
             document["recommissionIdentityChain"] = json!(chain);
         }
+        if let Some(retry) = &retry {
+            document["controlledRetryProgram"] = retry.program.value();
+        }
         // Present only for a Runtime-owned debug attempt; an ordinary Job's
         // digest bytes are unchanged (Swift `encodeIfPresent`).
         if let Some(permit) = permit {
@@ -469,6 +494,7 @@ impl<'a> FlashPlanner<'a> {
                 identity: Some(facts.identity_sha256.clone()),
                 binding_revision: Some(facts.binding_revision),
                 recommission,
+                recommission_retry_program_sha256: retry.map(|retry| retry.program.sha256()),
             },
             operation_admission_blocker(&facts, reference == RECOMMISSION),
         ))

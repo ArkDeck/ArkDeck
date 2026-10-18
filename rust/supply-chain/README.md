@@ -71,7 +71,8 @@ do not replace source audits or real Windows device acceptance.
 ## First-party git source: ArkForge
 
 ArkForge, the device-neutral flash mechanism, is first-party and unpublished.
-Its crates (`arkforge-client` and what it needs; `arkforge-authority-api`,
+Its crates (`arkforge-client` and what it needs; `arkforge-artifact` for bounded
+preboot archive inspection; `arkforge-authority-api`,
 `arkforge-core` and `arkforge-ipc` for tests) come from
 `https://github.com/ArkDeck/ArkForge.git`, the one `allow-git` entry in
 `deny.toml`, at exactly the revision `Packages/ArkDeckKit/Package.swift` pins,
