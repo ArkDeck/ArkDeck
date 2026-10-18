@@ -339,7 +339,7 @@ struct RuntimeOperationCatalogTests {
     #expect(restoration.binding == .confirmedDevice)
     #expect(restoration.concurrencyKey == .deviceExclusive)
     #expect(Set(restoration.inputs.map(\.name)) == ["sourceJobId", "budgetMs", "artifactLease"])
-    #expect(restoration.inputs.allSatisfy(\.isRequired))
+    #expect(restoration.inputs.allSatisfy { $0.isRequired })
     let budget = try #require(restoration.inputs.first { $0.name == "budgetMs" })
     #expect(budget.minimum == 1_000)
     #expect(budget.maximum == 600_000)

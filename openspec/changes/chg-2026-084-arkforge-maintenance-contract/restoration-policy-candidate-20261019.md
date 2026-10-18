@@ -75,6 +75,14 @@ participated. Local logs are retained outside Git under
   `python rust/scripts/run-cargo.py run -p arkdeck-hoststore --example
   flash_catalog_review`: exit 0; `catalog-review-final.log`. Only their Catalog
   digest changed; all selected full-restore steps and their digest stay exact.
+- `arkdeck maintainer contracts export` generated all 244 owned products into a
+  private directory. Comparison found only two changed products: the CLI command
+  registry and feature-coverage Catalog digests. Those two generated files were
+  installed; the other 242 products, including frozen fixtures, retain their bytes.
+  Log: `cli-contracts-export-ci-repair.log`.
+- `python rust/scripts/run-cargo.py test -p arkdeck-cli --test machine_contracts
+  --test maintainer_contracts`: exit 0, fourteen Windows tests;
+  `cli-machine-contracts-ci-repair.log`.
 - `python rust/scripts/generate-contract.py --write` and `--check`: exit 0;
   `contract-write-ci-repair.log`, `contract-check-ci-repair.log`. Catalog is a
   consumed input, so its current development manifest must be regenerated even
@@ -90,6 +98,14 @@ because the development manifest had not been regenerated. The generator now
 reproduces the manifest exactly; this was a real candidate omission. The seven
 changed fields are the Catalog digest, operations-directory digest, two Catalog
 file blob/hash pairs and aggregate input digest. No assertion was relaxed.
+
+Corrected head `fb1a5ad099fd0bf9b7269c34a40c159499c6462b`, Swift CI run
+`39155288983`: host-independent checks passed. The Swift test target failed to
+compile the new `#expect(allSatisfy(\.isRequired))` macro expansion; it now uses
+the existing nonthrowing closure form with the same assertion. Linux workspace
+tests found the two stale generated CLI Catalog digests above. Both failing CLI
+test targets now pass locally after regeneration. These are candidate omissions,
+not invalid runs; no accepted assertion or frozen oracle was relaxed.
 
 The corrected head's `guard`, `swift` aggregate and selected platform lanes remain
 pending. Results from the earlier discovery-fix PR do not verify this Catalog.
