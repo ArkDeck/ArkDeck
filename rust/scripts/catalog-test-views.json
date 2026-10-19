@@ -109,7 +109,7 @@
     "crates/arkdeck-agentd/tests/trace_summary_analyzer.rs": "bd3fbfa2586a0bebef909ce1b756a7bec8cd8a790ba8c9784f322487958226ec",
     "crates/arkdeck-agentd/tests/windows_account_locations_process.rs": "f1ec91d781b9f361c751274cbb33b29918285d6c1d2673e6ba94a44e7ccdf197",
     "crates/arkdeck-agentd/tests/windows_analyzer_process.rs": "c233f9cf3b10d8ee02ff39894f7143186d3858a7355e6b3b5616aa8526ef66b1",
-    "crates/arkdeck-agentd/tests/windows_artifact_owner_process.rs": "e18fccf49a651725f92819e1cce4f21dc78a0826b1d966949bb3ec61062c6a8c",
+    "crates/arkdeck-agentd/tests/windows_artifact_owner_process.rs": "2cd62030e4a12b62fac095884a34ea7b457fd2ef2359a4f0eeb4ff7a902c814e",
     "crates/arkdeck-agentd/tests/windows_bootstrap_owners_process.rs": "4e41382de3c8726851c7eae3bafa8d9fb86dd8f9ff0d62324cf6f753edbf6bb5",
     "crates/arkdeck-agentd/tests/windows_cleanup_debt_process.rs": "c29eadb09e25d35787d65874d92635bb10f945a2e139ba97790a8bc9a3a3513f",
     "crates/arkdeck-agentd/tests/windows_client_start_process.rs": "a63f2d9cd0f7f7332451266aa11cd1b09b01b182dee06dd00d9ef267e400be57",
@@ -191,9 +191,9 @@
     "crates/arkdeck-cli/src/job_plan.rs": "ab96fbc98c3288891cd2b47a0e168578eb6cb317555384fba82a5ecdb8944bda",
     "crates/arkdeck-cli/src/job_resources.rs": "08a13ae78f10911b5cfb561615503a222e51fa0f5d32bf84f7c472dec66e75e9",
     "crates/arkdeck-cli/src/job_wait.rs": "8d63c718d2091a3a20d171275ee0b55d0ed3e60b3fa05456fae440a00fce230f",
-    "crates/arkdeck-cli/src/lib.rs": "7b3d6df9a915f35a59a7f20638ff15e25f933cc56156b05753c9456dec364bb4",
+    "crates/arkdeck-cli/src/lib.rs": "8dafee60e3feb043c24e144145e76be698f5cbb9156081d76894b182915c8bf3",
     "crates/arkdeck-cli/src/machine_contracts.rs": "1aa5f7bdf6d0308c250f414cf2af8f52d6aea140a3a85dc7f5051734684c7693",
-    "crates/arkdeck-cli/src/main.rs": "fa026a75f0460519a0993a58c8b6495d7e106d8cf618d62f93eeaae5e0837053",
+    "crates/arkdeck-cli/src/main.rs": "26abf8fbcc6f1bc067d508491fbbbc819ccd60edb8f0801862a862a1eedb2a58",
     "crates/arkdeck-cli/src/maintainer_contracts.rs": "f79f70d986c996aa36592d893a557c61f4ebcf72b19d766c63068e978501f8c3",
     "crates/arkdeck-cli/src/operation_validation.rs": "c393eecccc0cf2376aab4efa353e0fa955a51c36704fc807724198cc7b99377a",
     "crates/arkdeck-cli/src/read_only_resources.rs": "d4d7e45f1ead6cc7373f8f6717d807e0c5f5a14e21bb00378637128a72b5ac18",
@@ -202,7 +202,7 @@
     "crates/arkdeck-cli/src/runtime_service_install.rs": "4bb0bef4ee42b1e30a3e613a10a0284c3d3e35186aaa1d3599e82437cba4e0b0",
     "crates/arkdeck-cli/src/runtime_service_preflight.rs": "5183cb5d27c9e1ab8f1b90ea98c0d734260ec3a3572bd4d9c17d2195b7664120",
     "crates/arkdeck-cli/src/runtime_service_verify.rs": "8c72d07c4d381996dd1b47440510f216ae95c98a8fd1c1bd8dca5e332477bb81",
-    "crates/arkdeck-cli/src/runtime_service_windows.rs": "bbffa583f7772cf60d291134b55982e1485291f7b5972e8d2c25681652f608d5",
+    "crates/arkdeck-cli/src/runtime_service_windows.rs": "490751418f692b260ce30da6bc4e56af96ac03f524b29b819af9049eefb26daf",
     "crates/arkdeck-cli/src/runtime_update/artifact.rs": "67581614abb966d9df73917f555440705b846f50a0b90fd9b867a3b05c8bb9de",
     "crates/arkdeck-cli/src/runtime_update/cache.rs": "ac2e969d9cfacf3f599a5d7f5be8544723ffd4554ada36fa2dd1da7f4bb83a89",
     "crates/arkdeck-cli/src/runtime_update/consumer.rs": "b6fe5e6b07edb95d8ba2c712020b26a9f28867c2af3ebf03d4fbb7d64b916852",
@@ -234,7 +234,7 @@
     "crates/arkdeck-cli/tests/agent_executions.rs": "4a469f4f7b5f5c46525a8023da075fca4594882bd24d1a3fcf4e1306aa59a82e",
     "crates/arkdeck-cli/tests/agent_resume.rs": "094fbfd079deae06eb78dff304206494fccb12616ec659c7759b16069a5b02d6",
     "crates/arkdeck-cli/tests/argv_fixtures.rs": "b6cb5ba16c44b8aa007ef1682702b9b2bd9894c58d9e6479c06ce748c2407f0a",
-    "crates/arkdeck-cli/tests/artifact_quota.rs": "7ab38f48d4a481d541d95938d3484079e405d3c6a980cf4341a9ad7231b31866",
+    "crates/arkdeck-cli/tests/artifact_quota.rs": "ddab2526e852b4854d7aee248bdfbd19861c758b1ddf8f70e110e7de9c359f23",
     "crates/arkdeck-cli/tests/artifact_resources.rs": "4939647babd6698ca44349baf3f1c4d9c9f643f128c94a9030eb2419ad60cc8e",
     "crates/arkdeck-cli/tests/bootstrap_resources.rs": "c5c47ea8c2dd0ec81699904ad075a41f4225af3a4822359b1f377850e2f41820",
     "crates/arkdeck-cli/tests/bundle_registration.rs": "97d454c02e5db893f2d722ff1e75694ad553f45a1b15cea82f4066128533357a",
@@ -273,9 +273,9 @@
     "crates/arkdeck-cli/tests/maintainer_contracts.rs": "6642d097e01ade77d2002a9ca4a5b6e9011f6710edd87e70bc047686dd0e7e6a",
     "crates/arkdeck-cli/tests/operation_validate.rs": "656275c0a26732bc8535590d2d176b57d615b74653be75b4b2b3f9eaf1f94b2a",
     "crates/arkdeck-cli/tests/read_leaves.rs": "510a9c3137c1f252d16d8b386311add161dbd22a3f5bf6c84e984131b568fcaa",
-    "crates/arkdeck-cli/tests/read_only_resources.rs": "c90b47cf944f947d17bc9d2755f7b8eebf26c4f02eb789cdaf2f2ffa7b936a4f",
+    "crates/arkdeck-cli/tests/read_only_resources.rs": "42fa09f58601f817ba14d21251d00512486e14bf97f52fe84300d8d55042fbf8",
     "crates/arkdeck-cli/tests/runtime_hdc_status.rs": "4404e7be32d7959535a2edbb64d31aaeb6f9700bc9903f2654f7409d52fc9eac",
-    "crates/arkdeck-cli/tests/runtime_health.rs": "6c3dbe660c2b0e252c681230c02d02b2ff39601fdcb6fe688f7057e55602aeff",
+    "crates/arkdeck-cli/tests/runtime_health.rs": "804d219062def7a07b6ff71e717f5668f536dba6fa1530b5c1bea6296e87c9b7",
     "crates/arkdeck-cli/tests/runtime_service.rs": "c712c58faf256b7957c1c06e86a42f527ea3d95fbfeeb7bc8ae4100e59d1a1fa",
     "crates/arkdeck-cli/tests/runtime_update.rs": "c2e979568a807fc32313303d6c034871b55187084f168559defa51bee0facb32",
     "crates/arkdeck-cli/tests/runtime_update_network.rs": "db92613670b4d78b89359dd004fb3f4cb8f0f958764e0c3712c8d1078230a5ed",
@@ -7798,7 +7798,8 @@
       "functions": {
         "the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart": "both",
         "an_artifact_directory_that_is_not_owner_only_refuses_the_start": "both",
-        "gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon": "historical"
+        "gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon": "historical",
+        "inventory_commands_honor_explicit_waits_through_the_signed_cli": "both"
       },
       "ignored": [],
       "platformFunctions": {
@@ -7806,6 +7807,7 @@
         "win32": [
           "an_artifact_directory_that_is_not_owner_only_refuses_the_start",
           "gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon",
+          "inventory_commands_honor_explicit_waits_through_the_signed_cli",
           "the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart"
         ],
         "linux": []

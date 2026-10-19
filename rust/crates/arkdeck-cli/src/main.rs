@@ -28,6 +28,15 @@ fn correlation() -> io::Result<String> {
 /// The local Runtime this invocation reaches: `--socket`, `ARKDECK_ENDPOINT`
 /// or the default endpoint, and the daemon identity it must prove.
 fn runtime_endpoint(invocation: &Invocation) -> Result<(LocalEndpoint, ServerIdentity), CliError> {
+    runtime_endpoint_with_deadline(invocation, None)
+}
+
+fn runtime_endpoint_with_deadline(
+    invocation: &Invocation,
+    deadline: Option<Instant>,
+) -> Result<(LocalEndpoint, ServerIdentity), CliError> {
+    #[cfg(not(windows))]
+    let _ = deadline;
     let endpoint = match invocation
         .socket
         .clone()
@@ -72,10 +81,47 @@ fn runtime_endpoint(invocation: &Invocation) -> Result<(LocalEndpoint, ServerIde
     #[cfg(windows)]
     let endpoint = if invocation.socket.is_some() {
         endpoint
+    } else if let Some(deadline) = deadline {
+        arkdeck_cli::runtime_service_windows::ensure_runtime_with_wait(
+            endpoint,
+            &identity,
+            deadline.saturating_duration_since(Instant::now()),
+        )?
     } else {
         arkdeck_cli::runtime_service_windows::ensure_runtime(endpoint, &identity)?
     };
     Ok((endpoint, identity))
+}
+
+/// Explicit wait for startup, authentication, health and inventory verification
+/// together. The timeout is local; the Runtime receives its original request.
+fn bounded_inventory_query(
+    invocation: &Invocation,
+    id: &str,
+    wait: u64,
+) -> Result<Value, CliError> {
+    let deadline = Instant::now() + Duration::from_millis(wait);
+    let (endpoint, identity) = runtime_endpoint_with_deadline(invocation, Some(deadline))?;
+    let mut client = Client::connect_bounded(
+        &endpoint,
+        &identity,
+        deadline.saturating_duration_since(Instant::now()),
+    )
+    .map_err(|error| CliError::from_connect(error, invocation.method))?;
+    if invocation.command == "runtime.health" {
+        return client.health(id).map_err(|error| match error {
+            arkdeck_client::ClientError::Contract(_) => CliError::new(
+                "protocolMalformed",
+                "the local Runtime response does not conform to the current contract",
+            ),
+            error => CliError::from_client(error, "health"),
+        });
+    }
+    let result = client
+        .request(id, invocation.method, invocation.params.clone())
+        .map_err(|error| CliError::from_client(error, invocation.method))?;
+    arkdeck_cli::validate_session_response(invocation, &result)?;
+    Ok(result)
 }
 
 fn run_flash_maintenance(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
@@ -152,6 +198,13 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     arkdeck_cli::validate_read_only_request(invocation)?;
     arkdeck_cli::validate_bootstrap_request(invocation)?;
     arkdeck_cli::validate_session_request(invocation)?;
+    if matches!(
+        invocation.command,
+        "runtime.health" | "runtime.storage.status" | "artifact.quota"
+    ) && let Some(wait) = invocation.timeout_ms
+    {
+        return bounded_inventory_query(invocation, id, wait);
+    }
     let (endpoint, identity) = runtime_endpoint(invocation)?;
     if matches!(invocation.command, "job.plan" | "job.submit") {
         // The request document is read before any connection is made.

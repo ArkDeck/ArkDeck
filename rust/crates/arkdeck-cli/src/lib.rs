@@ -1172,6 +1172,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "runtime.health" | "runtime.storage.status" | "artifact.quota" => &["timeout"],
         "runtime.signing.install-sdk-release" | "signing.install-sdk-release" => {
             &["sdk", "java", "bundleName", "projectRef"]
         }
@@ -1813,6 +1814,25 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     };
     let continuation_timeout =
         workspace_continuation::configure(command, &mut method_options, help)?;
+    let inventory_timeout = if !help
+        && matches!(
+            command,
+            "runtime.health" | "runtime.storage.status" | "artifact.quota"
+        ) {
+        method_options
+            .remove("timeout")
+            .map(|value| {
+                read_only_resources::duration(value.as_str().unwrap_or_default()).ok_or_else(|| {
+                    CliError::new(
+                        "invalidOption",
+                        "timeout must be a positive duration bounded by 24h",
+                    )
+                })
+            })
+            .transpose()?
+    } else {
+        None
+    };
     let wait_timeout = if command == "job.wait" && !help {
         job_wait::configure(&mut method_options, mode.as_deref() == Some("jsonl"))?
     } else {
@@ -1842,6 +1862,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         .or(human_action_timeout)
         .or(hdc_timeout)
         .or(continuation_timeout)
+        .or(inventory_timeout)
         .or(if flash_maintenance::serves(command) {
             method_options
                 .get("timeout")

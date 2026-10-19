@@ -170,6 +170,17 @@ pub fn ensure_runtime(
     endpoint: LocalEndpoint,
     identity: &ServerIdentity,
 ) -> Result<LocalEndpoint, CliError> {
+    ensure_runtime_with_wait(endpoint, identity, START_WAIT)
+}
+
+/// The same startup proof inside an explicit caller budget; no request is
+/// replayed and no second daemon is launched when the wait expires.
+pub fn ensure_runtime_with_wait(
+    endpoint: LocalEndpoint,
+    identity: &ServerIdentity,
+    wait: Duration,
+) -> Result<LocalEndpoint, CliError> {
+    let deadline = Instant::now() + wait;
     let named = std::env::var_os("ARKDECK_ENDPOINT");
     let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT");
     let target = StartTarget::resolve(named.as_deref(), development.as_deref(), identity.clone())
@@ -182,7 +193,17 @@ pub fn ensure_runtime(
     let Some(target) = target else {
         return Ok(endpoint);
     };
-    ensure_running(&target, START_WAIT).map_err(|failure| start_error(&failure))?;
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return Err(CliError::from_client(
+            ClientError::Transport(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "control deadline exceeded before Runtime startup",
+            )),
+            "health",
+        ));
+    }
+    ensure_running(&target, remaining).map_err(|failure| start_error(&failure))?;
     Ok(target.endpoint)
 }
 
