@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 33] = [
+const READABLE: [&str; 35] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -56,6 +56,8 @@ const READABLE: [&str; 33] = [
     "workspace.symbolize-crash@1",
     "flash.full-restore@1",
     "flash.recommission@1",
+    "flash.verify@1",
+    "flash.restore-boot-loop@1",
     "flash.dayu200",
 ];
 const MAX_LEDGER: usize = 16 * 1024 * 1024;

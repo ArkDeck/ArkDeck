@@ -1,7 +1,7 @@
 //! Candidate policy tests over real Runtime owners and synthetic Provider ports.
 //! No installed Runtime, HDC, device, or hardware evidence is involved.
 use super::*;
-use arkdeck_hoststore::{MaintenanceContext, MaintenanceReads};
+use arkdeck_hoststore::{MaintenanceContext, MaintenanceObservation, MaintenanceReads};
 use arkdeck_provider_arkforge::{
     ActionReceipt, DeviceBinding, Execution, FlashLane, LaneArtifact, LaneFailure, PrewarmReceipt,
     Terminal, maintenance as m,
@@ -17,6 +17,8 @@ struct Calls {
     writes: AtomicUsize,
     reads: AtomicUsize,
     bad_readback: AtomicUsize,
+    bad_evidence: AtomicUsize,
+    mounted_writable: AtomicUsize,
 }
 
 struct Lane {
@@ -168,6 +170,25 @@ struct Reads {
     calls: Arc<Calls>,
 }
 impl MaintenanceReads for Reads {
+    fn observe_evidence(
+        &self,
+        execution: &Execution,
+        deadline: Instant,
+    ) -> Result<MaintenanceObservation, String> {
+        if self.calls.bad_evidence.load(Ordering::SeqCst) == 1 {
+            return Err("synthetic evidence read unavailable".into());
+        }
+        let (identity, mut binding) = self.observe(execution, deadline)?;
+        if self.calls.bad_evidence.load(Ordering::SeqCst) == 2 {
+            binding.binding_revision += 1;
+        }
+        Ok(MaintenanceObservation {
+            identity,
+            binding,
+            model: "synthetic-board".into(),
+            firmware: "synthetic-firmware".into(),
+        })
+    }
     fn observe(
         &self,
         execution: &Execution,
@@ -205,6 +226,9 @@ impl MaintenanceReads for Reads {
     ) -> Result<m::ReadOutcome, String> {
         self.observe(execution, deadline)?;
         self.calls.reads.fetch_add(1, Ordering::SeqCst);
+        if self.calls.mounted_writable.load(Ordering::SeqCst) != 0 {
+            return Ok(m::ReadOutcome::MountedWritable);
+        }
         Ok(m::ReadOutcome::FullHash(
             if self.calls.bad_readback.load(Ordering::SeqCst) != 0 {
                 "0".repeat(64)
@@ -281,7 +305,22 @@ fn submit(owners: &Owners, fakes: &Fakes, params: &Value) -> String {
 }
 
 fn run(owners: &Owners, fakes: &Fakes, job: &str) -> Value {
-    let answer = owners.answer(fakes, "job.run", json!({"jobId":job}).as_object().unwrap());
+    run_with_clock(owners, fakes, job, now)
+}
+
+fn run_with_clock(
+    owners: &Owners,
+    fakes: &Fakes,
+    job: &str,
+    clock: fn() -> Option<String>,
+) -> Value {
+    let answer = owners.answer_with_clock(
+        fakes,
+        "job.run",
+        json!({"jobId":job}).as_object().unwrap(),
+        clock,
+        precise_now,
+    );
     if answer["ok"] == true
         && let Err(error) =
             arkdeck_contract::validate_method_value("job.status", "result", &answer["result"])
@@ -321,9 +360,50 @@ fn source_history(owners: &Owners, source: &str) -> Vec<Vec<u8>> {
     .collect()
 }
 
+fn assert_published_result(owners: &Owners, fakes: &Fakes, job: &str) {
+    let params = json!({"jobId":job});
+    for method in ["job.result", "job.evidence"] {
+        let answer = owners.answer(fakes, method, params.as_object().unwrap());
+        assert_eq!(answer["ok"], true, "{method}: {answer}");
+        arkdeck_contract::validate_method_value(method, "result", &answer["result"])
+            .unwrap_or_else(|error| panic!("{method}: {error:?}; {answer}"));
+        let evidence = if method == "job.result" {
+            assert_eq!(
+                answer["result"]["job"]["sessionPublication"]["state"], "published",
+                "{answer}"
+            );
+            assert_eq!(answer["result"]["artifacts"].as_array().unwrap().len(), 1);
+            &answer["result"]["evidence"]
+        } else {
+            &answer["result"]
+        };
+        assert_eq!(evidence["status"], "verified", "{answer}");
+        assert_eq!(
+            evidence["observation"]["confirmationMethod"], "machineReadback",
+            "{answer}"
+        );
+        assert_eq!(evidence["outcomeUnknown"], false);
+        assert_eq!(evidence["missingRequiredArtifacts"], json!([]));
+        assert_eq!(evidence["artifacts"][0]["bytesVerified"], true);
+        if evidence["authority"]["kind"] == "runtimeCapability" {
+            assert!(
+                evidence["observation"]["confirmedAtUtc"].as_str().unwrap()
+                    < evidence["authority"]["admittedAtUtc"].as_str().unwrap(),
+                "{answer}"
+            );
+        }
+    }
+}
+
 #[test]
 fn restoration_policy_uses_one_exact_ramdisk_capability_and_independent_readback() {
+    static TICKS: AtomicUsize = AtomicUsize::new(0);
+    fn advancing_clock() -> Option<String> {
+        let tick = TICKS.fetch_add(1, Ordering::SeqCst);
+        Some(format!("2026-09-25T00:{:02}:{:02}Z", tick / 60, tick % 60))
+    }
     let _lock = exclusive();
+    TICKS.store(0, Ordering::SeqCst);
     let root = lay_down();
     let fakes = Fakes::default();
     let owners = Owners::open(&root, &fakes);
@@ -333,12 +413,13 @@ fn restoration_policy_uses_one_exact_ramdisk_capability_and_independent_readback
     let calls = Arc::new(Calls::default());
     install(&owners, &fakes, &calls);
     let job = submit(&owners, &fakes, &request(&source, "success", true));
-    let result = run(&owners, &fakes, &job);
+    let result = run_with_clock(&owners, &fakes, &job, advancing_clock);
     assert_eq!(result["result"]["state"], "succeeded", "{result}");
     assert_eq!(
         result["result"]["maintenanceResult"]["exit_code"], 0,
         "{result}"
     );
+    assert_published_result(&owners, &fakes, &job);
     assert_eq!(calls.prepares.load(Ordering::SeqCst), 1);
     assert_eq!(calls.writes.load(Ordering::SeqCst), 1);
     assert_eq!(calls.reads.load(Ordering::SeqCst), 1);
@@ -377,16 +458,71 @@ fn restoration_policy_uses_one_exact_ramdisk_capability_and_independent_readback
     assert_eq!(again["error"]["code"], "resourceConflict", "{again}");
     assert_eq!(calls.writes.load(Ordering::SeqCst), 1);
     let verify = submit(&owners, &fakes, &request(&job, "verify-restored", false));
-    let verified = run(&owners, &fakes, &verify);
+    let verified = run_with_clock(&owners, &fakes, &verify, advancing_clock);
     assert_eq!(verified["result"]["state"], "succeeded", "{verified}");
     assert_eq!(
         verified["result"]["maintenanceResult"]["exit_code"], 0,
         "{verified}"
     );
+    assert_published_result(&owners, &fakes, &verify);
     assert_eq!(calls.writes.load(Ordering::SeqCst), 1);
     assert_eq!(calls.reads.load(Ordering::SeqCst), 2);
     assert_eq!(uses(&root), original_uses + 1);
     assert_eq!(source_history(&owners, &source), original);
+}
+
+#[test]
+fn maintenance_missing_or_mismatched_evidence_stops_before_any_write() {
+    let _lock = exclusive();
+    for restoring in [false, true] {
+        for bad_evidence in [1, 2] {
+            let root = lay_down();
+            let fakes = Fakes::default();
+            let owners = Owners::open(&root, &fakes);
+            let source = primary(&owners, &fakes);
+            let original = source_history(&owners, &source);
+            let original_uses = uses(&root);
+            let calls = Arc::new(Calls::default());
+            install(&owners, &fakes, &calls);
+            let job = submit(
+                &owners,
+                &fakes,
+                &request(&source, "evidence-refused", restoring),
+            );
+            calls.bad_evidence.store(bad_evidence, Ordering::SeqCst);
+            let stopped = run(&owners, &fakes, &job);
+            assert_eq!(stopped["result"]["state"], "failed", "{stopped}");
+            assert_eq!(stopped["result"]["outcomeUnknown"], false);
+            assert_eq!(calls.prepares.load(Ordering::SeqCst), 0);
+            assert_eq!(calls.writes.load(Ordering::SeqCst), 0);
+            assert_eq!(calls.reads.load(Ordering::SeqCst), 0);
+            assert_eq!(uses(&root), original_uses);
+            assert_eq!(source_history(&owners, &source), original);
+        }
+    }
+}
+
+#[test]
+fn maintenance_partial_verification_remains_readable_and_published() {
+    let _lock = exclusive();
+    let root = lay_down();
+    let fakes = Fakes::default();
+    let owners = Owners::open(&root, &fakes);
+    let source = primary(&owners, &fakes);
+    let calls = Arc::new(Calls::default());
+    install(&owners, &fakes, &calls);
+    let job = submit(&owners, &fakes, &request(&source, "partial", false));
+    calls.mounted_writable.store(1, Ordering::SeqCst);
+    let result = run(&owners, &fakes, &job);
+    assert_eq!(result["result"]["state"], "succeeded", "{result}");
+    let report = &result["result"]["maintenanceResult"];
+    assert_eq!(report["exit_code"], 9, "{report}");
+    assert_eq!(report["outcome"], "partial");
+    assert_eq!(report["verified"], 0);
+    assert_eq!(report["failed"], 0);
+    assert!(report["skipped"].as_u64().unwrap() > 0);
+    assert_published_result(&owners, &fakes, &job);
+    assert_eq!(calls.writes.load(Ordering::SeqCst), 0);
 }
 
 #[test]

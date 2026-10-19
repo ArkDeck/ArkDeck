@@ -883,4 +883,6 @@ mod flash_maintenance;
 #[cfg(any(target_os = "macos", windows))]
 mod flash_recommission_retry;
 #[cfg(any(target_os = "macos", windows))]
-pub use flash_maintenance::{MaintenanceContext, MaintenanceReads, NativeMaintenanceReads};
+pub use flash_maintenance::{
+    MaintenanceContext, MaintenanceObservation, MaintenanceReads, NativeMaintenanceReads,
+};
