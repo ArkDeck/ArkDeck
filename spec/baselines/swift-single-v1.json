@@ -1,5 +1,5 @@
 {
-  "catalogDigest": "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195",
+  "catalogDigest": "fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18",
   "contractIdentity": "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2",
   "corpusFileCount": 110,
   "corpusMethodCounts": {
@@ -560,7 +560,7 @@
     "successes": 608
   },
   "directoryDigests": {
-    "Catalog/operations": "3cd70b9c0338bcae88fc2b0318505102613a09ae7a7e78cd23a3a705bc6d9c73",
+    "Catalog/operations": "7fd57899e08859c5f210b2690129b8902a437c053083705ff3b899e6736a068f",
     "Catalog/profiles": "b15c4106c7c80fb02c7c2b93787455c130ccf1e9edcb677b8ce2c02b87940d0a",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "09b90f7b27e0644f8f6a937eb72d20f439dfa718ead3e92f06c7f55499e450c2",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
@@ -568,8 +568,8 @@
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
-      "blob": "91090bcb143d6932cacd6f37b2702ae02c68e8eb",
-      "sha256": "ce943eb347178d6507221f74ace8b0998369d1dce97966637915cb4afeaeb773"
+      "blob": "599f5ef8b15fb0480e14b25d797581e2f1fad1b8",
+      "sha256": "066e4c91419c47eb1938c0dd7aea05cfec58e04e28fa3ada849c22776bf04506"
     },
     "Catalog/operations/analyzer.analyze-trace.v1.json": {
       "blob": "0a12b2f04854bc18c4b98381d4cc0bc1a6115c3e",
@@ -648,8 +648,8 @@
       "sha256": "2a3467a96e8c34c7f0373a1e2fb7c8cd6bdc0a4fa0369d1e10e274950b7646f6"
     },
     "Catalog/operations/observe.device.v1.json": {
-      "blob": "bf736d370c95f124184fdc3cfdddab7151275148",
-      "sha256": "d5ff3627da293bc59affbef5c869c19f475998e8e3a591b72a85d4a0ba60ac37"
+      "blob": "9ae8c79a71b18675b939384b4e106cd647b3a2f1",
+      "sha256": "fddd51b73d7424f830b08a354da98dd17a09544139b3880381ae3d9dc09167c3"
     },
     "Catalog/operations/port-forward.create.v1.json": {
       "blob": "f2628c6aacdde4569a3122d37a158649ee825128",
@@ -1368,8 +1368,8 @@
       "sha256": "4d47d63b8c1ba0d40e4c3e67fdf845a076dd339791ef94bdc096106e39624668"
     },
     "openspec/contracts/workflow-step.schema.json": {
-      "blob": "a646b5d3628af45021b9601d006d9075119fa490",
-      "sha256": "0479a714e95fb84b29a494a065c4075299851eb4cb410244b3397ccf6a685a20"
+      "blob": "a21b13632124da1b595985c902cbba8fc0f3cc76",
+      "sha256": "efdaa137f86c0aaa3f7339b08816f9e0ab8401c92ea99432c034f59933c6c3c7"
     },
     "spec/control/methods/agent.abandon.json": {
       "blob": "8873e36ae748d2097598336c855ebd0096fe8508",
@@ -1812,7 +1812,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "35e32d056af3cdeb49ceba2586103f2d45da8e84dc2ec1f688cea9599664139c",
+  "inputDigest": "0ead214f890d68f5c64fdd652928827bb6c287d813e717194938d21a0dc6736d",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",
