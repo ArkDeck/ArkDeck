@@ -8,6 +8,14 @@ and immutable Runtime Artifact domain as separate typed objects. Their roots,
 quotas, usage, and retention policies are never added together; the Artifact
 root remains an opaque Runtime reference.
 
+`runtime storage status`, `artifact quota` and `runtime health` accept an optional
+`--timeout <duration>` (positive `ms`, `s`, `m` or `h`, at most 24 hours).
+For example, `arkdeck runtime storage status --timeout 5m --output json` can wait
+for full verification of retained multi-gigabyte images. The explicit budget
+covers Windows startup, authentication, health and the read together. It is not
+sent to the Runtime, does not cancel verification or replay a request, and does
+not skip payload hashing. Omitting it retains the existing 20-second waits.
+
 The Session resource is a canonical private document in the daemon state
 directory. Policy and root mutations require the exact current generation and
 publish by atomic rename. A custom root must be an existing, owner-controlled,

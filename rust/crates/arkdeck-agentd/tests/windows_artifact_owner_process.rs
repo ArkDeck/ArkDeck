@@ -639,6 +639,61 @@ fn cli(
     (output.status.code(), envelope)
 }
 
+fn signed_daemon(root: &Root, thumbprint: &std::ffi::OsStr) -> (PathBuf, String) {
+    let signed = root.0.join("signed-bin");
+    std::fs::create_dir(&signed).unwrap();
+    let daemon = signed.join("arkdeck-agentd.exe");
+    std::fs::copy(env!("CARGO_BIN_EXE_arkdeck-agentd"), &daemon).unwrap();
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/windows-dev-identity.ps1");
+    let signing = Command::new(pwsh())
+        .args(["-NoProfile", "-NonInteractive", "-File"])
+        .arg(&script)
+        .arg("sign")
+        .arg("-Thumbprint")
+        .arg(thumbprint)
+        .arg("-Path")
+        .arg(&daemon)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(signing.status.success(), "{signing:?}");
+    let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
+    let pin = pin["pin"].as_str().unwrap().to_owned();
+
+    (daemon, pin)
+}
+
+#[test]
+fn inventory_commands_honor_explicit_waits_through_the_signed_cli() {
+    let Some(thumbprint) =
+        std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty())
+    else {
+        eprintln!("SKIPPED: no host-trusted development signer; no signed CLI check was performed");
+        return;
+    };
+    let _turn = turn();
+    let root = Root::new().with_recorded_job();
+    let original = Root::tree(&root.artifacts().join(JOB));
+    let (daemon, pin) = signed_daemon(&root, &thumbprint);
+    let mut running = Daemon::start(&daemon, &root.0);
+    let pipe = running.serving();
+    for arguments in [
+        vec!["artifact", "quota", "--timeout", "5m"],
+        vec!["runtime", "storage", "status", "--timeout", "5m"],
+        vec!["runtime", "health", "--timeout", "5m"],
+    ] {
+        let (status, envelope) = cli(&root, &daemon, &pin, &pipe, &arguments);
+        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        assert_eq!(envelope["ok"], true);
+        if arguments[0] == "artifact" {
+            assert_eq!(envelope["result"], expected_quota(&root));
+        }
+    }
+    assert_eq!(Root::tree(&root.artifacts().join(JOB)), original);
+    running.stop(&root.0);
+}
+
 #[test]
 fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let Some(thumbprint) =
@@ -656,26 +711,7 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let exports = root.exports();
     let job_artifacts = Root::tree(&root.artifacts().join(JOB));
     let expected = expected_reads(&root);
-    let signed = root.0.join("signed-bin");
-    std::fs::create_dir(&signed).unwrap();
-    let daemon = signed.join("arkdeck-agentd.exe");
-    std::fs::copy(env!("CARGO_BIN_EXE_arkdeck-agentd"), &daemon).unwrap();
-    let script =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/windows-dev-identity.ps1");
-    let signing = Command::new(pwsh())
-        .args(["-NoProfile", "-NonInteractive", "-File"])
-        .arg(&script)
-        .arg("sign")
-        .arg("-Thumbprint")
-        .arg(&thumbprint)
-        .arg("-Path")
-        .arg(&daemon)
-        .stdin(Stdio::null())
-        .output()
-        .unwrap();
-    assert!(signing.status.success(), "{signing:?}");
-    let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
-    let pin = pin["pin"].as_str().unwrap().to_owned();
+    let (daemon, pin) = signed_daemon(&root, &thumbprint);
 
     let quota = expected_quota(&root);
     let mut running = Daemon::start(&daemon, &root.0);

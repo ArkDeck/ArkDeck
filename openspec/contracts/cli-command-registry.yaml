@@ -158,6 +158,17 @@
     "options":
       - "form": "value"
         "grammar":
+          "kind": "duration"
+          "maximumMilliseconds": 86400000
+          "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+        "name": "--timeout"
+        "placeholder": "duration"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "total client wait for startup, authentication and the read; the Runtime keeps running"
+      - "form": "value"
+        "grammar":
           "kind": "enumeration"
           "values":
             - "human"
@@ -2383,6 +2394,17 @@
       - - "--output"
         - "--json"
     "options":
+      - "form": "value"
+        "grammar":
+          "kind": "duration"
+          "maximumMilliseconds": 86400000
+          "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+        "name": "--timeout"
+        "placeholder": "duration"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "total client wait for startup, authentication and the read; the Runtime keeps running"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -6732,6 +6754,17 @@
       - - "--output"
         - "--json"
     "options":
+      - "form": "value"
+        "grammar":
+          "kind": "duration"
+          "maximumMilliseconds": 86400000
+          "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+        "name": "--timeout"
+        "placeholder": "duration"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "total client wait for startup, authentication and the read; the Runtime keeps running"
       - "form": "value"
         "grammar":
           "kind": "enumeration"

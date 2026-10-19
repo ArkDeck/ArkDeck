@@ -1,6 +1,7 @@
 //! `arkdeck runtime health` against a fake Runtime: the contract preflight is
 //! the call, as it is in Swift's client (`verifyContract: method != "health"`),
 //! and the answer is the Runtime's own health document in Swift's envelope.
+
 // The fake Runtime these leaves are driven against is a Unix socket.
 #[cfg(target_os = "macos")]
 mod support;
@@ -34,6 +35,20 @@ mod runtime {
         assert_eq!(envelope["meta"]["controlProtocolVersion"], PROTOCOL_VERSION);
         // The leaf sends no parameters at all, as Swift's `health` request does.
         assert_eq!(envelope["result"]["providers"], json!(["hdc"]));
+    }
+
+    #[test]
+    fn bounded_health_keeps_one_exchange_and_the_runtime_document() {
+        let (output, envelope) = support::run_session(
+            &["runtime", "health", "--timeout", "5m"],
+            vec![(
+                "health".to_owned(),
+                Value::Null,
+                json!({"ok":true,"result":health()}),
+            )],
+        );
+        assert_eq!(output.status.code(), Some(0));
+        assert_eq!(envelope["result"], health());
     }
 
     #[test]

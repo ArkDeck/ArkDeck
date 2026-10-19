@@ -211,6 +211,20 @@
         {
           "form": "value",
           "grammar": {
+            "kind": "duration",
+            "maximumMilliseconds": 86400000,
+            "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+          },
+          "name": "--timeout",
+          "placeholder": "duration",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "total client wait for startup, authentication and the read; the Runtime keeps running"
+        },
+        {
+          "form": "value",
+          "grammar": {
             "kind": "enumeration",
             "values": [
               "human",
@@ -3201,6 +3215,20 @@
         ]
       ],
       "options": [
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "duration",
+            "maximumMilliseconds": 86400000,
+            "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+          },
+          "name": "--timeout",
+          "placeholder": "duration",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "total client wait for startup, authentication and the read; the Runtime keeps running"
+        },
         {
           "form": "value",
           "grammar": {
@@ -9037,6 +9065,20 @@
         ]
       ],
       "options": [
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "duration",
+            "maximumMilliseconds": 86400000,
+            "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+          },
+          "name": "--timeout",
+          "placeholder": "duration",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "total client wait for startup, authentication and the read; the Runtime keeps running"
+        },
         {
           "form": "value",
           "grammar": {
@@ -20680,7 +20722,7 @@
       "positionals": [],
       "replacementArgvPattern": null,
       "requiresExactlyOneOf": [],
-      "summary": "write every \u00a714 contract product and argv fixture from the compiled registries"
+      "summary": "write every §14 contract product and argv fixture from the compiled registries"
     },
     {
       "catalogOperation": null,

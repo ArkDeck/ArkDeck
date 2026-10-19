@@ -669,6 +669,28 @@ mod endpoint {
     const SHARED_DELAYS_MS: [u64; 2] = [2_500, 2_000];
 
     #[test]
+    fn inventory_timeout_is_shared_by_health_and_query_without_replay() {
+        for (argv, method, result) in [
+            (vec!["artifact", "quota", "--timeout", SHARED_BUDGET], "artifact.quota",
+                json!({"totalBytes": 8589934592_u64, "usedBytes": 1, "remainingBytes":8589934591_u64})),
+            (vec!["runtime", "storage", "status", "--timeout", SHARED_BUDGET], "runtime.storage.status",
+                sample(include_str!("../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.status.jsonl"))["result"].clone()),
+        ] {
+            let (out, requests) = run_delayed(
+                &argv, json!({"id":"cli-read-test", "ok":true, "result":result}), SHARED_DELAYS_MS,
+            );
+            assert_eq!(out.status.code(), Some(75));
+            let doc: Value = serde_json::from_slice(&out.stdout).unwrap();
+            assert_eq!(doc["error"]["code"], "clientTimeout");
+            assert!(doc.get("result").is_none());
+            assert_eq!(requests.len(), 2);
+            assert_eq!(requests[0]["method"], "health");
+            assert_eq!(requests[1]["method"], method);
+            assert!(requests[1]["params"].is_null());
+        }
+    }
+
+    #[test]
     fn evidence_timeout_is_shared_by_health_and_query_and_emits_no_snapshot_or_replay() {
         let snapshot = sample(EVIDENCE)["result"].clone();
         let id = snapshot["jobId"].as_str().unwrap();

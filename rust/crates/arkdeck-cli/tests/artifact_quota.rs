@@ -42,5 +42,39 @@ fn quota_argv_matches_current_swift() {
         .into_iter()
         .map(str::to_owned)
         .collect();
-    assert_eq!(parse(&bounded).unwrap_err().code, "invalidOption");
+    let invocation = parse(&bounded).unwrap();
+    assert_eq!(invocation.timeout_ms, Some(300_000));
+    assert_eq!(invocation.params, None);
+}
+
+#[test]
+fn inventory_wait_is_local_bounded_and_discoverable() {
+    use arkdeck_cli::{help_text, parse};
+    for path in [
+        vec!["runtime", "health"],
+        vec!["runtime", "storage", "status"],
+        vec!["artifact", "quota"],
+    ] {
+        let args = |extra: &[&str]| {
+            path.iter()
+                .chain(extra)
+                .map(|s| (*s).to_owned())
+                .collect::<Vec<_>>()
+        };
+        let original = parse(&args(&[])).unwrap();
+        assert_eq!(original.timeout_ms, None);
+        let bounded = parse(&args(&["--timeout", "5m"])).unwrap();
+        assert_eq!(bounded.timeout_ms, Some(300_000));
+        assert_eq!(bounded.method, original.method);
+        assert_eq!(bounded.params, original.params);
+        assert!(parse(&args(&["--help"])).unwrap().help);
+        let help = help_text(&path.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>()).unwrap();
+        assert!(help.contains("--timeout"));
+        for duration in ["0s", "01s", "25h", "18446744073709551616h"] {
+            assert_eq!(
+                parse(&args(&["--timeout", duration])).unwrap_err().code,
+                "invalidOption"
+            );
+        }
+    }
 }
