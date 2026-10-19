@@ -70,10 +70,18 @@ reserve、consume。主机输入构建不构成设备验收。
   `fmt-batched-final.log`。
 - `sh scripts/check-sdd.sh` exit 0，0 errors、0 warnings、121 acceptance IDs，日志
   `sdd-final.log`；`git diff --check` exit 0。
+- CI 发现两处生成物 drift 后，官方 `generate-contract.py --write`、`--check` 均 exit 0，
+  仅更新输入指纹，110 个 control methods、1085 个 recorded shapes 和 contract identity
+  保持不变。Windows JSON 从官方 Swift Flash 投影同步，单跑
+  `TheCatalogReviewIsTheOneTheMacOsAppCompilesIn` 一项 exit 0。日志
+  `contract-*-ci-fix.log`、`windows-projection-test-ci-fix.log`。
 
-Windows 本机不执行 SwiftPM 或 App 构建；相应变更交 PR CI。本地未运行统一门。
+本机未执行 SwiftPM、macOS App build-for-testing 或本地统一门；Windows 只单跑了上述
+离线投影检查。
 
 ## CI
 
-观测能力发布 PR 和当前 head 的 CI 结果待实际运行后记录。CI 成功与 host fixture 均不
-替代本专项的真实设备结果。
+观测能力 [PR #2678](https://github.com/ArkDeck/ArkDeck/pull/2678) 的首轮
+`39197939838` 在契约输入指纹与 Windows App 投影一致性检查失败；已按实际错误同步生成物，
+未修改断言。修复 head 的 CI 结论待实际完成后记录。CI 成功与 host fixture 均不替代
+本专项的真实设备结果。
