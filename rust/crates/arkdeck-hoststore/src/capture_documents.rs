@@ -214,6 +214,16 @@ pub(crate) fn flash_facts(
     for (key, value) in facts {
         fields.insert(key.clone(), json!(value));
     }
+    if name == "post-flash-facts.json" {
+        for (property, member) in [
+            ("const.product.model", "model"),
+            ("const.ohos.fullname", "firmware"),
+        ] {
+            if let Some(value) = facts.get(property) {
+                fields.insert(member.into(), json!(value));
+            }
+        }
+    }
     flash_lineage(&mut fields, record);
     session_json::encode_canonical_pretty(&Value::Object(fields))
         .map_err(|_| "the document cannot be encoded".into())

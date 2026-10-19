@@ -1186,6 +1186,7 @@ impl FlashRunner<'_> {
                 "completeOverwriteRecovery.freshTargetTopologyOrToolMissing".into(),
             ));
         }
+        self.capture_preflight_observation(run, flash, facts)?;
         let undurable = |detail: String| {
             Stop::Failed(format!(
                 "authorizationRequired: capability admission could not become durable: {detail}"
@@ -1369,6 +1370,70 @@ impl FlashRunner<'_> {
                 return Err(undurable("the recovery state could not be entered".into()));
             }
         }
+        Ok(())
+    }
+
+    /// Native Normal-mode reads have no daemon execution yet. Persist their
+    /// complete machine observation before consuming authority; postflight
+    /// publishes its own facts without replacing this admission audit point.
+    fn capture_preflight_observation(
+        &self,
+        run: &mut Run,
+        flash: &FlashExecution<'_>,
+        facts: &RockchipFacts,
+    ) -> Stepped<()> {
+        // Legacy lane-only compositions and Loader-first observations retain
+        // their existing postflight product. Only the composed Normal reader
+        // can establish this complete pre-admission evidence.
+        if !matches!(
+            run.record.operation(),
+            "flash.full-restore@1" | "flash.dayu200"
+        ) || facts.device_mode != "hdc"
+        {
+            return Ok(());
+        }
+        let context = flash
+            .planning
+            .maintenance
+            .lock()
+            .map_err(|_| Stop::Failed("flash evidence reader is unavailable".into()))?
+            .clone();
+        let Some(context) = context else {
+            return Ok(());
+        };
+        let observed = context
+            .reads
+            .observe_flash_evidence(facts, Instant::now() + std::time::Duration::from_secs(30))
+            .map_err(|reason| Stop::Failed(format!("flash evidence readback failed: {reason}")))?;
+        if observed.binding.target_id != facts.target_id
+            || observed.binding.binding_revision != facts.binding_revision
+            || observed.binding.stable_identity_sha256 != facts.identity_sha256
+            || observed.binding.connect_key != facts.execution_connect_key
+            || Some(&observed.binding.usb_topology)
+                != facts.server_facts.get("dayu200HDCNormalAliasUSBTopology")
+            || observed.identity.serial_sha256 != facts.identity_sha256
+            || observed.identity.topology_sha256
+                != sha256_hex(observed.binding.usb_topology.as_bytes())
+            || !crate::job_record::digest(&observed.identity.descriptor_sha256)
+            || observed.model.trim().is_empty()
+            || observed.firmware.trim().is_empty()
+        {
+            return Err(Stop::Failed(
+                "flash evidence differs from the materialized target".into(),
+            ));
+        }
+        let confirmed = run.clock()?;
+        run.record.set_evidence_observation(json!({
+            "providerID": run.record.provider(), "toolVersion": TOOL_VERSION,
+            "toolSHA256": flash.lane.toolchain_sha256(), "transport": "usb",
+            "confirmedAtUTC": confirmed, "confirmationMethod": "machineReadback",
+            "preflightSteps": [], "targetID": observed.binding.target_id,
+            "bindingRevision": observed.binding.binding_revision,
+            "stableIdentitySHA256": observed.binding.stable_identity_sha256,
+            "model": observed.model, "firmware": observed.firmware,
+        }));
+        run.record.set_first_evidence(&confirmed);
+        run.persist(self.runner.jobs)?;
         Ok(())
     }
 
@@ -1727,8 +1792,8 @@ impl FlashRunner<'_> {
     }
 
     /// Swift `publishLanePostflightFacts`: the completed plan's postflight
-    /// facts become the Job's evidence observation, and its declared facts
-    /// product is published from them.
+    /// facts become the Job's evidence observation only when no pre-admission
+    /// observation exists. The declared product always retains postflight facts.
     fn publish_postflight_facts(
         &self,
         run: &mut Run,
@@ -1795,8 +1860,10 @@ impl FlashRunner<'_> {
         if let Some(firmware) = facts.get("const.ohos.fullname") {
             observation["firmware"] = json!(firmware);
         }
-        run.record.set_evidence_observation(observation);
-        run.record.set_first_evidence(&confirmed);
+        if run.record.evidence_observation().is_none() {
+            run.record.set_evidence_observation(observation);
+            run.record.set_first_evidence(&confirmed);
+        }
         run.persist(self.runner.jobs)?;
         let contents = crate::capture_documents::flash_facts(
             descriptor,

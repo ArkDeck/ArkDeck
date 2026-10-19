@@ -170,6 +170,45 @@ struct Reads {
     calls: Arc<Calls>,
 }
 impl MaintenanceReads for Reads {
+    fn observe_flash_evidence(
+        &self,
+        facts: &arkdeck_hoststore::RockchipFacts,
+        _deadline: Instant,
+    ) -> Result<MaintenanceObservation, String> {
+        if self.calls.bad_evidence.load(Ordering::SeqCst) == 1 {
+            return Err("synthetic evidence read unavailable".into());
+        }
+        let mut binding = DeviceBinding {
+            target_id: facts.target_id.clone(),
+            binding_revision: facts.binding_revision,
+            stable_identity_sha256: facts.identity_sha256.clone(),
+            connect_key: facts.execution_connect_key.clone(),
+            usb_topology: facts.server_facts["dayu200HDCNormalAliasUSBTopology"].clone(),
+            loader_first_connector_sha256: None,
+            recommission: None,
+        };
+        if self.calls.bad_evidence.load(Ordering::SeqCst) == 2 {
+            binding.binding_revision += 1;
+        }
+        let mut observed = MaintenanceObservation {
+            identity: m::Identity {
+                serial_sha256: binding.stable_identity_sha256.clone(),
+                topology_sha256: arkdeck_contract::sha256_hex(binding.usb_topology.as_bytes()),
+                descriptor_sha256: "d".repeat(64),
+            },
+            binding,
+            model: "synthetic-board".into(),
+            firmware: "synthetic-firmware".into(),
+        };
+        match self.calls.bad_evidence.load(Ordering::SeqCst) {
+            3 => observed.model.clear(),
+            4 => observed.firmware.clear(),
+            5 => observed.binding.connect_key.push_str("-drifted"),
+            6 => observed.identity.serial_sha256 = "0".repeat(64),
+            _ => {}
+        }
+        Ok(observed)
+    }
     fn observe_evidence(
         &self,
         execution: &Execution,
@@ -392,6 +431,91 @@ fn assert_published_result(owners: &Owners, fakes: &Fakes, job: &str) {
                 "{answer}"
             );
         }
+    }
+}
+
+#[test]
+fn full_restore_retains_pre_admission_evidence_with_an_advancing_clock() {
+    static TICKS: AtomicUsize = AtomicUsize::new(0);
+    fn advancing_clock() -> Option<String> {
+        let tick = TICKS.fetch_add(1, Ordering::SeqCst);
+        Some(format!("2026-09-25T00:{:02}:{:02}Z", tick / 60, tick % 60))
+    }
+    let _lock = exclusive();
+    TICKS.store(0, Ordering::SeqCst);
+    let root = lay_down();
+    let fakes = Fakes::default();
+    let owners = Owners::open(&root, &fakes);
+    let calls = Arc::new(Calls::default());
+    install(&owners, &fakes, &calls);
+    fakes.begin(Script::default());
+    let params = recorded("failures", "prewarmRefused.submit")["params"].clone();
+    let accepted = owners.answer(&fakes, "job.submit", params.as_object().unwrap());
+    let job = accepted["result"]["jobId"].as_str().unwrap();
+    let completed = run_with_clock(&owners, &fakes, job, advancing_clock);
+    assert_eq!(completed["result"]["state"], "succeeded", "{completed}");
+    let result = owners.answer(
+        &fakes,
+        "job.result",
+        json!({"jobId":job}).as_object().unwrap(),
+    );
+    assert_eq!(
+        result["result"]["job"]["sessionPublication"]["state"], "published",
+        "{result}"
+    );
+    let evidence = &result["result"]["evidence"];
+    arkdeck_contract::validate_method_value("job.result", "result", &result["result"]).unwrap();
+    assert_eq!(evidence["status"], "verified", "{result}");
+    assert_eq!(evidence["observation"]["model"], "synthetic-board");
+    assert_eq!(evidence["observation"]["firmware"], "synthetic-firmware");
+    assert!(
+        evidence["observation"]["confirmedAtUtc"].as_str().unwrap()
+            < evidence["authority"]["admittedAtUtc"].as_str().unwrap(),
+        "{result}"
+    );
+    assert_eq!(evidence["outcomeUnknown"], false);
+    assert_eq!(evidence["missingRequiredArtifacts"], json!([]));
+    assert_eq!(uses(&root), 1);
+    let artifact = result["result"]["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["name"] == "post-flash-facts.json")
+        .unwrap();
+    let bytes = owners
+        .artifacts
+        .read(job, artifact["artifactId"].as_str().unwrap(), 0, 4096, true)
+        .unwrap();
+    assert!(bytes.eof);
+    let postflight: Value = serde_json::from_slice(&bytes.bytes).unwrap();
+    assert_eq!(postflight["model"], "DAYU200");
+    assert_eq!(postflight["firmware"], "OpenHarmony-7.0.0.36");
+    assert_eq!(postflight["const.product.model"], "DAYU200");
+    assert_eq!(postflight["const.ohos.fullname"], "OpenHarmony-7.0.0.36");
+}
+
+#[test]
+fn full_restore_missing_or_mismatched_preflight_consumes_no_capability() {
+    let _lock = exclusive();
+    for bad_evidence in 1..=6 {
+        let root = lay_down();
+        let fakes = Fakes::default();
+        let owners = Owners::open(&root, &fakes);
+        let calls = Arc::new(Calls::default());
+        install(&owners, &fakes, &calls);
+        fakes.begin(Script::default());
+        let params = recorded("failures", "prewarmRefused.submit")["params"].clone();
+        let accepted = owners.answer(&fakes, "job.submit", params.as_object().unwrap());
+        let job = accepted["result"]["jobId"].as_str().unwrap();
+        calls.bad_evidence.store(bad_evidence, Ordering::SeqCst);
+        let stopped = run(&owners, &fakes, job);
+        assert_eq!(stopped["result"]["state"], "failed", "{stopped}");
+        assert_eq!(stopped["result"]["outcomeUnknown"], false);
+        assert_eq!(uses(&root), 0);
+        let (lane, dispatches) = fakes.calls();
+        assert!(lane.iter().all(|call| !call.starts_with("prepare ")));
+        assert!(lane.iter().all(|call| !call.starts_with("perform ")));
+        assert!(dispatches.is_empty());
     }
 }
 
