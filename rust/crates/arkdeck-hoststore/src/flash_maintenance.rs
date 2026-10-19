@@ -18,7 +18,22 @@ pub(crate) fn is_maintenance(reference: &str) -> bool {
     matches!(reference, "flash.verify@1" | "flash.restore-boot-loop@1")
 }
 
+/// Fresh, job-local readback; source Job metadata cannot supply this evidence.
+pub struct MaintenanceObservation {
+    pub identity: m::Identity,
+    pub binding: DeviceBinding,
+    pub model: String,
+    pub firmware: String,
+}
+
 pub trait MaintenanceReads: Send + Sync {
+    fn observe_evidence(
+        &self,
+        _execution: &Execution,
+        _deadline: Instant,
+    ) -> Result<MaintenanceObservation, String> {
+        Err("maintenance evidence readback is unavailable".into())
+    }
     fn recommission_facts(
         &self,
         _target: &str,
@@ -94,6 +109,43 @@ impl HdcDispatch for BoundedHdc<'_> {
     }
 }
 impl MaintenanceReads for NativeMaintenanceReads {
+    fn observe_evidence(
+        &self,
+        execution: &Execution,
+        deadline: Instant,
+    ) -> Result<MaintenanceObservation, String> {
+        use arkdeck_provider_hdc::{Action, Expected, Outcome, Property};
+        let (identity, binding) = self.observe(execution, deadline)?;
+        let hdc = (self.hdc)()?;
+        let bounded = BoundedHdc {
+            hdc: &*hdc,
+            deadline,
+        };
+        let property = |property| -> Result<String, String> {
+            let action = Action::QueryProperty(property);
+            let receipt = bounded
+                .dispatch(&action.lower("maintenance-evidence", Some(&binding.connect_key))?)
+                .map_err(|error| format!("{error:?}"))?;
+            match action.verify(&receipt, Expected::default()) {
+                Outcome::Verified(facts) => facts
+                    .get("value")
+                    .cloned()
+                    .ok_or_else(|| "maintenance property readback is absent".into()),
+                _ => Err("maintenance property readback is not verified".into()),
+            }
+        };
+        let model = property(Property::ProductName)?;
+        let firmware = property(Property::FullBuildVersion)?;
+        if Instant::now() >= deadline {
+            return Err("maintenance evidence budget exhausted".into());
+        }
+        Ok(MaintenanceObservation {
+            identity,
+            binding,
+            model,
+            firmware,
+        })
+    }
     fn recommission_facts(
         &self,
         target: &str,

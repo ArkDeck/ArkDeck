@@ -184,14 +184,47 @@ impl m::VerificationPort for Port<'_, '_> {
         source: &m::Source,
         deadline: Instant,
     ) -> Result<m::Identity, m::Error> {
-        self.context
+        let observed = self
+            .context
             .reads
-            .observe(
+            .observe_evidence(
                 self.execution(&source.job.job_id)?,
                 deadline.min(self.deadline),
             )
-            .map(|(identity, _)| identity)
-            .map_err(authority)
+            .map_err(authority)?;
+        let execution = self.execution(&source.job.job_id)?;
+        if observed.identity != source.identity
+            || observed.binding.target_id != execution.target_id
+            || observed.binding.binding_revision != execution.binding_revision
+            || observed.binding.stable_identity_sha256 != execution.stable_identity_sha256
+            || observed.binding.usb_topology != execution.usb_topology
+            || observed.binding.connect_key != self.prepared.binding.connect_key
+            || observed.model.is_empty()
+            || observed.firmware.is_empty()
+        {
+            return Err(authority(
+                "maintenance evidence differs from the bound source",
+            ));
+        }
+        if self.run.record.evidence_observation().is_none() {
+            // Retain the proof obtained before capability consumption. Later
+            // readbacks revalidate identity without replacing that audit point.
+            let confirmed = self.run.clock().map_err(|_| m::Error::PersistenceFailed)?;
+            self.run.record.set_evidence_observation(json!({
+                "providerID": self.run.record.provider(), "toolVersion": TOOL_VERSION,
+                "toolSHA256": execution.toolchain_sha256, "transport": "usb",
+                "confirmedAtUTC": confirmed, "confirmationMethod": "machineReadback",
+                "preflightSteps": [], "targetID": observed.binding.target_id,
+                "bindingRevision": observed.binding.binding_revision,
+                "stableIdentitySHA256": observed.binding.stable_identity_sha256,
+                "model": observed.model, "firmware": observed.firmware,
+            }));
+            self.run.record.set_first_evidence(&confirmed);
+            self.run
+                .persist(self.owner.runner.jobs)
+                .map_err(|_| m::Error::PersistenceFailed)?;
+        }
+        Ok(observed.identity)
     }
     fn verification_intent(&mut self, source: &m::Source, budget_ms: u64) -> Result<(), m::Error> {
         self.immutable("maintenance-verification-intent.json", &json!({
