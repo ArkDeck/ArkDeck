@@ -360,6 +360,8 @@ package enum CatalogOperationEffectResolver {
       return optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs)
     }
     switch step.stepID {
+    case "read-boot-context":
+      return value("includeBootContext", descriptor, inputs) == .bool(true)
     case "stop-ability":
       if case .string(let state)? = value("postRunAbilityState", descriptor, inputs) {
         return state == "stopped"

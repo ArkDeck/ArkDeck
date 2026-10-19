@@ -10,6 +10,12 @@
   "concurrencyKey": "device-shared-readonly",
   "inputs": {
     "fields": {
+      "includeBootContext": {
+        "type": "boolean",
+        "required": false,
+        "description": "Read a coherent boot ID, uptime and optional RAM-only reboot fault marker. A requested snapshot must verify successfully.",
+        "default": false
+      },
       "refreshServerFacts": {
         "type": "boolean",
         "required": false,
@@ -22,7 +28,8 @@
     "fields": {
       "deviceFacts": { "type": "artifactReference", "required": true },
       "toolFacts": { "type": "artifactReference", "required": true },
-      "bindingSnapshot": { "type": "artifactReference", "required": true }
+      "bindingSnapshot": { "type": "artifactReference", "required": true },
+      "bootContext": { "type": "artifactReference", "required": false }
     }
   },
   "steps": [
@@ -76,6 +83,19 @@
       "compensation": "none"
     },
     {
+      "stepID": "read-boot-context",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "bootContext"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Selected only by includeBootContext=true; a selected read is mandatory and rejects incoherent or incomplete snapshots."
+    },
+    {
       "stepID": "finalize-session",
       "kind": "finalizeSession",
       "effect": "hostOnly",
@@ -91,7 +111,8 @@
   "artifacts": [
     { "name": "device-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": true },
     { "name": "tool-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "standard", "required": true },
-    { "name": "binding-snapshot.json", "role": "derived", "mediaType": "application/json", "privacy": "sensitive", "required": true }
+    { "name": "binding-snapshot.json", "role": "derived", "mediaType": "application/json", "privacy": "sensitive", "required": true },
+    { "name": "boot-context.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false }
   ],
   "profiles": ["openharmony-standard@1", "dayu200"]
 }

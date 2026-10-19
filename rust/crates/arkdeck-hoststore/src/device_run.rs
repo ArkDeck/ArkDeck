@@ -1822,7 +1822,23 @@ impl JobRunner<'_> {
                 self.publish_received(run, &product, declaration, receipt)?;
                 continue;
             }
-            let contents = contents(name, &run.record, summary, receipt);
+            let contents = if name == "boot-context.json" {
+                let mut document: Value =
+                    serde_json::from_slice(&facts(name, &run.record, summary))
+                        .map_err(|_| Stop::Publication("cannot encode boot context".into()))?;
+                document["observationWindow"] = match &window {
+                    Some((start, end)) => json!({"startedAtUTC": start, "endedAtUTC": end}),
+                    None => {
+                        return Err(Stop::Publication(
+                            "boot context has no observation window".into(),
+                        ));
+                    }
+                };
+                session_json::encode_canonical_pretty(&document)
+                    .map_err(|_| Stop::Publication("cannot encode boot context".into()))?
+            } else {
+                contents(name, &run.record, summary, receipt)
+            };
             if device_steps::diagnostic_capture(&owner.reference) {
                 let budget = byte_budget(&run.record);
                 let used = publisher.published_bytes(&owner.job_id).map_err(|error| {

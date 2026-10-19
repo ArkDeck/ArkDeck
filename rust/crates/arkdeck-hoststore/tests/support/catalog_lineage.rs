@@ -18,6 +18,7 @@ pub const CONTROLLED_RETRY: &str =
     "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a";
 pub const RESTORATION_POLICY: &str =
     "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195";
+pub const BOOT_CONTEXT: &str = "fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18";
 pub const MAINTENANCE: &str = "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const PACKET_SHA: &str = "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab";
@@ -209,6 +210,7 @@ impl HapPlans {
             RECOMMISSION,
             CONTROLLED_RETRY,
             RESTORATION_POLICY,
+            BOOT_CONTEXT,
         ]
         .contains(&catalog)
         {
@@ -431,15 +433,25 @@ impl Lineage {
     ) -> Result<(), String> {
         if matches!(
             catalog_digest,
-            MAINTENANCE | RECOMMISSION | CONTROLLED_RETRY | RESTORATION_POLICY
+            MAINTENANCE | RECOMMISSION | CONTROLLED_RETRY | RESTORATION_POLICY | BOOT_CONTEXT
         ) {
             let mut observed = Self::read_sources(directory)?;
             let complete: Vec<_> = observed.values().cloned().collect();
-            if sha256_hex(&catalog_bytes(&complete)?) != catalog_digest
-                || (matches!(
-                    catalog_digest,
-                    RECOMMISSION | CONTROLLED_RETRY | RESTORATION_POLICY
-                ) && observed.remove("flash.recommission@1").is_none())
+            if sha256_hex(&catalog_bytes(&complete)?) != catalog_digest {
+                return Err("Flash Catalog source digest differs".into());
+            }
+            if catalog_digest == BOOT_CONTEXT {
+                // The full table hash above pins the exact new observe
+                // descriptor. All remaining prior descriptors must be exact.
+                observed.insert(
+                    "observe.device@1".into(),
+                    self.operations["observe.device@1"].clone(),
+                );
+            }
+            if (matches!(
+                catalog_digest,
+                RECOMMISSION | CONTROLLED_RETRY | RESTORATION_POLICY | BOOT_CONTEXT
+            ) && observed.remove("flash.recommission@1").is_none())
                 || observed.remove("flash.verify@1").is_none()
                 || observed.remove("flash.restore-boot-loop@1").is_none()
                 || observed != self.operations
@@ -513,6 +525,7 @@ impl Lineage {
             RECOMMISSION,
             CONTROLLED_RETRY,
             RESTORATION_POLICY,
+            BOOT_CONTEXT,
         ]
         .iter()
         .any(|digest| current_plan["catalogDigest"] == *digest)
@@ -552,6 +565,7 @@ impl Lineage {
                 RECOMMISSION,
                 CONTROLLED_RETRY,
                 RESTORATION_POLICY,
+                BOOT_CONTEXT,
             ]
             .iter()
             .any(|digest| actual["result"]["catalogDigest"] == *digest)

@@ -53,6 +53,8 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
         "observe.device@1/read-evidence-firmware": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
+        "observe.device@1/read-boot-context": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "bootContext"),
         "capture.diagnostics@1/read-evidence-model": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
         "capture.diagnostics@1/read-evidence-firmware": CatalogActionReference(

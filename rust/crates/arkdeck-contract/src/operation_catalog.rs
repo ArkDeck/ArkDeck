@@ -417,6 +417,9 @@ impl CatalogOperation {
             return self.optional_step_is_selected(step, inputs);
         }
         match step.step_id.as_str() {
+            "read-boot-context" => {
+                self.resolved("includeBootContext", inputs) == Some(&Value::Bool(true))
+            }
             "stop-ability" => match self.resolved("postRunAbilityState", inputs) {
                 Some(Value::String(state)) => state == "stopped",
                 _ => true,

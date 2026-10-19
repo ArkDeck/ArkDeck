@@ -20,6 +20,56 @@ const CONTROLLED_RETRY_INPUT_CATALOG: &str =
     "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a";
 const RESTORATION_POLICY_INPUT_CATALOG: &str =
     "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195";
+const BOOT_CONTEXT_INPUT_CATALOG: &str =
+    "fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18";
+
+// This comparison is only for a read-side Import retention census. It never
+// translates a persisted Catalog, execution plan, trusted fact or capability.
+fn input_schema_is_compatible(active: &str, retained: &str, request: &OperationRequest) -> bool {
+    let current = if active == BOOT_CONTEXT_INPUT_CATALOG {
+        // The only new input is not an Artifact reference. Prior observe
+        // requests must still satisfy the old closed input vocabulary.
+        if retained != active
+            && request.reference() == "observe.device@1"
+            && request.inputs.contains_key("includeBootContext")
+        {
+            return false;
+        }
+        RESTORATION_POLICY_INPUT_CATALOG
+    } else {
+        active
+    };
+    retained == active
+        || retained == current
+        || (retained == HISTORICAL_INPUT_CATALOG
+            && matches!(current, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG))
+        || (current == MAINTENANCE_INPUT_CATALOG
+            && matches!(retained, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG)
+            && !matches!(
+                request.reference().as_str(),
+                "flash.verify@1" | "flash.restore-boot-loop@1"
+            ))
+        || (current == RESTORATION_POLICY_INPUT_CATALOG
+            && retained == CONTROLLED_RETRY_INPUT_CATALOG)
+        || (matches!(
+            current,
+            CONTROLLED_RETRY_INPUT_CATALOG | RESTORATION_POLICY_INPUT_CATALOG
+        ) && retained == RECOMMISSION_INPUT_CATALOG
+            && !request.inputs.contains_key("failedRecommissionJobId")
+            && !request.inputs.contains_key("restorationArtifactLease"))
+        || (matches!(
+            current,
+            RECOMMISSION_INPUT_CATALOG
+                | CONTROLLED_RETRY_INPUT_CATALOG
+                | RESTORATION_POLICY_INPUT_CATALOG
+        ) && request.reference() != "flash.recommission@1"
+            && (retained == MAINTENANCE_INPUT_CATALOG
+                || (matches!(retained, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG)
+                    && !matches!(
+                        request.reference().as_str(),
+                        "flash.verify@1" | "flash.restore-boot-loop@1"
+                    ))))
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ImportReference {
@@ -191,34 +241,11 @@ impl JobStore {
                 OperationRequest::decode(&serde_json::to_vec(&record.request).map_err(unreadable)?)
                     .map_err(unreadable)?;
             let refs = if unsettled {
-                let current = arkdeck_contract::CATALOG_DIGEST;
-                let compatible = record.catalog_digest() == current
-                    || (record.catalog_digest() == HISTORICAL_INPUT_CATALOG
-                        && matches!(current, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG))
-                    || (current == MAINTENANCE_INPUT_CATALOG
-                        && matches!(record.catalog_digest(), HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG)
-                        // The two new operations never existed in either source Catalog.
-                        && !matches!(request.reference().as_str(), "flash.verify@1" | "flash.restore-boot-loop@1"))
-                    // This policy revision changes no input schema. This is
-                    // read-side retention only, never execution or authority.
-                    || (current == RESTORATION_POLICY_INPUT_CATALOG
-                        && record.catalog_digest() == CONTROLLED_RETRY_INPUT_CATALOG)
-                    || (matches!(current, CONTROLLED_RETRY_INPUT_CATALOG | RESTORATION_POLICY_INPUT_CATALOG)
-                        && record.catalog_digest() == RECOMMISSION_INPUT_CATALOG
-                        && !request.inputs.contains_key("failedRecommissionJobId")
-                        && !request.inputs.contains_key("restorationArtifactLease"))
-                    || (matches!(
-                        current,
-                        RECOMMISSION_INPUT_CATALOG | CONTROLLED_RETRY_INPUT_CATALOG | RESTORATION_POLICY_INPUT_CATALOG
-                    ) && request.reference() != "flash.recommission@1"
-                        && (record.catalog_digest() == MAINTENANCE_INPUT_CATALOG
-                            || (matches!(
-                                record.catalog_digest(),
-                                HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG
-                            ) && !matches!(
-                                request.reference().as_str(),
-                                "flash.verify@1" | "flash.restore-boot-loop@1"
-                            ))));
+                let compatible = input_schema_is_compatible(
+                    arkdeck_contract::CATALOG_DIGEST,
+                    record.catalog_digest(),
+                    &request,
+                );
                 if !compatible {
                     return Err(unreadable(()));
                 }
@@ -265,5 +292,60 @@ impl JobStore {
         }
         found.sort();
         action(&found)
+    }
+}
+
+#[cfg(test)]
+mod boot_input_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn prior_input_census_retains_closed_schemas_without_accepting_future_boot_inputs() {
+        for inputs in [
+            json!({}),
+            json!({"includeBootContext": false}),
+            json!({"includeBootContext": true}),
+        ] {
+            let request = OperationRequest::decode(
+                &serde_json::to_vec(&json!({
+                    "schemaVersion":"1.0.0", "documentType":"runtime-operation-request",
+                    "requestId":"req-census", "idempotencyKey":"idem-census",
+                    "operation":{"id":"observe.device", "version":1},
+                    "target":{"targetId":"TGT-census", "expectedBindingRevision":1},
+                    "inputs":inputs, "requestedOutputs":["derivedArtifacts"]
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            assert!(input_schema_is_compatible(
+                BOOT_CONTEXT_INPUT_CATALOG,
+                BOOT_CONTEXT_INPUT_CATALOG,
+                &request
+            ));
+            for old in [
+                HISTORICAL_INPUT_CATALOG,
+                OBSERVED_INPUT_CATALOG,
+                MAINTENANCE_INPUT_CATALOG,
+                RECOMMISSION_INPUT_CATALOG,
+                CONTROLLED_RETRY_INPUT_CATALOG,
+                RESTORATION_POLICY_INPUT_CATALOG,
+            ] {
+                assert_eq!(
+                    input_schema_is_compatible(BOOT_CONTEXT_INPUT_CATALOG, old, &request),
+                    !request.inputs.contains_key("includeBootContext")
+                );
+            }
+            assert!(!input_schema_is_compatible(
+                BOOT_CONTEXT_INPUT_CATALOG,
+                &"f".repeat(64),
+                &request
+            ));
+            assert!(!input_schema_is_compatible(
+                RESTORATION_POLICY_INPUT_CATALOG,
+                BOOT_CONTEXT_INPUT_CATALOG,
+                &request
+            ));
+        }
     }
 }
