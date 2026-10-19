@@ -1,8 +1,10 @@
 # Original-ramdisk restoration policy candidate — 2026-10-19
 
-This is the unapproved revision-2 candidate for CHG-2026-084. It does not record
-hardware acceptance or publish a Runtime. Maintainer review and protected-main
-publication remain required before the policy can issue authority.
+Revision 2's scoped policy was published through
+[PR #2675](https://github.com/ArkDeck/ArkDeck/pull/2675) as
+`f67e9919f87c9cb25d285c6317cbeb0e1b1cdf5b`. This file retains the candidate's
+host-check history; actual device results are recorded separately in the
+[independent acceptance run](independent-acceptance-20261019.md).
 
 The candidate changes `flash.restore-boot-loop@1`'s default issuance flag from
 disabled to enabled. The Catalog digest is
@@ -107,15 +109,18 @@ tests found the two stale generated CLI Catalog digests above. Both failing CLI
 test targets now pass locally after regeneration. These are candidate omissions,
 not invalid runs; no accepted assertion or frozen oracle was relaxed.
 
-The corrected head's `guard`, `swift` aggregate and selected platform lanes remain
-pending. Results from the earlier discovery-fix PR do not verify this Catalog.
-CI will be reported on the candidate PR without amending a green head.
+Final head `d0c19d3738d199a0d11e27a3b71632bbcb422a79` passed
+[Swift CI 39156057942](https://github.com/ArkDeck/ArkDeck/actions/runs/39156057942)
+and [SDD Guard 39161411725](https://github.com/ArkDeck/ArkDeck/actions/runs/39161411725),
+including the `guard`/`swift` required contexts, all six Rust lanes, Swift tests,
+App build and Windows client checks. The policy merged on 2026-10-18 at
+23:29:52 UTC. Results from the earlier discovery-fix PR do not verify this Catalog.
 
-## Remaining real-device acceptance
+## Separate real-device acceptance
 
-The [independent entry-point run](independent-acceptance-20261019.md) remains
-incomplete. The recovered recommission source is not an eligible ordinary
-primary-Flash source for restoration. A fresh ordinary nine-partition source
-Flash, including userdata, is a separate device-write scope decision. Neither
-this candidate nor green host tests authorize that setup or establish
-`REAL_DEVICE_PASS` for either maintenance entry.
+The [independent entry-point run](independent-acceptance-20261019.md) records the
+separately authorized ordinary nine-partition source Flash, including userdata,
+and actual published-Runtime maintenance Jobs. Recovery-source refusals remain
+enforced. Original-ramdisk restoration and a subsequent independent full-hash
+verify each returned exit 0; the nine-partition verify truthfully returned partial
+exit 9. Host checks are not used in place of those Runtime device records.

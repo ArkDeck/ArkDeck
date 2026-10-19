@@ -10,8 +10,9 @@
 
 ## TASK-AFM-002 — Integrate authority-owned maintenance
 
-- Status: in-progress; Runtime ports, candidate Catalog, CLI and both client surfaces implemented;
-  local verification and follow-up PR CI in progress; maintainer review pending.
+- Status: done; integration published in PR #2659, with discovery and public
+  result/Session repairs published in PRs #2673 and #2676. Scoped independent
+  real-device results are recorded in [the acceptance run](independent-acceptance-20261019.md).
 - Hardware required: no for implementation and fake tests.
 - Implemented scope: retain an immutable source plan/receipt/binding correlation;
   implement device-exclusive source loading and bounded partition-read port;
@@ -21,19 +22,22 @@
 - Safety: no standalone authority access, no arbitrary paths/argv, no capability
   administration, no replay, no historical receipt changes, no hardware claims.
 
-- Remaining authorization boundaries: destructive default policy issuance stays
-  disabled in revision 1; revision 2's candidate awaits its separate approval.
+- Authority boundary: destructive default policy issuance stays disabled in the
+  immutable revision-1 Catalog; revision 2's exact original-ramdisk policy was
+  separately published in PR #2675.
   Plan-only failures do not create stopped records. No production
   support or hardware acceptance is inferred from fake checks.
 
 ## TASK-AFM-003 — Prepare the default ramdisk-restoration policy
 
-- Status: in-progress; candidate implementation and focused host verification prepared;
-  maintainer review pending.
+- Status: done; focused host checks and selected platform CI passed, and the
+  separately reviewed policy was published in PR #2675 as
+  `f67e9919f87c9cb25d285c6317cbeb0e1b1cdf5b`.
 - Hardware required: no for candidate preparation and host tests.
-- Scope: propose enabling only `flash.restore-boot-loop@1`'s existing exact-plan
+- Scope: enable only `flash.restore-boot-loop@1`'s existing exact-plan
   Runtime-owned capability policy; retain its source, Artifact, identity, budget,
   exclusion, durable-intent and no-replay checks. Preserve all old input schemas
   and immutable Catalog views when adding the candidate digest.
-- Completion of this Repo change does not establish positive hardware acceptance
-  or authorize a new nine-partition source Flash that overwrites userdata.
+- Policy publication alone does not establish hardware acceptance or authorize a
+  new nine-partition source Flash that overwrites userdata. Both scopes were
+  separately authorized for [the completed independent run](independent-acceptance-20261019.md).

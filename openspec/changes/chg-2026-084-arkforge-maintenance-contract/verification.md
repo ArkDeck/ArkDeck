@@ -2,11 +2,16 @@
 
 > Change:CHG-2026-084-arkforge-maintenance-contract@r2
 
-Revision 2 is proposed and awaits maintainer review.
+Revision 2's scoped policy was published in PR #2675 as
+`f67e9919f87c9cb25d285c6317cbeb0e1b1cdf5b`. The maintenance result/publication
+repair was published in PR #2676 as `80d7f9ecd3e70888e3be62173856f6c595096c42`.
 
-All checks below are host/fake tests, not hardware acceptance.
-The sections preceding the revision-2 candidate retain the original revision-1
-results; only the final section links the new candidate's focused checks.
+The implementation checks below are host/fake tests. The separate
+[independent acceptance run](independent-acceptance-20261019.md) records actual
+current-Catalog device results and their limits.
+The historical implementation lists retain the original revision-1 checks and
+their local-environment limitations. The final sections link revision-2 policy
+checks and the separate device run.
 
 ## Local targeted checks
 
@@ -25,10 +30,11 @@ results; only the final section links the new candidate's focused checks.
 
 ## CI
 
-Pending the PR's current-head SDD Guard, Swift aggregate, Rust and Windows lanes.
-No result from another head substitutes for these checks.
+Final-head SDD Guard, Swift aggregate and selected platform checks passed for
+PRs #2675 and #2676. Exact heads and run IDs are recorded in the acceptance run's
+CI section. Results from another head do not substitute for these checks.
 
-## Maintenance implementation checks (follow-up to merged #2657)
+## Historical maintenance implementation checks (follow-up to merged #2657)
 
 The companion ArkForge adapter tests cover 0/9/7, identity drift, failed intent
 persistence, stopped recording, invalid parameters with zero port calls, exact
@@ -70,26 +76,30 @@ Local targeted checks for this implementation:
 - Historical Import reference compatibility: nine terminal-publication tests
   passed, including refusal when an old Catalog record claims a new operation.
   This compatibility affects read-only input retention, not execution authority.
-- Windows decoder tests added; no local .NET executable. Windows execution is
-  pending the Windows CI lane. Cross-platform CI is still pending this PR's head.
+- Windows decoder tests were added without a local .NET executable in the initial
+  implementation run. Its platform CI was pending at that point; final publication
+  CI is recorded above.
 
-Default destructive capability issuance remains disabled. Plan-only refusals are
-read-only and produce no stopped record; submitted admission refusals retain their
-own immutable stopped record. No live-device execution, hardware evidence,
+At revision 1, default destructive capability issuance remained disabled.
+Plan-only refusals are read-only and produce no stopped record; submitted
+admission refusals retain their own immutable stopped record. No live-device execution, hardware evidence,
 production-support promotion, tag or release was performed.
 
 ## Independent entry-point acceptance follow-up
 
-The [2026-10-19 run](independent-acceptance-20261019.md) records the production
-discovery defect, its focused fix and independent published-Runtime refusal
-checks. Positive hardware acceptance and the separate destructive policy decision
-remain incomplete; the recommission result is not substituted for either entry.
+The [2026-10-19 run](independent-acceptance-20261019.md) records production
+discovery and result/publication repairs, both current-Runtime refusal paths,
+independent original-ramdisk restoration and a separate successful full-hash
+verification Job. The ordinary nine-partition verification retains its partial
+exit 9 (eight verified and mounted-writable userdata skipped). All three new
+maintenance Sessions were published. The recommission result is not substituted
+for either entry, and the run states its Normal/HDC scope explicitly.
 
-## Revision-2 default restoration policy candidate
+## Revision-2 default restoration policy publication
 
 The [2026-10-19 candidate checks](restoration-policy-candidate-20261019.md)
-cover the proposed exact original-ramdisk default policy, its immutable Catalog
+cover the exact original-ramdisk default policy, its immutable Catalog
 lineage, real-owner synthetic-port integration and standard failure-code repair.
-Revision 1's published policy remains disabled until separate maintainer review
-and protected-main publication. This proposed revision is not approved or verified,
-and its host checks do not complete either independent hardware acceptance.
+Revision 1's immutable policy remains disabled. Revision 2 was separately
+published through PR #2675 after its final-head CI passed; those host checks do
+not substitute for the independent device results linked above.
