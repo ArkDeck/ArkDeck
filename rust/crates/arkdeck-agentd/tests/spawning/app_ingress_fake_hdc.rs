@@ -198,7 +198,9 @@ esac
         .with_artifacts(ArtifactReadStore::open(&root.0.join("artifacts")).unwrap())
         .with_storage(
             SessionStore::open(&root.0.join("session-owner"), &root.0.join("Sessions")).unwrap(),
-            ArtifactUsage::open(&root.0.join("artifacts"), 128 * 1024 * 1024).unwrap(),
+            // Exercise the default Runtime capacity: the capture's 128 MiB
+            // Artifact budget also needs room for its other published products.
+            ArtifactUsage::open(&root.0.join("artifacts"), crate::host::ARTIFACT_QUOTA).unwrap(),
         )
         .with_planning(&root.0, None)
         .with_development_hdc(Some(ProcessDispatch::new(
