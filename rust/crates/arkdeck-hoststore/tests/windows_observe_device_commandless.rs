@@ -65,6 +65,7 @@ struct C2 {
     pinned: Option<&'static WindowsHdcTuple>,
     observation: Mutex<ServerObservation>,
     calls: Mutex<Vec<String>>,
+    boot_context: Mutex<Option<Vec<u8>>>,
 }
 
 impl C2 {
@@ -73,6 +74,7 @@ impl C2 {
             pinned: pinned.then(|| windows_tuple(C2_SHA256).unwrap()),
             observation: Mutex::new(ServerObservation::Observed),
             calls: Mutex::default(),
+            boot_context: Mutex::default(),
         }
     }
 
@@ -97,6 +99,17 @@ impl HdcDispatch for C2 {
             b"OpenHarmony Reference Device\n".to_vec()
         } else if joined == format!("-t {KEY} shell param get const.ohos.fullname") {
             b"OpenHarmony-4.1-release\n".to_vec()
+        } else if plan.arguments
+            == arkdeck_provider_hdc::Action::ObserveBootContext
+                .lower("read-boot-context", Some(KEY))
+                .unwrap()
+                .arguments
+        {
+            self.boot_context
+                .lock()
+                .unwrap()
+                .clone()
+                .expect("a requested boot snapshot")
         } else {
             panic!("the registered tuple is never asked {joined:?}");
         };
@@ -198,6 +211,10 @@ impl Fixture {
     /// An `observe.device@1` Job admitted and run over `hdc`: its run's
     /// answer and its Job record.
     fn run(&self, hdc: &C2, key: &str) -> (Value, Value) {
+        self.run_request(hdc, &Self::request(key))
+    }
+
+    fn run_request(&self, hdc: &C2, request: &[u8]) -> (Value, Value) {
         let jobs = JobStore::open_owner(&self.root.join("jobs-state")).unwrap();
         let artifacts = ArtifactReadStore::open(&self.root.join("artifacts")).unwrap();
         let targets = TargetStore::open(&self.root.join("targets-state")).unwrap();
@@ -215,7 +232,7 @@ impl Fixture {
             jobs: &jobs,
             now,
         }
-        .submit(&Self::request(key))
+        .submit(request)
         .unwrap()["jobId"]
             .as_str()
             .unwrap()
@@ -308,5 +325,94 @@ fn the_plan_names_the_observation_only_on_a_registered_tuple() {
     assert_ne!(
         pinned, unpinned,
         "a registered tuple's plan names no checkserver process"
+    );
+}
+
+#[test]
+fn requested_boot_snapshots_publish_correlated_facts_without_mutation_authority() {
+    const BOOT: &str = "01234567-89ab-cdef-0123-456789abcdef";
+    const NONCE: &str = "0123456789abcdef0123456789abcdef";
+    for marker in [
+        "none".to_owned(),
+        format!("arkdeck-reboot-v1 {NONCE} {BOOT} 180"),
+    ] {
+        let fixture = Fixture::new();
+        let hdc = C2::new(true);
+        *hdc.boot_context.lock().unwrap() = Some(
+            format!("ARKDECK_BOOT_CONTEXT_V1\n{BOOT}\n42.31 17.20\n{marker}\n{BOOT}\n")
+                .into_bytes(),
+        );
+        let mut request: Value =
+            serde_json::from_slice(&Fixture::request("boot-snapshot")).unwrap();
+        request["inputs"]["includeBootContext"] = json!(true);
+        let (answer, record) = fixture.run_request(&hdc, &serde_json::to_vec(&request).unwrap());
+        assert_eq!(record["state"], "succeeded", "{answer}\n{record}");
+        assert_eq!(record["actualEffect"], "readOnly");
+        assert!(
+            record["capabilityConsumptions"]
+                .as_array()
+                .is_none_or(Vec::is_empty)
+        );
+        let job = record["jobID"].as_str().unwrap();
+        let artifacts = ArtifactReadStore::open(&fixture.root.join("artifacts")).unwrap();
+        let rows = artifacts.list(job).unwrap().page(0, 100).unwrap().items;
+        let metadata = rows
+            .iter()
+            .find(|row| row["name"] == "boot-context.json")
+            .unwrap_or_else(|| panic!("{rows:?}"));
+        let artifact = metadata["artifactID"].as_str().unwrap();
+        assert!(
+            artifacts.read(job, artifact, 0, 4096, false).is_err(),
+            "boot facts are sensitive"
+        );
+        let bytes = artifacts.read(job, artifact, 0, 4096, true).unwrap().bytes;
+        assert_eq!(arkdeck_contract::sha256_hex(&bytes), metadata["sha256"]);
+        let boot: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(boot["jobId"], job);
+        assert_eq!(boot["bootId"], BOOT);
+        assert_eq!(boot["uptimeMilliseconds"], "42310");
+        assert_eq!(boot["faultPresent"], (marker != "none").to_string());
+        assert_eq!(
+            boot["observationWindow"]["startedAtUTC"],
+            "2026-09-14T00:00:00.000Z"
+        );
+        if marker != "none" {
+            assert_eq!(boot["faultNonce"], NONCE);
+        }
+        assert_eq!(
+            hdc.calls().len(),
+            6,
+            "only one additional, read-only process"
+        );
+    }
+}
+
+#[test]
+fn a_requested_incoherent_boot_snapshot_fails_instead_of_becoming_optional_success() {
+    let fixture = Fixture::new();
+    let hdc = C2::new(true);
+    *hdc.boot_context.lock().unwrap() = Some(b"incomplete boot output\n".to_vec());
+    let mut request: Value =
+        serde_json::from_slice(&Fixture::request("bad-boot-snapshot")).unwrap();
+    request["inputs"]["includeBootContext"] = json!(true);
+    let (answer, record) = fixture.run_request(&hdc, &serde_json::to_vec(&request).unwrap());
+    assert_eq!(record["state"], "failed", "{answer}\n{record}");
+    assert!(
+        timeline(&record)
+            .iter()
+            .any(|line| line.contains("invalidBootContext"))
+    );
+    let artifacts = ArtifactReadStore::open(&fixture.root.join("artifacts")).unwrap();
+    let rows = artifacts
+        .list(record["jobID"].as_str().unwrap())
+        .unwrap()
+        .page(0, 100)
+        .unwrap()
+        .items;
+    assert!(
+        !rows
+            .iter()
+            .any(|row| row["name"] == "boot-context.json"
+                && row["status"].get("published").is_some())
     );
 }

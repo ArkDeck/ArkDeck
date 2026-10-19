@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+mod boot_context;
 mod capture_files;
 mod debug_hap;
 mod debug_read;

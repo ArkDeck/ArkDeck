@@ -319,6 +319,7 @@ class RealCatalogTests(unittest.TestCase):
                 "debug.hap@1/package-readback": "packageInfo",
                 "observe.device@1/read-evidence-model": "deviceModel",
                 "observe.device@1/read-evidence-firmware": "firmwareBuild",
+                "observe.device@1/read-boot-context": "bootContext",
             },
         )
 

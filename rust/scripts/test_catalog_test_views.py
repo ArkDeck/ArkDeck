@@ -194,6 +194,9 @@ class ClosedSources(unittest.TestCase):
     def test_recommission_catalog_adds_one_operation_to_maintenance_and_rejects_drift(self):
         rust = Path(__file__).resolve().parents[1]
         rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'Catalog/operations').glob('*.json'))]
+        self.assertEqual(views.catalog_table_digest(rust, rows), views.BOOT_CONTEXT)
+        _, baseline = views.catalogs(rust)
+        rows = [copy.deepcopy(baseline['observe.device@1']) if row['id'] == 'observe.device' else row for row in rows]
         self.assertEqual(views.catalog_table_digest(rust, rows), views.RESTORATION_POLICY)
         disabled = copy.deepcopy(rows)
         restoration = next(row for row in disabled if row['id'] == 'flash.restore-boot-loop')
@@ -232,8 +235,25 @@ class ClosedSources(unittest.TestCase):
         row['functions']['policy'] = 'policy'
         names.append('policy')
         self.assertEqual(views.selected(row, names, views.RESTORATION_POLICY), ['new', 'shared', 'retry', 'policy'])
-        for digest in views.CATALOGS[:-1]:
+        for digest in views.CATALOGS[:views.CATALOGS.index(views.RESTORATION_POLICY)]:
             self.assertNotIn('policy', views.selected(row, names, digest))
+        self.assertEqual(views.selected(row, names, views.BOOT_CONTEXT), ['new', 'shared', 'retry', 'policy'])
+        row['functions']['boot'] = 'boot'
+        names.append('boot')
+        for digest in views.CATALOGS[:-1]:
+            self.assertNotIn('boot', views.selected(row, names, digest))
+        self.assertIn('boot', views.selected(row, names, views.BOOT_CONTEXT))
+
+    def test_boot_context_catalog_rejects_descriptor_or_destructive_policy_drift(self):
+        rust = Path(__file__).resolve().parents[1]
+        rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'Catalog/operations').glob('*.json'))]
+        self.assertEqual(views.catalog_table_digest(rust, rows), views.BOOT_CONTEXT)
+        for operation, field, value in [('observe.device', 'timeoutSeconds', 120),
+                                        ('flash.restore-boot-loop', 'defaultPolicyIssuance', 'disabled')]:
+            changed = copy.deepcopy(rows)
+            next(row for row in changed if row['id'] == operation)[field] = value
+            with self.assertRaises(ValueError):
+                views.catalog_table_digest(rust, changed)
 
     def setUp(self):
         self.base = Path(tempfile.mkdtemp(prefix='arkdeck-test-catalog-views-')).resolve()

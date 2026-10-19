@@ -46,12 +46,13 @@ use serde_json::{Map, Value};
 /// that its provider confirms not executed, the pointer gesture, which has no
 /// readback, every mutation Swift reads back, and the screen sequence's two,
 /// which Swift's materialization does not know and this Runtime reads back.
-const PORTED: [&str; 39] = [
+const PORTED: [&str; 40] = [
     "hdc.observeTool",
     "hdc.observeServer",
     "hdc.listDeviceCandidates",
     "hdc.observeDevice",
     "hdc.queryProperty",
+    "hdc.observeBootContext",
     "hdc.observeStorage",
     "hdc.captureHilog",
     "hdc.captureUIDump",
@@ -198,6 +199,7 @@ pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
             Ok(DeviceAction::ReadOnly)
         }
         "hdc.observeDevice" => string("connectKey").map(|_| DeviceAction::ReadOnly),
+        "hdc.observeBootContext" if arguments.is_empty() => Ok(DeviceAction::ReadOnly),
         "hdc.runDebugTemplate" => DebugReadTemplate::parse(string("templateId")?)
             .map(|_| DeviceAction::ReadOnly)
             .ok_or_else(|| unsupported("persisted debug template is not in the closed set")),
@@ -563,6 +565,24 @@ mod tests {
     }
 
     #[test]
+    fn boot_context_reconcile_cannot_accept_caller_paths_or_commands() {
+        assert!(matches!(
+            materialize(&json!({"kind": "hdc.observeBootContext", "arguments": {}})),
+            Ok(DeviceAction::ReadOnly)
+        ));
+        for arguments in [
+            json!({"path": "/data"}),
+            json!({"command": "cat"}),
+            json!({"connectKey": "other"}),
+        ] {
+            assert!(
+                materialize(&json!({"kind": "hdc.observeBootContext", "arguments": arguments}))
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
     fn a_persisted_action_is_materialized_as_swift_materializes_it() {
         let job = "job-0123456789abcdef0123456789abcdef";
         let owned = |step: &str, suffix: &str| {
@@ -580,6 +600,7 @@ mod tests {
             json!({"kind": "hdc.observeServer", "arguments": {"ignored": 1}}),
             json!({"kind": "hdc.observeDevice", "arguments": {"connectKey": "resolved-by-binding"}}),
             json!({"kind": "hdc.queryProperty", "arguments": {"property": "const.ohos.fullname"}}),
+            json!({"kind": "hdc.observeBootContext", "arguments": {}}),
             json!({"kind": "hdc.observeStorage", "arguments": {"requiredBytes": 134217728}}),
             json!({"kind": "hdc.captureHilog", "arguments": {"durationSeconds": 30,
                 "filters": ["A:B", "*"], "byteBudget": 16777216}}),

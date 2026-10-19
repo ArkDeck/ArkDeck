@@ -649,7 +649,8 @@
             "packageInfo",
             "storageUsage",
             "deviceModel",
-            "firmwareBuild"
+            "firmwareBuild",
+            "bootContext"
           ]
         },
         "parameters": {

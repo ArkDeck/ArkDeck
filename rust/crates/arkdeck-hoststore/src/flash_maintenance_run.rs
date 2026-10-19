@@ -587,7 +587,8 @@ mod tests {
             "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c"
             | "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080"
             | "9b184df93d8130d0c7448301844f9afa61137e08f111c77bcaa57261303f319a"
-            | "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195" => (),
+            | "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195"
+            | "fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18" => (),
             _ => panic!("a future Catalog needs an explicit maintenance journal review"),
         }
         for operation in ["flash.verify@1", "flash.restore-boot-loop@1"] {

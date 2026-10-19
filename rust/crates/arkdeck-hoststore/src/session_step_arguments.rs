@@ -569,6 +569,7 @@ pub(super) fn validate(kind: &str, row: &Object) -> Result<Policy> {
                         "storageUsage",
                         "deviceModel",
                         "firmwareBuild",
+                        "bootContext",
                         "nativeLibraryInspection",
                         "debugTemplate",
                     ]

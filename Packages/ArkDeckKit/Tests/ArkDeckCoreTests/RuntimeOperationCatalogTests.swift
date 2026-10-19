@@ -140,8 +140,8 @@ struct RuntimeOperationCatalogTests {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     #expect(
-      withDefaults.count == 30,
-      "the catalog declares thirty input defaults; the runtime must see all of them")
+      withDefaults.count == 31,
+      "the catalog declares thirty-one input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -209,8 +209,8 @@ struct RuntimeOperationCatalogTests {
       }
     }
     #expect(
-      checked == 30,
-      "the catalog declares thirty input defaults; all of them must be exercised here")
+      checked == 31,
+      "the catalog declares thirty-one input defaults; all of them must be exercised here")
   }
 
   @Test func viewerCanOmitHilogWithoutChangingTheDefaultDiagnosticsPlan() throws {
@@ -231,6 +231,24 @@ struct RuntimeOperationCatalogTests {
       CatalogOperationEffectResolver.stepIsSelected(
         hilog, descriptor: descriptor, inputs: ["captureHilog": .bool(false)])
         == false)
+  }
+
+  @Test func bootContextIsOffByDefaultAndMandatoryWhenRequested() throws {
+    let descriptor = try #require(
+      RuntimeOperationCatalog.descriptor(reference: "observe.device@1"))
+    let step = try #require(descriptor.steps.first { $0.stepID == "read-boot-context" })
+    #expect(!step.isOptional)
+    #expect(
+      !CatalogOperationEffectResolver.stepIsSelected(step, descriptor: descriptor, inputs: [:]))
+    #expect(
+      !CatalogOperationEffectResolver.stepIsSelected(
+        step, descriptor: descriptor, inputs: ["includeBootContext": .bool(false)]))
+    #expect(
+      CatalogOperationEffectResolver.stepIsSelected(
+        step, descriptor: descriptor, inputs: ["includeBootContext": .bool(true)]))
+    #expect(
+      CatalogOperationEffectResolver.effectiveEffect(
+        descriptor: descriptor, inputs: ["includeBootContext": .bool(true)]) == .readOnly)
   }
 
   @Test func descriptorLookupIsExactAndFailClosed() {

@@ -457,7 +457,8 @@
             "packageInfo",
             "storageUsage",
             "deviceModel",
-            "firmwareBuild"
+            "firmwareBuild",
+            "bootContext"
           ]
         }
       },
@@ -508,7 +509,8 @@
                 "packageInfo",
                 "storageUsage",
                 "deviceModel",
-                "firmwareBuild"
+                "firmwareBuild",
+                "bootContext"
               ]
             }
           }

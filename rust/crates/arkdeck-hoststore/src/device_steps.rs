@@ -1047,6 +1047,7 @@ pub(crate) fn evidence_preflight_step(step: &CatalogStep) -> bool {
 pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str] {
     match (operation, step_id) {
         ("observe.device@1", "probe-host-tool") => &["tool-facts.json"],
+        ("observe.device@1", "read-boot-context") => &["boot-context.json"],
         ("observe.device@1", "read-evidence-firmware") => {
             &["device-facts.json", "binding-snapshot.json"]
         }
@@ -1152,7 +1153,7 @@ pub(crate) fn omitted_products(
 ) -> BTreeSet<String> {
     let reference = descriptor.reference();
     let mut steps: BTreeSet<&str> = BTreeSet::new();
-    for step in descriptor.steps.iter().filter(|step| step.optional) {
+    for step in &descriptor.steps {
         if upstream(&reference, &step.step_id).is_some_and(|upstream| steps.contains(upstream))
             || !descriptor.step_is_selected(step, inputs)
         {

@@ -1,7 +1,7 @@
 {
   "appCapabilityRegistrySchemaVersion": "arkdeck.app-product-capability-registry/1",
   "bundleVersion": "arkdeck.cli.contracts/1",
-  "catalogDigest": "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195",
+  "catalogDigest": "fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18",
   "classificationVocabulary": [
     "direct",
     "generic",

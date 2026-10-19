@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "88c20a2c364b87ae6e7327edfd1b3bffecaeeff2e67f71dbd6aaa43db74ec195"
+  public static let catalogDigest = "fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -826,10 +826,12 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceSharedReadOnly,
       inputs: [
+        CatalogFieldDescriptor(name: "includeBootContext", type: .boolean, isRequired: false, summary: "Read a coherent boot ID, uptime and optional RAM-only reboot fault marker. A requested snapshot must verify successfully.", defaultValue: .bool(false)),
         CatalogFieldDescriptor(name: "refreshServerFacts", type: .boolean, isRequired: false, summary: "Re-probe HDC server facts even when a fresh snapshot exists.", defaultValue: .bool(true))
       ],
       outputs: [
         CatalogFieldDescriptor(name: "bindingSnapshot", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "bootContext", type: .artifactReference, isRequired: false),
         CatalogFieldDescriptor(name: "deviceFacts", type: .artifactReference, isRequired: true),
         CatalogFieldDescriptor(name: "toolFacts", type: .artifactReference, isRequired: true)
       ],
@@ -839,6 +841,7 @@ extension RuntimeOperationCatalog {
         CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
         CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
         CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "read-boot-context", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "bootContext")),
         CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
       ],
       timeoutSeconds: 60,
@@ -847,7 +850,8 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "device-facts.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "tool-facts.json", role: .raw, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
-        CatalogArtifactDescriptor(name: "binding-snapshot.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default)
+        CatalogArtifactDescriptor(name: "binding-snapshot.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "boot-context.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default)
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),

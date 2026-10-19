@@ -63,6 +63,8 @@ pub enum Action {
     /// The one target row the binding's connect key names.
     ObserveDevice,
     QueryProperty(Property),
+    /// Coherent kernel boot facts and an optional RAM-only fault marker.
+    ObserveBootContext,
     /// Swift `.observeStorage`: the free space under [`STORAGE_ROOT`],
     /// judged against the bytes the capture may need.
     ObserveStorage {
@@ -224,6 +226,7 @@ impl Action {
             ("runApprovedRemoteRead", Some("firmwareBuild")) => {
                 Some(Self::QueryProperty(Property::FullBuildVersion))
             }
+            ("runApprovedRemoteRead", Some("bootContext")) => Some(Self::ObserveBootContext),
             _ => None,
         }
     }
@@ -283,6 +286,7 @@ impl Action {
         match self {
             Self::ObserveTool | Self::ObserveServer => "hostOnly",
             Self::ObserveDevice
+            | Self::ObserveBootContext
             | Self::QueryProperty(_)
             | Self::ObserveStorage { .. }
             | Self::CaptureHilog { .. }
@@ -305,6 +309,7 @@ impl Action {
                 "hdc.queryProperty",
                 vec![("property", text(property.key()))],
             ),
+            Self::ObserveBootContext => ("hdc.observeBootContext", Vec::new()),
             Self::ObserveStorage { required_bytes } => (
                 "hdc.observeStorage",
                 vec![("requiredBytes", Persisted::Integer(*required_bytes))],
@@ -358,6 +363,11 @@ impl Action {
                 device(&["shell", "param", "get", property.key()])?,
                 TIMEOUT,
                 CAPTURE_BYTES,
+            ),
+            Self::ObserveBootContext => (
+                device(&["shell", crate::boot_context::QUERY])?,
+                TIMEOUT,
+                crate::boot_context::CAPTURE_BYTES,
             ),
             Self::ObserveStorage { .. } => (
                 device(&["shell", "df", "-k", STORAGE_ROOT])?,
@@ -452,6 +462,7 @@ impl Action {
             },
             Self::ObserveDevice => observe_device(receipt, expected),
             Self::QueryProperty(property) => query_property(receipt, *property),
+            Self::ObserveBootContext => crate::boot_context::verify(receipt),
             Self::ObserveStorage { required_bytes } => observe_storage(receipt, *required_bytes),
             // HiLog is raw sensitive output: bytes that are not UTF-8 are
             // kept, never refused.
