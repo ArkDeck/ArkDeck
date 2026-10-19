@@ -27,6 +27,15 @@ pub struct MaintenanceObservation {
 }
 
 pub trait MaintenanceReads: Send + Sync {
+    /// Read the live Normal-mode subject before a new FullFlash capability
+    /// is consumed; no daemon execution or source receipt exists yet.
+    fn observe_flash_evidence(
+        &self,
+        _facts: &crate::flash_facts::RockchipFacts,
+        _deadline: Instant,
+    ) -> Result<MaintenanceObservation, String> {
+        Err("flash evidence readback is unavailable".into())
+    }
     fn observe_evidence(
         &self,
         _execution: &Execution,
@@ -109,33 +118,77 @@ impl HdcDispatch for BoundedHdc<'_> {
     }
 }
 impl MaintenanceReads for NativeMaintenanceReads {
+    fn observe_flash_evidence(
+        &self,
+        expected: &crate::flash_facts::RockchipFacts,
+        deadline: Instant,
+    ) -> Result<MaintenanceObservation, String> {
+        let hdc = (self.hdc)()?;
+        let bounded = BoundedHdc {
+            hdc: &*hdc,
+            deadline,
+        };
+        let facts = self
+            .facts
+            .current_facts(&self.targets, Some(&bounded), &expected.target_id)?;
+        let topology = expected
+            .server_facts
+            .get("dayu200HDCNormalAliasUSBTopology")
+            .ok_or("flash evidence has no bound Normal topology")?;
+        if facts.target_id != expected.target_id
+            || facts.binding_revision != expected.binding_revision
+            || facts.identity_sha256 != expected.identity_sha256
+            || facts.tool_sha256 != expected.tool_sha256
+            || facts.execution_connect_key != expected.execution_connect_key
+            || facts.device_mode != "hdc"
+            || facts
+                .server_facts
+                .get("dayu200NormalLoaderHardwareIdentity")
+                .map(String::as_str)
+                != Some("satisfied")
+            || facts.server_facts.get("dayu200HDCNormalAliasUSBTopology") != Some(topology)
+            || Instant::now() >= deadline
+        {
+            return Err("flash evidence target, routing or tool changed".into());
+        }
+        let binding = DeviceBinding {
+            target_id: facts.target_id,
+            binding_revision: facts.binding_revision,
+            stable_identity_sha256: facts.identity_sha256.clone(),
+            connect_key: facts.execution_connect_key,
+            usb_topology: topology.clone(),
+            loader_first_connector_sha256: None,
+            recommission: None,
+        };
+        let identity = m::Identity {
+            serial_sha256: facts.identity_sha256,
+            topology_sha256: sha256_hex(topology.as_bytes()),
+            descriptor_sha256: arkdeck_provider_arkforge::host_topology_digest(topology)
+                .ok_or("flash evidence connector is unreadable")?,
+        };
+        let (model, firmware) = evidence_properties(&bounded, &binding.connect_key)?;
+        if Instant::now() >= deadline {
+            return Err("flash evidence budget exhausted".into());
+        }
+        Ok(MaintenanceObservation {
+            identity,
+            binding,
+            model,
+            firmware,
+        })
+    }
     fn observe_evidence(
         &self,
         execution: &Execution,
         deadline: Instant,
     ) -> Result<MaintenanceObservation, String> {
-        use arkdeck_provider_hdc::{Action, Expected, Outcome, Property};
         let (identity, binding) = self.observe(execution, deadline)?;
         let hdc = (self.hdc)()?;
         let bounded = BoundedHdc {
             hdc: &*hdc,
             deadline,
         };
-        let property = |property| -> Result<String, String> {
-            let action = Action::QueryProperty(property);
-            let receipt = bounded
-                .dispatch(&action.lower("maintenance-evidence", Some(&binding.connect_key))?)
-                .map_err(|error| format!("{error:?}"))?;
-            match action.verify(&receipt, Expected::default()) {
-                Outcome::Verified(facts) => facts
-                    .get("value")
-                    .cloned()
-                    .ok_or_else(|| "maintenance property readback is absent".into()),
-                _ => Err("maintenance property readback is not verified".into()),
-            }
-        };
-        let model = property(Property::ProductName)?;
-        let firmware = property(Property::FullBuildVersion)?;
+        let (model, firmware) = evidence_properties(&bounded, &binding.connect_key)?;
         if Instant::now() >= deadline {
             return Err("maintenance evidence budget exhausted".into());
         }
@@ -256,6 +309,30 @@ impl MaintenanceReads for NativeMaintenanceReads {
             arkdeck_provider_hdc::PartitionHash::MountedWritable => m::ReadOutcome::MountedWritable,
         })
     }
+}
+
+fn evidence_properties(
+    hdc: &dyn HdcDispatch,
+    connect_key: &str,
+) -> Result<(String, String), String> {
+    use arkdeck_provider_hdc::{Action, Expected, Outcome, Property};
+    let property = |property| -> Result<String, String> {
+        let action = Action::QueryProperty(property);
+        let receipt = hdc
+            .dispatch(&action.lower("maintenance-evidence", Some(connect_key))?)
+            .map_err(|error| format!("{error:?}"))?;
+        match action.verify(&receipt, Expected::default()) {
+            Outcome::Verified(facts) => facts
+                .get("value")
+                .cloned()
+                .ok_or_else(|| "maintenance property readback is absent".into()),
+            _ => Err("maintenance property readback is not verified".into()),
+        }
+    };
+    Ok((
+        property(Property::ProductName)?,
+        property(Property::FullBuildVersion)?,
+    ))
 }
 
 pub struct MaintenanceContext {
