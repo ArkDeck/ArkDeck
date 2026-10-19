@@ -424,7 +424,9 @@ jobs:
     # and another full Windows view (100 minutes total). Linux keeps 30 minutes.
     # Test/Runtime/operation deadlines, coverage and failure aggregation stay
     # unchanged; every selected check and isolated view must still complete.
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 100 || startsWith(matrix.os, 'xcode') && 65 || 30 }}
+    # Catalog input drift runs published, candidate, c6 and e4 in isolated
+    # targets. Windows needs room for three full suites plus the consumer suite.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || startsWith(matrix.os, 'xcode') && 65 || 30 }}
     defaults:
       run:
         shell: bash

@@ -756,7 +756,7 @@ RUST_WORKSPACE_TOKENS = (
 # The published and candidate contract views: once per host, in the
 # `contracts` matrix beside `workspace`, since they read none of its products.
 RUST_CONTRACTS_TOKENS = (
-    "    timeout-minutes: ${{ matrix.os == 'windows-latest' && 100 || startsWith(matrix.os, 'xcode') && 65 || 30 }}\n",
+    "    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || startsWith(matrix.os, 'xcode') && 65 || 30 }}\n",
     'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"',
     'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-contract-test-timings" >> "$GITHUB_ENV"',
     "        working-directory: .\n"
@@ -1555,13 +1555,13 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             ),
             rust[:rust.index("  contracts:\n")],
             # Each matrix retains its own exact whole-job allowance:
-            # workspace Windows40/macOS50/Linux30; contracts Windows100/macOS65/Linux30.
+            # workspace Windows40/macOS50/Linux30; contracts Windows120/macOS65/Linux30.
             # Independent removal, drift or swapping must still fail closed.
             rust.replace(workspace_timeout, "").replace(contracts_timeout, ""),
             rust.replace(workspace_timeout, ""),
             rust.replace(contracts_timeout, ""),
             rust.replace(workspace_timeout, workspace_timeout.replace("&& 40", "&& 41")),
-            rust.replace(contracts_timeout, contracts_timeout.replace("&& 100", "&& 101")),
+            rust.replace(contracts_timeout, contracts_timeout.replace("&& 120", "&& 121")),
             rust.replace(contracts_timeout, contracts_timeout.replace("&& 65", "&& 66")),
             rust.replace(workspace_timeout, contracts_timeout),
             rust.replace(contracts_timeout, workspace_timeout),
