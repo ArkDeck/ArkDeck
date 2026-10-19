@@ -561,6 +561,59 @@ mod windows {
             .to_owned();
         assert_eq!(again, job);
         third.stop(&root.0);
+
+        // A smaller configured limit must reach both the direct runner and
+        // the agent's background runner, while keeping the prior publication.
+        let mut fourth = {
+            let mut command = daemon(&root.0);
+            command
+                .env("ARKDECK_WORKSPACE_INSPECTOR", root.inspector())
+                .env("ARKDECK_ARTIFACT_QUOTA_BYTES", "1");
+            Daemon::spawn(command)
+        };
+        let pipe = fourth.serving();
+        let inputs = json!({"projectRef": registered, "symbol": "build", "fileScope": "*.ets"});
+        let (ran, _) = run_job(
+            &pipe,
+            "capacity-direct",
+            "workspace.inspect-source",
+            inputs.clone(),
+        );
+        assert_eq!(ran["state"], "failed", "{ran}");
+        let mut execution = answered(
+            &pipe,
+            "agent.run",
+            json!({
+                "schemaVersion": "arkdeck.agent-execution-request/1",
+                "executionId": "capacity-background", "operation": "workspace.inspect-source@1",
+                "inputs": inputs, "target": {"targetId": "workspace-host"},
+                "maximumWaitMilliseconds": "30000"
+            }),
+        );
+        let deadline = Instant::now() + DEADLINE;
+        while !["succeeded", "failed", "cancelled", "abandoned"]
+            .contains(&execution["jobState"].as_str().unwrap_or_default())
+        {
+            assert!(
+                Instant::now() < deadline,
+                "background Job did not finish: {execution}"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+            execution = answered(
+                &pipe,
+                "agent.status",
+                json!({"executionId": "capacity-background"}),
+            );
+        }
+        assert_eq!(execution["jobState"], "failed", "{execution}");
+        assert_eq!(
+            derived(&pipe, &job),
+            ("source-inspection.txt".into(), redacted)
+        );
+        let quota = answered(&pipe, "artifact.quota", json!({}));
+        assert_eq!(quota["totalBytes"], 1);
+        assert_eq!(quota["remainingBytes"], 0);
+        fourth.stop(&root.0);
     }
 
     /// `arkdeck-agentd --workspace-tool <tool> <argv>`, with no environment

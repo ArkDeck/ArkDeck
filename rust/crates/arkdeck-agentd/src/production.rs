@@ -492,6 +492,7 @@ pub(crate) fn compose(
     host: Host,
     now: &str,
 ) -> Result<Composition, Box<dyn std::error::Error>> {
+    let artifact_quota = crate::host::configured_artifact_quota()?;
     let mut omitted = Vec::new();
     let state = HostDirectory::open(&layout.state)?;
     state.validate_path(&layout.state)?;
@@ -582,7 +583,7 @@ pub(crate) fn compose(
         )?)
         .with_storage(
             arkdeck_hoststore::SessionStore::open(&layout.state, &layout.sessions)?,
-            arkdeck_hoststore::ArtifactUsage::open(&layout.artifacts, crate::host::ARTIFACT_QUOTA)?,
+            arkdeck_hoststore::ArtifactUsage::open(&layout.artifacts, artifact_quota)?,
         )
         .with_bootstrap(&layout.bootstrap)?
         .with_jobs(arkdeck_hoststore::JobStore::open_state_root_owner(

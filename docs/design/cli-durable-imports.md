@@ -129,6 +129,15 @@ page size and snapshot revision, and survive restart. Shared Runtime/CLI project
 validation rejects malformed counts, state/receipt disagreement and foreign
 owners.
 
+The Rust Runtime's published Artifact capacity defaults to 8 GiB. An explicit
+startup environment `ARKDECK_ARTIFACT_QUOTA_BYTES` selects a positive decimal byte
+count up to `9223372036854775807`; malformed values refuse startup. This immutable
+per-daemon limit is shared by quota/storage reads, Import commits and every Job
+publication path, including background runs and reconciliation. It does not
+change the separate 8 GiB staging budget, Session policy, physical storage checks
+or retention. Increasing capacity preserves existing payloads; reducing it below
+current usage refuses new publication without evicting anything.
+
 Host fixtures cover actual SIGKILL during partial append, synchronized append,
 durable commit intent and publication-before-receipt; source/prefix corruption;
 symlinks; tombstones; snapshot restart; all registered validators; and actual CLI

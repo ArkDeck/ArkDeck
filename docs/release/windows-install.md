@@ -31,6 +31,12 @@ CLI 与 App 都不从管道上读 daemon 的身份，只认安装时给定的输
 | `ARKDECK_DAEMON_PACKAGE_FAMILY` | MSIX 包族名，可与发布者身份并列配置。 |
 | `ARKDECK_DAEMON_PATH` | daemon 映像的绝对路径。App 默认取它旁边的 `arkdeck-agentd.exe`；CLI 在 `bin\` 里，必须给出。 |
 
+Artifact 容量默认 8 GiB。需要保留更多镜像或验收数据时，可在启动 Runtime 的环境中设置
+`ARKDECK_ARTIFACT_QUOTA_BYTES=17179869184`（16 GiB）。只接受 `1` 至 `9223372036854775807`
+的十进制字节数，非法值拒绝启动。设置只在下一次 Runtime 启动时生效；已运行的 daemon 不随 CLI
+环境变化。`artifact quota`、`runtime storage status`、Import commit 和 Job 发布共用这个上限。
+这不会清理现有 Artifact，也不改变 retention、Session 配额或磁盘可用空间检查；容量不足仍拒绝新写入。
+
 正式包的这两个值写在 `rc-manifest.json` 的 `daemonConfiguration` 里。什么都没配置时，App 不连接任何东西，只显示恢复横幅；
 CLI 拒绝启动或连接 daemon。
 

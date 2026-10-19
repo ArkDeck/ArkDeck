@@ -367,6 +367,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     };
     #[cfg(target_os = "macos")]
     let host = if let Some((root, admission)) = isolated {
+        let artifact_quota = crate::host::configured_artifact_quota()?;
         let root = std::path::PathBuf::from(root);
         // LocalListener already authenticates the same-user peer. Require a
         // separate socket beside the explicit development document, never the
@@ -473,7 +474,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
             .with_storage(
                 sessions,
-                arkdeck_hoststore::ArtifactUsage::open(&artifacts, host::ARTIFACT_QUOTA)?,
+                arkdeck_hoststore::ArtifactUsage::open(&artifacts, artifact_quota)?,
             )
             .with_bootstrap(&bootstrap)?
             // The isolated owner admits Jobs, so it holds the Job owner connection.
