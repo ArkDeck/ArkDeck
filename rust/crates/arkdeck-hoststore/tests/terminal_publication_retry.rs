@@ -570,15 +570,45 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
         );
     }
     let mut compiled = by_reference(&compiled);
+    if arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::BOOT_CONTEXT {
+        let complete: Vec<_> = compiled.values().cloned().collect();
+        assert_eq!(
+            arkdeck_contract::sha256_hex(
+                &support::catalog_lineage::catalog_bytes(&complete).unwrap()
+            ),
+            support::catalog_lineage::BOOT_CONTEXT,
+            "the complete new Catalog must match its exact reviewed source"
+        );
+        let observe = compiled.get_mut("observe.device@1").unwrap();
+        let boot = &observe["inputs"]["fields"]["includeBootContext"];
+        assert_eq!(boot["type"], "boolean");
+        assert_eq!(boot["required"], false);
+        assert_eq!(boot["default"], false);
+        // Only this exact non-Artifact input addition is compatible. Prove
+        // that replacing its complete descriptor reproduces the complete
+        // prior published table; no other descriptor may be normalized.
+        *observe = current["observe.device@1"].clone();
+        let previous: Vec<_> = compiled.values().cloned().collect();
+        assert_eq!(
+            arkdeck_contract::sha256_hex(
+                &support::catalog_lineage::catalog_bytes(&previous).unwrap()
+            ),
+            support::catalog_lineage::RESTORATION_POLICY
+        );
+    }
     if matches!(
         arkdeck_contract::CATALOG_DIGEST,
         support::catalog_lineage::RECOMMISSION
             | support::catalog_lineage::CONTROLLED_RETRY
             | support::catalog_lineage::RESTORATION_POLICY
+            | support::catalog_lineage::BOOT_CONTEXT
     ) {
         assert_eq!(compiled.len(), 35);
         assert!(compiled.remove("flash.recommission@1").is_some());
-        if arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::RESTORATION_POLICY {
+        if matches!(
+            arkdeck_contract::CATALOG_DIGEST,
+            support::catalog_lineage::RESTORATION_POLICY | support::catalog_lineage::BOOT_CONTEXT
+        ) {
             let restoration = compiled.get_mut("flash.restore-boot-loop@1").unwrap();
             assert_eq!(restoration["defaultPolicyIssuance"], "enabled");
             restoration["defaultPolicyIssuance"] = json!("disabled");
@@ -598,6 +628,7 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
             | support::catalog_lineage::RECOMMISSION
             | support::catalog_lineage::CONTROLLED_RETRY
             | support::catalog_lineage::RESTORATION_POLICY
+            | support::catalog_lineage::BOOT_CONTEXT
     ) {
         assert_eq!(compiled.len(), 34);
         assert!(compiled.remove("flash.verify@1").is_some());
@@ -609,7 +640,8 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
         | support::catalog_lineage::MAINTENANCE
         | support::catalog_lineage::RECOMMISSION
         | support::catalog_lineage::CONTROLLED_RETRY
-        | support::catalog_lineage::RESTORATION_POLICY => &current,
+        | support::catalog_lineage::RESTORATION_POLICY
+        | support::catalog_lineage::BOOT_CONTEXT => &current,
         _ => panic!("a future Catalog needs an explicit input compatibility review"),
     };
     assert_eq!(&compiled, expected);

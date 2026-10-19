@@ -667,7 +667,7 @@
     "crates/arkdeck-hoststore/tests/support/reconcile.rs": "a7b1e073422bcfd3e266e3c03f30d7d20a4ddafbb7b8b66dbd816ac4ba1dc86d",
     "crates/arkdeck-hoststore/tests/support/workspace_publication_retry.rs": "d5d93d58b6a4e9562bdf590c89350da63fa23d3c8f9e699482147fdb33e5883a",
     "crates/arkdeck-hoststore/tests/target_adoption.rs": "ac4399a0d8eae0efb504140de3197c319dc36ee4f43acc0ab23d8bcfaf65a55b",
-    "crates/arkdeck-hoststore/tests/terminal_publication_retry.rs": "1ff8853eea9bbe1edf74aff7d9be8f56d131eea97316f0df6712ba320e049e32",
+    "crates/arkdeck-hoststore/tests/terminal_publication_retry.rs": "fa51cf889844280622cde32eb191f8028d22ef91b7ea520ad6c680853d30f7ae",
     "crates/arkdeck-hoststore/tests/tool_list_native.rs": "7f237ce96d648c83f1732b7b885bc9317c1251e49279367e0a4553c6b87aaf66",
     "crates/arkdeck-hoststore/tests/tool_macho.rs": "ba3ca1d467b7b99b605233d747e8c99a55b2016000480cab0a9f62563efdd274",
     "crates/arkdeck-hoststore/tests/tool_retirement_native.rs": "707918f49dcb32999d0c5a206867e5dda0c2cb50534547255f9ae8051f23c7ed",
