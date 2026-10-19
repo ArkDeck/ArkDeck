@@ -93,3 +93,14 @@ reserve、consume。主机输入构建不构成设备验收。
 和 Linux contract parity；Swift 的显式 remote-read 集合与历史输入兼容测试的版本清单
 尚未覆盖新 Catalog。后续提交加入明确的 `bootContext` 集合项和上述完整摘要证明，
 保持未知 action、未知 Catalog 和旧输入字段拒绝条件，继续由 CI 验证。
+
+`39200798439` 的 Swift、App、Windows ClientKit、主机检查、三平台 workspace 和
+Linux/macOS contract parity 均成功。Windows contract parity 被 100 分钟 job 上限取消：
+自动保留的 provenance 证明 published、candidate、historical 三视图完整通过，observed
+视图在最后一组单测中被截断，日志没有断言失败。该用例在前三视图均成功；published
+和 historical workspace 各约 28–29 分钟，candidate consumer 约 10 分钟，observed
+又执行约 26 分钟后被截断。本次输入差异
+需要完整四视图，因此 Windows 该 job 预算调整为 120 分钟；精确预算校验及 121 分钟
+拒绝用例同步更新，全部产品/契约用例、断言和设备 Runtime 预算保持原样。最后的
+Session 用例本机单跑 exit 0（25.61 秒），日志 `session-publication-isolated-budget-120.log`。
+新 head 的完整结论仍需 CI 实际给出。
