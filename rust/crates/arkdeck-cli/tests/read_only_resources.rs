@@ -686,7 +686,10 @@ mod endpoint {
             assert_eq!(requests.len(), 2);
             assert_eq!(requests[0]["method"], "health");
             assert_eq!(requests[1]["method"], method);
-            assert!(requests[1]["params"].is_null());
+            // Preserve each leaf's existing wire shape: quota omits params,
+            // while storage status sends its empty parameter object.
+            let expected = if method == "artifact.quota" { Value::Null } else { json!({}) };
+            assert_eq!(requests[1]["params"], expected);
         }
     }
 

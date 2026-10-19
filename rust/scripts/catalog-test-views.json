@@ -273,7 +273,7 @@
     "crates/arkdeck-cli/tests/maintainer_contracts.rs": "6642d097e01ade77d2002a9ca4a5b6e9011f6710edd87e70bc047686dd0e7e6a",
     "crates/arkdeck-cli/tests/operation_validate.rs": "656275c0a26732bc8535590d2d176b57d615b74653be75b4b2b3f9eaf1f94b2a",
     "crates/arkdeck-cli/tests/read_leaves.rs": "510a9c3137c1f252d16d8b386311add161dbd22a3f5bf6c84e984131b568fcaa",
-    "crates/arkdeck-cli/tests/read_only_resources.rs": "42fa09f58601f817ba14d21251d00512486e14bf97f52fe84300d8d55042fbf8",
+    "crates/arkdeck-cli/tests/read_only_resources.rs": "8f3a862382d2c685d66713f160e4edf5f0652fadce809d54bc4adf2339e6d79a",
     "crates/arkdeck-cli/tests/runtime_hdc_status.rs": "4404e7be32d7959535a2edbb64d31aaeb6f9700bc9903f2654f7409d52fc9eac",
     "crates/arkdeck-cli/tests/runtime_health.rs": "804d219062def7a07b6ff71e717f5668f536dba6fa1530b5c1bea6296e87c9b7",
     "crates/arkdeck-cli/tests/runtime_service.rs": "c712c58faf256b7957c1c06e86a42f527ea3d95fbfeeb7bc8ae4100e59d1a1fa",
