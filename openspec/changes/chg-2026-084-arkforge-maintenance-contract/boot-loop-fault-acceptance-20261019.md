@@ -75,6 +75,9 @@ reserve、consume。主机输入构建不构成设备验收。
   保持不变。Windows JSON 从官方 Swift Flash 投影同步，单跑
   `TheCatalogReviewIsTheOneTheMacOsAppCompilesIn` 一项 exit 0。日志
   `contract-*-ci-fix.log`、`windows-projection-test-ci-fix.log`。
+- 新 Catalog 的完整输入兼容证明单跑 exit 0，日志 `compatibility-ci-fix.log`：先核对完整
+  新 Catalog 的精确摘要，再仅以旧 `observe.device@1` 替换新描述符，要求完整表恢复为
+  已发布的前一 Catalog 摘要，随后继续逐项比较全部 32 个旧描述符。旧 fixture 不修改。
 
 本机未执行 SwiftPM、macOS App build-for-testing 或本地统一门；Windows 只单跑了上述
 离线投影检查。
@@ -85,3 +88,8 @@ reserve、consume。主机输入构建不构成设备验收。
 `39197939838` 在契约输入指纹与 Windows App 投影一致性检查失败；已按实际错误同步生成物，
 未修改断言。修复 head 的 CI 结论待实际完成后记录。CI 成功与 host fixture 均不替代
 本专项的真实设备结果。
+
+同 PR 的 `39198677397` 已通过主机检查、Windows ClientKit、App 构建、Linux workspace
+和 Linux contract parity；Swift 的显式 remote-read 集合与历史输入兼容测试的版本清单
+尚未覆盖新 Catalog。后续提交加入明确的 `bootContext` 集合项和上述完整摘要证明，
+保持未知 action、未知 Catalog 和旧输入字段拒绝条件，继续由 CI 验证。

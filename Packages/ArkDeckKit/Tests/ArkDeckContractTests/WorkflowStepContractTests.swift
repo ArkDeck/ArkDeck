@@ -330,7 +330,7 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
 
 final class HardwareEvidenceWorkflowStepContractTests: XCTestCase {
   func testEvidenceRemoteReadsAreValidDurableJournalActions() {
-    for actionID in ["deviceModel", "firmwareBuild"] {
+    for actionID in ["deviceModel", "firmwareBuild", "bootContext"] {
       XCTAssertNoThrow(try makeRemoteRead(actionID: actionID), actionID)
     }
   }
@@ -350,7 +350,7 @@ final class HardwareEvidenceWorkflowStepContractTests: XCTestCase {
       Set(actionIDs),
       Set([
         "deviceSummary", "systemProperties", "processList", "packageInfo", "storageUsage",
-        "deviceModel", "firmwareBuild",
+        "deviceModel", "firmwareBuild", "bootContext",
       ]))
     for actionID in actionIDs {
       XCTAssertNoThrow(try makeRemoteRead(actionID: actionID), actionID)
