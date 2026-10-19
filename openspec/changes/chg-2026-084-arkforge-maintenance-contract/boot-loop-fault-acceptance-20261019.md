@@ -102,8 +102,8 @@ destructive policy、历史 fixture 和设备写入范围均不放宽。新的�
   新 Catalog 的精确摘要，再仅以旧 `observe.device@1` 替换新描述符，要求完整表恢复为
   已发布的前一 Catalog 摘要，随后继续逐项比较全部 32 个旧描述符。旧 fixture 不修改。
 
-本机未执行 SwiftPM、macOS App build-for-testing 或本地统一门；Windows 只单跑了上述
-离线投影检查。
+观测能力这一轮本机未执行 SwiftPM、macOS App build-for-testing 或本地统一门；Windows
+仅单跑了上述离线投影检查。
 
 FullFlash 准入前观测修复的日志保存在本机 `flash-preflight-checks-20261019/`：
 
@@ -121,6 +121,11 @@ FullFlash 准入前观测修复的日志保存在本机 `flash-preflight-checks-
 - SDD 检查 exit 0，0 errors、0 warnings、121 acceptance IDs；`git diff --check` exit 0。
   受限 Temp 无法创建检查目录、受限 shell 无法启动的原始失败日志保留，改用正常本机环境
   执行同一检查后通过，未放宽断言。日志 `sdd-native.log`。
+- 补齐控制套接字 HDC 替身对既有 `const.product.name` 只读查询的响应后，Windows 的
+  Flash owner 三项 passed、一项保留的 subprocess fixture ignored，Agent run 套接字
+  一项 passed，均 exit 0。成功、unknown、不重放和缺失真实硬件证明拒绝的断言均保留。
+  日志 `flash-owner-fixture-property-name.log`、`flash-socket-fixture-property-name.log`。
+  macOS 替身分支只能由对应 CI 实际执行。
 
 ## CI
 
@@ -150,3 +155,9 @@ Session 用例本机单跑 exit 0（25.61 秒），日志 `session-publication-i
 包括 Windows contract parity（55 分 50 秒）、macOS contract parity（53 分 18 秒）、三平台
 workspace、Swift、App 和 Windows ClientKit；SDD Guard `39211002214` 成功。
 PR #2678 已合入上述 protected main。真实故障专项仍以独立设备完成条件为准。
+
+FullFlash 修复 [PR #2679](https://github.com/ArkDeck/ArkDeck/pull/2679) 的首轮
+`39224958377` 中 Linux workspace 与 contract parity、主机检查通过；macOS workspace
+在共用 HDC 替身的 13 个控制入口用例中失败。该替身只回答 `const.product.model`，未实现
+准入前观测已有的 `const.product.name` 查询；各用例在消费前停止。现补齐该响应并同步
+source pin，保持全部原断言和产品准入条件，后续 head 由 CI 重新验证。

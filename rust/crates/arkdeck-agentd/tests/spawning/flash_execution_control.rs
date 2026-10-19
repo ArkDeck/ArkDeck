@@ -366,7 +366,7 @@ pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::
 case "$*" in
   *"list targets"*) printf '150100424a544e4600\t\tUSB\tConnected\tlocalhost\n' ;;
   *"param get const.ohos.fullname"*) printf 'OpenHarmony-7.0.0.35-20260728_180253\n' ;;
-  *"param get const.product.model"*) printf 'DAYU200\n' ;;
+  *"param get const.product.model"*|*"param get const.product.name"*) printf 'DAYU200\n' ;;
   "-v") printf 'Ver: 3.2.0f\n' ;;
   *) exit 1 ;;
 esac
@@ -455,7 +455,9 @@ impl arkdeck_provider_hdc::HdcDispatch for ScriptedHdc {
             b"150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
         } else if line.contains("param get const.ohos.fullname") {
             b"OpenHarmony-7.0.0.35-20260728_180253\n"
-        } else if line.contains("param get const.product.model") {
+        } else if line.contains("param get const.product.model")
+            || line.contains("param get const.product.name")
+        {
             b"DAYU200\n"
         } else if line == "-v" {
             b"Ver: 3.2.0f\n"
