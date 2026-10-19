@@ -5,6 +5,41 @@
 #[cfg(test)]
 mod tests {
     use crate::host::*;
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn artifact_capacity_configuration_preserves_default_and_refuses_invalid_values() {
+        assert_eq!(artifact_quota_from(None).unwrap(), 8 << 30);
+        for value in ["1", "17179869184", "9223372036854775807"] {
+            assert_eq!(
+                artifact_quota_from(Some(value.into())).unwrap(),
+                value.parse::<u64>().unwrap()
+            );
+        }
+        for value in [
+            "",
+            "0",
+            "-1",
+            "+1",
+            " 1024",
+            "1024\n",
+            "16GiB",
+            "9223372036854775808",
+            "18446744073709551616",
+        ] {
+            let error = artifact_quota_from(Some(value.into())).unwrap_err();
+            assert!(error.starts_with("ARKDECK_ARTIFACT_QUOTA_BYTES must be"));
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::ffi::OsStringExt;
+            assert!(artifact_quota_from(Some(std::ffi::OsString::from_wide(&[0xd800]))).is_err());
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStringExt;
+            assert!(artifact_quota_from(Some(std::ffi::OsString::from_vec(vec![0xff]))).is_err());
+        }
+    }
     /// Health is used as a readiness probe before the Session resource lane
     /// seeds its fixtures. It must leave the retention catalog uninitialized
     /// so the first Session read can discover those fixtures.

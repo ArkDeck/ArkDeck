@@ -209,6 +209,11 @@ pub(crate) fn decode_index(bytes: &[u8], job_id: &str) -> io::Result<Vec<Value>>
 }
 
 impl ArtifactUsage {
+    /// The immutable limit shared by inventory reads and Artifact writers.
+    pub fn limit(&self) -> u64 {
+        self.quota
+    }
+
     pub fn open(path: &Path, quota: u64) -> io::Result<Self> {
         if quota == 0 || quota > i64::MAX as u64 {
             return Err(invalid());

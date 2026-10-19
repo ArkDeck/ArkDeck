@@ -316,6 +316,7 @@ impl Authority {
         String,
     > {
         use crate::development_usb::{RelationSource, relation_source};
+        let artifact_quota = crate::host::configured_artifact_quota()?;
         let host = host
             .with_jobs(self.job_store()?)
             .with_capabilities(self.capability_store()?);
@@ -372,14 +373,12 @@ impl Authority {
                     self.root.path().join("artifacts").display()
                 )
             })?;
-            arkdeck_hoststore::ArtifactUsage::open(&path, crate::host::ARTIFACT_QUOTA).map_err(
-                |error| {
-                    format!(
-                        "the Artifact usage owner {} is unusable: {error}; nothing was started",
-                        path.display()
-                    )
-                },
-            )?
+            arkdeck_hoststore::ArtifactUsage::open(&path, artifact_quota).map_err(|error| {
+                format!(
+                    "the Artifact usage owner {} is unusable: {error}; nothing was started",
+                    path.display()
+                )
+            })?
         });
         let host = host.with_history(self.history_store()?);
         // Beside the Job state, as the macOS daemons keep their agent

@@ -221,6 +221,83 @@ fn an_import_is_uploaded_committed_read_and_released_across_a_restart() {
 }
 
 #[test]
+fn configured_artifact_capacity_controls_imports_and_preserves_existing_bytes() {
+    let _turn = turn();
+    let root = Root::new();
+    let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
+    let start = |limit: usize| {
+        let mut command = daemon(executable, &root.0);
+        command.env("ARKDECK_ARTIFACT_QUOTA_BYTES", limit.to_string());
+        Daemon::from_command(command)
+    };
+    let assert_capacity = |pipe: &str, limit: usize, used: usize| {
+        let quota = answered(pipe, "artifact.quota", json!({}));
+        assert_eq!(quota["totalBytes"], json!(limit));
+        assert_eq!(quota["usedBytes"], json!(used));
+        assert_eq!(quota["remainingBytes"], json!(limit.saturating_sub(used)));
+        let status = answered(pipe, "runtime.storage.status", json!({}));
+        assert_eq!(status["artifactDomain"]["totalBytes"], limit.to_string());
+        assert_eq!(status["artifactDomain"]["usedBytes"], used.to_string());
+        assert_eq!(
+            status["artifactDomain"]["remainingBytes"],
+            limit.saturating_sub(used).to_string()
+        );
+    };
+    let mut daemon = start(HAP.len());
+    let pipe = daemon.serving();
+    let (first, committed) = upload(&pipe, "capacity-first", "hap", HAP);
+    assert_eq!(committed["ok"], true, "{committed}");
+    let artifact = committed["result"]["receipt"]["artifactId"]
+        .as_str()
+        .unwrap();
+    let payload = root.artifacts().join(&first).join(artifact);
+    assert_capacity(&pipe, HAP.len(), HAP.len());
+    let (_, refused) = upload(&pipe, "capacity-full", "hap", HAP);
+    assert_eq!(refused["error"]["code"], "quotaExceeded", "{refused}");
+    assert_eq!(std::fs::read(&payload).unwrap(), HAP);
+    daemon.stop(&root.0);
+
+    let mut daemon = start(1);
+    let pipe = daemon.serving();
+    assert_capacity(&pipe, 1, HAP.len());
+    let read = answered(
+        &pipe,
+        "artifact.read",
+        json!({
+            "owner": {"kind": "import", "id": first}, "artifactId": artifact
+        }),
+    );
+    assert!(!read.is_null());
+    let (_, refused) = upload(&pipe, "capacity-reduced", "hap", HAP);
+    assert_eq!(refused["error"]["code"], "quotaExceeded", "{refused}");
+    daemon.stop(&root.0);
+
+    let mut daemon = start(2 * HAP.len());
+    let pipe = daemon.serving();
+    let (_, committed) = upload(&pipe, "capacity-expanded", "hap", HAP);
+    assert_eq!(committed["ok"], true, "{committed}");
+    assert_capacity(&pipe, 2 * HAP.len(), 2 * HAP.len());
+    assert_eq!(std::fs::read(&payload).unwrap(), HAP);
+    daemon.stop(&root.0);
+}
+
+#[test]
+fn malformed_artifact_capacity_refuses_start_before_artifact_owners_open() {
+    let _turn = turn();
+    let root = Root::new();
+    let output = daemon(Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")), &root.0)
+        .env("ARKDECK_ARTIFACT_QUOTA_BYTES", "0")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(69), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("ARKDECK_ARTIFACT_QUOTA_BYTES must be")
+    );
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("listening on"));
+    assert!(!root.artifacts().exists());
+}
+
+#[test]
 fn gj1_import_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let Some(thumbprint) =
         std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty())
@@ -462,7 +539,11 @@ struct Daemon {
 
 impl Daemon {
     fn start(executable: &Path, root: &Path) -> Self {
-        let mut child = daemon(executable, root).spawn().unwrap();
+        Self::from_command(daemon(executable, root))
+    }
+
+    fn from_command(mut command: Command) -> Self {
+        let mut child = command.spawn().unwrap();
         let stdout = child.stdout.take().unwrap();
         let (sender, lines) = mpsc::channel();
         std::thread::spawn(move || {

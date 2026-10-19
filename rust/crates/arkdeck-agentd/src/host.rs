@@ -41,9 +41,31 @@ fn job_owner_not_configured() -> WireError {
     }
 }
 
-/// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
+/// The default Artifact quota, matching Swift's `ArtifactQuota()`.
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
+
+/// Explicit host capacity, fixed for this daemon. Invalid configuration must
+/// not silently select a different limit or echo arbitrary environment text.
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) fn artifact_quota_from(value: Option<std::ffi::OsString>) -> Result<u64, String> {
+    let Some(value) = value else {
+        return Ok(ARTIFACT_QUOTA);
+    };
+    value
+        .to_str()
+        .filter(|text| !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|text| text.parse::<u64>().ok())
+        .filter(|bytes| *bytes > 0 && *bytes <= i64::MAX as u64)
+        .ok_or_else(|| {
+            "ARKDECK_ARTIFACT_QUOTA_BYTES must be a decimal integer from 1 to 9223372036854775807; nothing was started".into()
+        })
+}
+
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) fn configured_artifact_quota() -> Result<u64, String> {
+    artifact_quota_from(std::env::var_os("ARKDECK_ARTIFACT_QUOTA_BYTES"))
+}
 
 /// The lane and per-action host are shared by direct and background Jobs.
 #[cfg(any(target_os = "macos", windows))]
@@ -769,6 +791,7 @@ impl Host {
             self.running.clone(),
             self.home.clone(),
         );
+        let quota = self.artifact_limit();
         let imports = self.imports.clone();
         let receive_root = self.receive_root.clone();
         let helper = self.code_sign_helper.clone();
@@ -838,7 +861,7 @@ impl Host {
                     jobs: &jobs,
                     artifacts: &artifacts,
                     analyzer: Some(&analyzer),
-                    quota: ARTIFACT_QUOTA,
+                    quota,
                     home: &home,
                     now: clock_now,
                     precise_now: clock_precise_now,
@@ -924,6 +947,7 @@ impl Host {
         let default_mutation_root = self.default_mutation_root.clone();
         let capabilities = self.capabilities.clone();
         let holds = self.holds.clone();
+        let quota = self.artifact_limit();
         let imports = self.imports.clone();
         let targets = self.targets.clone();
         let dispatch = self.owned_job_hdc();
@@ -1012,6 +1036,7 @@ impl Host {
                         &planning,
                         &jobs,
                         &artifacts,
+                        quota,
                         imports.as_deref(),
                         authority,
                         &home,
@@ -1086,6 +1111,12 @@ impl Host {
     ) -> Self {
         self.storage = Some(std::sync::Arc::new((sessions, artifacts)));
         self
+    }
+    #[cfg(any(target_os = "macos", windows))]
+    fn artifact_limit(&self) -> u64 {
+        self.storage
+            .as_deref()
+            .map_or(ARTIFACT_QUOTA, |(_, artifacts)| artifacts.limit())
     }
     #[cfg(any(target_os = "macos", windows))]
     pub fn with_workspace_projects(
@@ -1848,6 +1879,7 @@ fn windows_runner<'a>(
     (state_root, analyzers): &'a (std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles),
     jobs: &'a arkdeck_hoststore::JobStore,
     artifacts: &'a arkdeck_hoststore::ArtifactReadStore,
+    quota: u64,
     imports: Option<&'a arkdeck_hoststore::ImportUploadStore>,
     authority: Option<arkdeck_hoststore::MutationAuthority<'a>>,
     home: &'a str,
@@ -1865,7 +1897,7 @@ fn windows_runner<'a>(
         jobs,
         artifacts,
         analyzer: Some(analyzers),
-        quota: ARTIFACT_QUOTA,
+        quota,
         home,
         now: clock_now,
         precise_now: clock_precise_now,
@@ -2794,6 +2826,7 @@ impl HostServices for Host {
                     planning,
                     jobs,
                     artifacts,
+                    self.artifact_limit(),
                     self.imports.as_deref(),
                     self.authority(),
                     &self.home,
@@ -2889,7 +2922,7 @@ impl HostServices for Host {
                 jobs,
                 artifacts,
                 analyzer: Some(analyzer),
-                quota: ARTIFACT_QUOTA,
+                quota: self.artifact_limit(),
                 home: &self.home,
                 now: clock_now,
                 precise_now: clock_precise_now,
@@ -3036,7 +3069,7 @@ impl HostServices for Host {
                 .planning
                 .as_ref()
                 .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
-            quota: ARTIFACT_QUOTA,
+            quota: self.artifact_limit(),
             home: &self.home,
             now: clock_now,
             precise_now: clock_precise_now,
@@ -3085,6 +3118,7 @@ impl HostServices for Host {
             state_root,
             jobs,
             artifacts,
+            self.artifact_limit(),
             self.imports.as_deref(),
             self.authority(),
             &self.home,
@@ -3221,7 +3255,7 @@ impl HostServices for Host {
                     jobs,
                     artifacts,
                     analyzer: Some(analyzer),
-                    quota: ARTIFACT_QUOTA,
+                    quota: self.artifact_limit(),
                     home: &self.home,
                     now: clock_now,
                     precise_now: clock_precise_now,
@@ -3282,6 +3316,7 @@ impl HostServices for Host {
                 planning,
                 jobs,
                 artifacts,
+                self.artifact_limit(),
                 self.imports.as_deref(),
                 self.authority(),
                 &self.home,
@@ -4320,7 +4355,7 @@ impl Host {
                 &utc_now(),
                 app_owned,
                 self.artifacts.as_ref().ok_or_else(unavailable)?,
-                ARTIFACT_QUOTA,
+                self.artifact_limit(),
                 |intent| {
                     self.targets
                         .as_ref()
