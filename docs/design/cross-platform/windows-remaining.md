@@ -1,19 +1,55 @@
-# Windows: what remains (2026-10-14 installed acceptance)
+# Windows: what remains (2026-10-20, after Flash maintenance acceptance)
 
 Source: the official `cli-feature-coverage.json` generator and its exact Windows
-App source/fixture mapping. The App increment is published on protected main
+App source/fixture mapping, at protected main `534e3c620` (Catalog
+`fe0806a5756ae59d55410a976039d2cd1853105f6d7d1f5aa00473026a81ed18`). The App
+increment is published on protected main
 `caec3e7f77a9bfd3c2f15e39e9716385987ae568` (#2631). The 2026-10-13 clean signed
 development RC uses that source; implementation counts and actual acceptance
 results remain distinct.
 
-The 162 Windows CLI features remain unchanged: 149 `implemented`, 11 `partial`
-and 2 `notImplemented`. The 68 App capabilities are separately Windows-required
+There are now 165 Windows CLI features: 149 `implemented`, 14 `partial` and 2
+`notImplemented`. The three added since 2026-10-14 are the Flash maintenance
+operations `flash.verify@1`, `flash.restore-boot-loop@1` (CHG-2026-084) and
+`flash.recommission@1` (CHG-2026-086). Each is `partial` because it is reached
+only through the generic Runtime leaves; the other 162 features keep their
+status. The 68 App capabilities are separately Windows-required
 under accepted ruling 10: 59 `implemented` software targets, one `partial`
 installed-update target and eight accepted `deferred` rich TraceViewer targets.
-There are 230 Windows-required entries and 33 non-App macOS-only entries; the
-scope/status digest of all 195 non-App entries is unchanged. GUI status comes
+There are 233 Windows-required entries and 33 non-App macOS-only entries, 266
+in all. GUI status comes
 from exact Windows source/fixture records, with hardware, Narrator and installed
 release validation stated separately; a measured CLI equivalent proves no GUI.
+
+## Blockers at a glance (2026-10-20)
+
+Real Windows Flash now succeeds through the typed Runtime operation. All
+remaining blockers are external inputs, maintainer review or quiet-host time:
+
+1. **AF-W1 / GJ-4 (external).** ArkForge has no `windows-acceptance.yml` run,
+   no registered runner and no `arkforge.release-bundle/v1` release. Its
+   `windows-production` environment exists. It still needs the WHDP-attested
+   `arkforge-rockusb.cat`, a trusted release certificate and a qualified
+   DAYU200 runner. `TASK-XPA-010` stays `blocked`, and no Windows GJ-4
+   `REAL_DEVICE_PASS` is recorded.
+2. **Loader-path changes (maintainer review).** CHG-2026-082 (Normal→Loader
+   hardware identity), CHG-2026-083 (Loader-first flash), CHG-2026-084 (vendor-SN
+   retained archive), CHG-2026-085 (retained-archive maintenance) and CHG-2026-086 (expired
+   unknown recommission) are `in-progress`. Each awaits maintainer review or
+   current-Catalog acceptance through the published Runtime.
+3. **ArkTrace production distribution (external).** The development-signed
+   package passed native qualification on 2026-10-18. Production publisher
+   signing, clean-host packaging and installed acceptance remain open.
+4. **Generic leaves (dependency).** These are `job plan|submit|run`, `agent run|resume`,
+   `human-action resume`, `capture.diagnostic-session@1` and the three
+   maintenance operations. They are counted only after 1 and 3 close.
+5. **Release (`TASK-XPA-022`, external).** Production signing, clean-host install
+   and a formal update feed remain open. A same-publisher, higher-version signed
+   MSIX is needed for `app.settings.updates`.
+6. **Performance (`TASK-XPA-025`, quiet host).** The quiet-host reference
+   capture and a full-duration 24-hour soak still have to run, see below.
+7. **Rulings batch.** The delegated decisions marked "pending the next rulings
+   batch" below have not yet been recorded.
 
 CLI measurements include `debug.hap@1`,
 `deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
@@ -73,8 +109,10 @@ board window), **now** (Swift-oracle parity work we can do now), **dependency** 
 | `flash.reconcile-alias` | 4 | done | Signed CLI checks 21 `flash-host-reads` alias exchanges and the `post-flash-alias` reissued lineage, exact private/archive bytes, restart durability and zero HDC dispatch (`flash_alias_cli.rs`) |
 | `debug.template@1`, `debug.template.run` | 2 | done | Signed CLI checks all four closed template Jobs, sensitive/raw binary Artifacts, failure paths and unknown-intent restart/reconcile without replay (`debug_template_cli.rs`). Delegated reference: macOS Rust `debug_template_run.rs` owner semantics plus existing Swift `debug-probe` normal payloads; pending next rulings batch |
 | `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | external | Windows loader, doctor, exact Artifact inspection, summary/CPU analysis Jobs and export pass with the recipe-built parser and host-trusted signed CLI. Production signed publication, clean-host and installed acceptance remain open; absent/invalid distributions keep typed refusals |
-| `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` and the missing Windows ArkTrace distribution prevent completion |
-| `flash.dayu200` | 4 | external | Real flash through the ArkForge lane (AF-W1) |
+| `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` (AF-W1) and the production-signed Windows ArkTrace distribution prevent completion |
+| `flash.dayu200` | 4 | external | The Windows Runtime composes the signed ArkForge bundle and has completed real typed nine-partition flashes (2026-10-19). Formal GJ-4 acceptance still requires AF-W1 and a matched release Bundle |
+| `flash.verify@1`, `flash.restore-boot-loop@1` | 4 | dependency | Real Windows results on 2026-10-19: independent verification, original-ramdisk restoration and a real boot-loop fault recovery. Reached only through `agent run`, so counted with the generic leaves |
+| `flash.recommission@1` | 4 | dependency | Windows Runtime only (macOS lacks the historical process-lifetime proof). Generic; CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
 | `runtime.service.install`, `runtime.service.update` | — | closed | Keep ruling 42: the client-started daemon has no installer. Runtime RC updates continue through reinstall (ruling 78); delegated decision of 2026-10-05 keeps these leaves `notImplemented` |
 
 No item is blocked only on the board: each device leaf above replays a Swift oracle through the
@@ -121,8 +159,9 @@ again passed a full-minute idle-host preflight, then its default performance
 capture stopped at the unchanged cold-start phase load gate (4.2146 against 4).
 No capture run or baseline completed. After all App/build work, a separate new
 24-hour soak started at `2026-10-14T01:09:47.702Z`, with a fresh private root,
-unchanged defaults and passive host-load diagnostics. It is still running;
-no full-duration pass is claimed, and the earlier failure remains retained.
+unchanged defaults and passive host-load diagnostics. As of 2026-10-20 no
+result for that run is recorded in the repository. No full-duration pass is
+claimed, and the earlier failure remains retained.
 
 ## Remaining acceptance and dependencies
 
@@ -204,7 +243,7 @@ and the published `conflict` refusal remain in force. See the
 [published installed readback run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-installed-readback-2026-10-13-run.md).
 
 The presently actionable CLI increments above are measured. Remaining generic
-leaves depend on AF-W1 and a trusted Windows ArkTrace distribution; service
+leaves depend on AF-W1 and a production-signed Windows ArkTrace distribution; service
 install/update keep their existing closed decision.
 
 The host workspace Session publication repair is released in #2597, protected
@@ -294,8 +333,9 @@ authentication, followed by the same board at its fixed USB port, is required.
 
 GJ-4 is independent: ArkForge's production `windows-acceptance.yml` has no AF-W1
 run, and no downloadable matched `arkforge.release-bundle/v1` Windows release.
-The ArkForge release/protected `windows-production` environment and qualified
-DAYU200 runner owners must provide both. Ordinary Windows/Rust CI is not AF-W1,
+On 2026-10-20 the protected `windows-production` environment exists, but no
+runner is registered. The ArkForge release owners and qualified DAYU200 runner
+owners must provide both. Ordinary Windows/Rust CI is not AF-W1,
 and an acceptance JSON alone is not the release Bundle. The prepared published
 DAYU200 OpenHarmony 7.0.0.43 image has whole SHA-256
 `781d2eaebe2f8d10a25d13102a38259b134210480b2153786032a3bdea675fed`.
@@ -305,3 +345,34 @@ Runtime admission using fresh trusted facts, the complete materialized plan
 and an exactly matching RuntimeCapability under `POL-AGENT-002`. No flash was
 dispatched; historical campaign or chat-confirmation fields do not replace
 that authority.
+
+## Windows Flash progress, 2026-10-15 to 2026-10-19
+
+These results are Runtime records, not GJ-4 acceptance. `TASK-XPA-010` keeps its
+AF-W1 blocker.
+
+- **ArkForge composition (#2644–#2649).** The installed Runtime composes the
+  published signed ArkForge bundle and binds plans to the observed USB
+  connector. Its first real execution stopped after the HDC-to-Loader
+  transition with `outcomeUnknown`. That Job was preserved without replay
+  ([availability record](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-010/windows-flash-availability-20261015-run.md)).
+  The binding-change recovery guard keeps GJ-4 blocked until a complete
+  Loader lineage and recovery path are mechanically proved.
+- **Loader identity and recommission.** CHG-2026-082/083/084/085/086 add
+  pre-transition hardware identity, Loader-first adoption, vendor-SN archive,
+  retained-archive maintenance and bounded recommission for expired unknown
+  boards. Their implementations are merged on protected main, and every one is still
+  `in-progress` pending maintainer review and current-Catalog acceptance.
+- **Maintenance entries (CHG-2026-084 ArkForge maintenance, all tasks done).**
+  On the Windows Runtime, after explicit approval of the policy and the
+  userdata-overwrite scope, an ordinary nine-partition Flash succeeded.
+  `flash.verify@1` then returned exit 9: eight full hashes matched and userdata
+  was a `typedSkip`. `flash.restore-boot-loop@1` restored the original 4 MiB
+  ramdisk with a full hash, and a second verification returned exit 0. See the
+  [independent acceptance](../../../openspec/changes/chg-2026-084-arkforge-maintenance-contract/independent-acceptance-20261019.md).
+- **Real boot-loop fault.** An induced 300-second reboot loop was observed across
+  three boot IDs. It was then recovered by an independent Runtime restoration
+  and verified, with more than 330 seconds of stable observation. This covers
+  only the HDC-observable window, not early-boot HDC loss or the Loader/MaskRom
+  paths. See the
+  [boot-loop record](../../../openspec/changes/chg-2026-084-arkforge-maintenance-contract/boot-loop-fault-acceptance-20261019.md).
