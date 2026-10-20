@@ -735,6 +735,16 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // binding oracle's state, by the same CLI against the same signed test
     // daemon (TASK-XPA-010).
     "flash.bind-loader",
+    // Flash maintenance (TASK-XPA-010): after a `flash run`, `flash verify` of
+    // it (partial, userdata mounted writable), `flash restore-boot-loop` of its
+    // original ramdisk under one Runtime capability, `flash verify` of that
+    // restoration and the restoration's repeat, which writes nothing, by the
+    // same CLI against the same signed test daemon. Its partition readbacks
+    // are the production closed reads over the fake HDC; its identity
+    // observation is synthetic, as Windows resolves a USB connector only from
+    // the host's device tree (`flash_maintenance_cli.rs`).
+    "flash.verify",
+    "flash.restore-boot-loop",
     // The protected Flash recovery broker over the Flash invocation owner
     // (TASK-XPA-010): an invocation started, its pinned full restore executed
     // to a terminal state, shown and listed (`recovery flash-invocation …`

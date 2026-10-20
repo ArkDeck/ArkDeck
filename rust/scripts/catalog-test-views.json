@@ -49,7 +49,7 @@
     "crates/arkdeck-agentd/src/flash_plan_control.rs": "c8f7f10aca7ccac915908b4d406dfda0b0f8b98161036bf2f190c60057e463cf",
     "crates/arkdeck-agentd/src/hdc_status_control.rs": "b11467b2f6cb2ff1d562d5298bfa9cb7be8bb2f6fa536ddd680822d25fbfda0c",
     "crates/arkdeck-agentd/src/hilog_summary_analyzer.rs": "6a650c97d4d49800fab347821a0d128caea2bd413279aaf46ee07cd4fed4f6cc",
-    "crates/arkdeck-agentd/src/host.rs": "e10710f3a0cbce4465b124b83059b64981805b681c4bb4961b449874c9bdae02",
+    "crates/arkdeck-agentd/src/host.rs": "145d9020a31ef0beefdd8d465acd709cc7b8a9875494573cedb0857462d13b3a",
     "crates/arkdeck-agentd/src/host_tests.rs": "e2a4a9d0521b183de4f6696b4f16cece9dc8911f8fa4c44d94018643ec5f49f8",
     "crates/arkdeck-agentd/src/lib.rs": "bf962254b34c36f4de7a1fe97ddede3dd87f15cefe7ddd4c65c8c41d0750e857",
     "crates/arkdeck-agentd/src/loader_binding_control.rs": "e88ba38eb35e887d4482402c33ba1d4027c57966c14a41fed638773888b471ca",
@@ -90,15 +90,16 @@
     "crates/arkdeck-agentd/tests/spawning/diagnostic_session_cli.rs": "3107566531d788e21eab01945247f2d5009318bbbdc8af3206f3002537b6925c",
     "crates/arkdeck-agentd/tests/spawning/flash_alias_cli.rs": "fda59a6500456ad5793b17a19c9d6b61d532ab066111270ce9d40f62c12259d1",
     "crates/arkdeck-agentd/tests/spawning/flash_broker_control.rs": "f71628f8e939e4bc82e3674d89627773fa516d5c9b0debbc9682cb0f8e8ffa8e",
-    "crates/arkdeck-agentd/tests/spawning/flash_execution_control.rs": "7303771ef292f2ac32d258e5924ef7ac1643f3e050f5c88276edafed1a99bb89",
+    "crates/arkdeck-agentd/tests/spawning/flash_execution_control.rs": "26ff6d9328109592c4b744be95e279116b015695db79cc21fd1f7b008cae0d9c",
     "crates/arkdeck-agentd/tests/spawning/flash_host_facts_control.rs": "5b710a625a654ba2da7bc8a4818d77d219e278560117c09bcb2492ab4937a8f1",
-    "crates/arkdeck-agentd/tests/spawning/flash_socket_control.rs": "f48d72115c8e4c0f15f6250d1b814269add7109ca14289a665c0cdb73c73139d",
+    "crates/arkdeck-agentd/tests/spawning/flash_maintenance_cli.rs": "7179326cfabf94da7b4aba7bfa713f3a0deb4812422203a4ff4a91a2f8bab768",
+    "crates/arkdeck-agentd/tests/spawning/flash_socket_control.rs": "13610724f79bdc3518866ee8c5c9cbcd78bc5b93d6cac06a89eab2458badb7d7",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_leaves.rs": "ba19de652d3e3662acd5ea57a81cfc8fb4a32dfe1a96c70dd18489afe937ce95",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_reads.rs": "81471780cc5a1d7ba53587d629376aab7d8f74fdbbbf73cce6447747a0a6116e",
     "crates/arkdeck-agentd/tests/spawning/gj1_inputs.rs": "d1986f815b0fba8710c8bb22d207fbae699a39138284f2267f0b6643f000578d",
     "crates/arkdeck-agentd/tests/spawning/gj23_replay.rs": "dd058550a16ed74ce89c3391ce0dba4939202c0d8ceb0a5a0487b4ff5024becd",
     "crates/arkdeck-agentd/tests/spawning/job_archive_cli.rs": "d084d06c5eed8f2ba05659862a08c02fee0bc3cfa92c9591c373ae61fdc4ae4d",
-    "crates/arkdeck-agentd/tests/spawning/main.rs": "a030ef6d804be75f88d4f8fba7ab56c5151fa885f87b63c783cb6d1a5d47da5a",
+    "crates/arkdeck-agentd/tests/spawning/main.rs": "a03eb46667bbb5e2d1029413a47a2219cace28e05ac404977fbd69cc6156093e",
     "crates/arkdeck-agentd/tests/spawning/managed_hdc_server.rs": "09383cb5ddec6e6ea2df8d10d3a6b9440c57a7d56598bec012c4b7be08c9c15f",
     "crates/arkdeck-agentd/tests/spawning/signed_daemon.rs": "88525261496fc1d5d028fb3db5e9a26cbaa57d4872b555f7cb62f40a93d28373",
     "crates/arkdeck-agentd/tests/spawning/target_observation_control.rs": "2fe77bf592b070d1e53076a5406c5f5bc5087a760e03b43dc03357bf32f34a20",
@@ -181,7 +182,7 @@
     "crates/arkdeck-cli/src/error_registry.rs": "8c67f5133e04e8993a3103b76f98447a39fe38b0f34769a0ef771887fa36c354",
     "crates/arkdeck-cli/src/failure_mapping.rs": "37eb7c7f0823022c393f9ffbb77f030fefa89cba36abe6d8c795f7a581d3c308",
     "crates/arkdeck-cli/src/feature_coverage/windows_app.rs": "67fdd84624feb33c819ada70339ac665a6167f65d6980df8b3bd638a0dfeca32",
-    "crates/arkdeck-cli/src/feature_coverage.rs": "712bae2c75e54def6b2cdfd9f10c89177c014d985a305f0d374ca51a6cbee563",
+    "crates/arkdeck-cli/src/feature_coverage.rs": "5f7a0ccaae15c9622d66052a6916a2e6f527cb32ae5371669663fda5bb7bcfba",
     "crates/arkdeck-cli/src/flash_leaves.rs": "38fd1408501dc1ee90108d5060a6d7fa452bcde8bb191c9760b912386ab4a9ae",
     "crates/arkdeck-cli/src/flash_maintenance.rs": "0c63893b41c1630fb587cce01e64021f9768ba4d53a952995603a41439be2984",
     "crates/arkdeck-cli/src/hdc_control.rs": "4fbc96c931d9237186da5015a6cf16a45b1375efa0bc16b53e157a91087e922b",
@@ -7641,7 +7642,8 @@
         "trace_probe_control::trace_probe_replays_the_swift_oracle_through_production_host": "both",
         "debug_read_control::debug_reads_execute_only_closed_commands_on_an_adopted_route": "both",
         "app_ingress_fake_hdc::uidump_missing_received_file_is_not_published_or_replayed": "both",
-        "flash_execution_control::missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch": "both"
+        "flash_execution_control::missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch": "both",
+        "flash_socket_control::flash_maintenance_verifies_and_restores_over_the_control_socket": "both"
       },
       "ignored": [
         "flash_broker_control::flash_broker_process_fixture",
@@ -7754,7 +7756,8 @@
           "workspace_sign_leaf::the_real_cli_signs_a_hap_with_a_registered_signing_preset",
           "workspace_symbolize_leaf::diagnostics_capture_publishes_the_named_crash_log",
           "workspace_symbolize_leaf::the_real_cli_symbolizes_a_devices_crash_with_the_daemons_own_mode",
-          "flash_execution_control::missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch"
+          "flash_execution_control::missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch",
+          "flash_socket_control::flash_maintenance_verifies_and_restores_over_the_control_socket"
         ],
         "linux": []
       },

@@ -436,12 +436,88 @@ esac
         )
 }
 
+/// One DAYU200 partition as the fixture board's closed block reads report
+/// it: its sealed range, the digest of its content and whether it is mounted
+/// writable.
+#[cfg(windows)]
+#[derive(Clone, Debug)]
+pub(crate) struct Partition {
+    pub(crate) start: u64,
+    pub(crate) length: u64,
+    pub(crate) sha256: String,
+    pub(crate) writable: bool,
+}
+
+/// The fixture board's partitions by name, shared with whatever stands for
+/// the writes that change them; empty unless a fixture lays them down.
+#[cfg(windows)]
+pub(crate) type Partitions =
+    std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<String, Partition>>>;
+
+/// The DAYU200 partitions in their `mmcblk0p` order.
+#[cfg(windows)]
+pub(crate) const PARTITION_NAMES: [&str; 9] = [
+    "uboot",
+    "resource",
+    "boot_linux",
+    "ramdisk",
+    "system",
+    "vendor",
+    "updater",
+    "chip_ckm",
+    "userdata",
+];
+
 /// What the macOS fixture's `hdc` script answers, in process: the bound
 /// board connected, its build and model, the registered version; anything
-/// else exits 1. Every plan it was asked is kept.
+/// else exits 1. Every plan it was asked is kept. The closed partition
+/// metadata and hash reads answer from the fixture's [`Partitions`].
 #[cfg(windows)]
 #[derive(Default)]
-pub(crate) struct ScriptedHdc(std::sync::Mutex<Vec<Vec<String>>>);
+pub(crate) struct ScriptedHdc(std::sync::Mutex<Vec<Vec<String>>>, Partitions);
+
+#[cfg(windows)]
+impl ScriptedHdc {
+    /// The fake HDC answering the closed partition reads from `partitions`.
+    pub(crate) fn with_partitions(partitions: Partitions) -> Self {
+        Self(Default::default(), partitions)
+    }
+}
+
+#[cfg(windows)]
+impl ScriptedHdc {
+    /// The block read of `line`'s partition, if it is one of the closed
+    /// partition reads and the fixture laid that partition down.
+    fn partition_read(&self, line: &str) -> Option<Vec<u8>> {
+        let partitions = self.1.lock().unwrap();
+        let number = |name: &str| {
+            PARTITION_NAMES
+                .iter()
+                .position(|n| *n == name)
+                .map(|i| i + 1)
+        };
+        if let Some(rest) = line.split("/dev/block/by-name/").nth(1) {
+            let name = rest.split(')').next()?;
+            let partition = partitions.get(name)?;
+            let n = number(name)?;
+            let mode = if partition.writable { "rw" } else { "ro" };
+            return Some(
+                format!(
+                    "ARKFORGE_BLOCK_V1\nmmcblk0p{n}\n179:{n}\n{}\n{}\nb3:{n:x}\nMOUNTS\n\
+                     1 0 179:{n} / /{name} {mode} - ext4 /dev/block/mmcblk0p{n} {mode}\n\
+                     ARKFORGE_BLOCK_OK\n",
+                    partition.start / 512,
+                    partition.length.div_ceil(512),
+                )
+                .into_bytes(),
+            );
+        }
+        let rest = line.split("dd if=/dev/block/mmcblk0p").nth(1)?;
+        let n: usize = rest.split(' ').next()?.parse().ok()?;
+        let partition = partitions.get(*PARTITION_NAMES.get(n.checked_sub(1)?)?)?;
+        Some(format!("{}  -\nARKFORGE_HASH_OK\n", partition.sha256).into_bytes())
+    }
+}
 
 #[cfg(windows)]
 impl arkdeck_provider_hdc::HdcDispatch for ScriptedHdc {
@@ -451,22 +527,24 @@ impl arkdeck_provider_hdc::HdcDispatch for ScriptedHdc {
     ) -> Result<arkdeck_provider_hdc::Receipt, arkdeck_provider_hdc::DispatchFailure> {
         self.0.lock().unwrap().push(plan.arguments.clone());
         let line = plan.arguments.join(" ");
-        let stdout: &[u8] = if line.contains("list targets") {
-            b"150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+        let stdout: Vec<u8> = if let Some(read) = self.partition_read(&line) {
+            read
+        } else if line.contains("list targets") {
+            b"150100424a544e4600\t\tUSB\tConnected\tlocalhost\n".to_vec()
         } else if line.contains("param get const.ohos.fullname") {
-            b"OpenHarmony-7.0.0.35-20260728_180253\n"
+            b"OpenHarmony-7.0.0.35-20260728_180253\n".to_vec()
         } else if line.contains("param get const.product.model")
             || line.contains("param get const.product.name")
         {
-            b"DAYU200\n"
+            b"DAYU200\n".to_vec()
         } else if line == "-v" {
-            b"Ver: 3.2.0f\n"
+            b"Ver: 3.2.0f\n".to_vec()
         } else {
-            b""
+            Vec::new()
         };
         Ok(arkdeck_provider_hdc::Receipt {
             exit_status: if stdout.is_empty() { 1 } else { 0 },
-            stdout: stdout.to_vec(),
+            stdout,
             stderr: Vec::new(),
             truncated: false,
             duration: std::time::Duration::ZERO,
@@ -492,7 +570,24 @@ pub(crate) fn census()
 
 #[cfg(windows)]
 pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::host::Host {
-    use execution_fakes::{FakeHost, FakeLane};
+    flash_host_with(
+        root,
+        fakes,
+        std::sync::Arc::new(execution_fakes::FakeLane::new(fakes)),
+        Partitions::default(),
+    )
+}
+
+/// [`flash_host`] over `lane`, its HDC answering the closed partition reads
+/// from `partitions`.
+#[cfg(windows)]
+pub(crate) fn flash_host_with(
+    root: &Root,
+    fakes: &execution_fakes::Fakes,
+    lane: std::sync::Arc<dyn arkdeck_provider_arkforge::FlashLane>,
+    partitions: Partitions,
+) -> crate::host::Host {
+    use execution_fakes::FakeHost;
     use std::sync::Arc;
     // The configured `arkforged` the RockUSB identity measures: never run.
     let arkforged_bytes = b"arkforged stand-in";
@@ -533,7 +628,7 @@ pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::
         )
         .with_mutation_root(root.0.join("jobs"))
         .with_test_hdc(
-            Arc::new(ScriptedHdc::default()),
+            Arc::new(ScriptedHdc::with_partitions(partitions)),
             &arkdeck_contract::sha256_hex(b"fixture hdc"),
         )
         .with_flash_host_facts(
@@ -547,7 +642,7 @@ pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::
             Some(execution_fakes::TOOLCHAIN.into()),
         ))
         .with_flash_execution(
-            Arc::new(FakeLane::new(fakes)),
+            lane,
             Arc::new(FakeHost(fakes.clone())),
             "org.openharmony.dayu200@1.0.0".into(),
         )

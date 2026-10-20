@@ -26,7 +26,7 @@
 use crate::flash_execution_control::{Root, execution_fakes, flash_host, request};
 use arkdeck_control::Control;
 use arkdeck_platform::{LocalEndpoint, LocalListener};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -183,6 +183,10 @@ enum Entry {
     /// store, binding and census, with ArkForge's half of the Loader
     /// observation confirming, then its retry.
     BindLoader,
+    /// `flash verify` and `flash restore-boot-loop` after a `flash run`, over
+    /// the daemon's maintenance context and closed partition reads.
+    #[cfg(windows)]
+    Maintenance,
 }
 
 fn inputs_file(directory: &Path, exchange: &str) -> (PathBuf, Value) {
@@ -224,6 +228,8 @@ fn run_case(entry: Entry, outcome: &str) {
                 Entry::Recovery => "recovery",
                 Entry::FlashReads => "reads",
                 Entry::BindLoader => "bind",
+                #[cfg(windows)]
+                Entry::Maintenance => "maintenance",
             },
         )
         .env("ARKDECK_TEST_FLASH_SOCKET_OUTCOME", outcome)
@@ -520,6 +526,8 @@ fn flash_socket_process_fixture() {
         Ok("recovery") => Entry::Recovery,
         Ok("reads") => Entry::FlashReads,
         Ok("bind") => Entry::BindLoader,
+        #[cfg(windows)]
+        Ok("maintenance") => Entry::Maintenance,
         other => panic!("no entry named: {other:?}"),
     };
     let unknown = std::env::var("ARKDECK_TEST_FLASH_SOCKET_OUTCOME").as_deref() == Ok("unknown");
@@ -535,6 +543,11 @@ fn flash_socket_process_fixture() {
     let sockets = SocketDirectory::new();
     if matches!(entry, Entry::BindLoader) {
         bind_loader_over_the_cli(&sockets);
+        return;
+    }
+    #[cfg(windows)]
+    if matches!(entry, Entry::Maintenance) {
+        maintenance_over_the_cli(&root, &fakes, &sockets);
         return;
     }
     let host = flash_host(&root, &fakes);
@@ -650,6 +663,8 @@ fn flash_socket_process_fixture() {
         }
         // Served before the Flash host is composed.
         Entry::BindLoader => unreachable!(),
+        #[cfg(windows)]
+        Entry::Maintenance => unreachable!(),
         Entry::FlashReads => {
             let public = serve_public(&sockets.0, &["rockusb-loader", "hdc-normal", "maskrom"]);
             let (status, access) = cli(&socket, &["flash", "device-access"]);
@@ -826,6 +841,141 @@ fn flash_socket_process_fixture() {
     let again = job(&socket, "run", &job_id);
     assert_eq!(again["ok"], false, "{again}");
     assert_eq!(fakes.calls(), calls, "terminal records never redispatch");
+}
+
+#[cfg(windows)]
+#[test]
+fn flash_maintenance_verifies_and_restores_over_the_control_socket() {
+    run_case(Entry::Maintenance, "completed");
+}
+
+/// The oracle's full restore through `flash run`, then, through the same
+/// CLI: `flash verify` of it, partial as on the real board (userdata is
+/// mounted writable after boot); `flash restore-boot-loop` of its original
+/// ramdisk, with one Runtime capability; `flash verify` of that restoration;
+/// and a repeat of the restoration, which reads its Job and writes nothing.
+#[cfg(windows)]
+fn maintenance_over_the_cli(
+    root: &Root,
+    fakes: &execution_fakes::Fakes,
+    sockets: &SocketDirectory,
+) {
+    use crate::flash_maintenance_cli as maintenance;
+    let partitions = crate::flash_execution_control::Partitions::default();
+    let host = crate::flash_execution_control::flash_host_with(
+        root,
+        fakes,
+        Arc::new(maintenance::MaintenanceLane::new(fakes, partitions.clone())),
+        partitions.clone(),
+    )
+    .with_test_maintenance_reads(Arc::new(maintenance::FixtureReads::new(partitions.clone())));
+    serve(host, &sockets.socket());
+    let socket = sockets.socket();
+    let (inputs, recorded) = inputs_file(&sockets.0, "canonical.full");
+    let target = recorded["target"]["targetId"].as_str().unwrap().to_owned();
+    let (status, flashed) = cli(
+        &socket,
+        &[
+            "flash",
+            "run",
+            "--target",
+            &target,
+            "--inputs-file",
+            &inputs.to_string_lossy(),
+            "--execution-id",
+            "gj4-maintenance-fixture",
+        ],
+    );
+    let source = job_of(&flashed).unwrap_or_else(|| panic!("{flashed}"));
+    assert_eq!(
+        status,
+        Some(0),
+        "{flashed}
+{}
+{}",
+        job(&socket, "status", &source),
+        cli(&socket, &["job", "evidence", "--job", &source]).1
+    );
+    maintenance::flashed_board(&partitions);
+    let run = |operation: &str, of: &str, label: &str| {
+        let file = sockets.0.join(format!("{label}.json"));
+        fs::write(
+            &file,
+            maintenance::request(&recorded, operation, of, label).to_string(),
+        )
+        .unwrap();
+        let verb = operation.strip_prefix("flash.").unwrap();
+        cli(
+            &socket,
+            &["flash", verb, "--request-file", &file.to_string_lossy()],
+        )
+    };
+    let writes = |calls: &(Vec<String>, Vec<String>)| {
+        calls
+            .0
+            .iter()
+            .filter(|call| call.starts_with("perform "))
+            .count()
+    };
+    let flash_writes = writes(&fakes.calls());
+
+    // Eight full hashes match; userdata is a typed skip, so the verification
+    // is partial (exit 9), succeeded and written nothing.
+    let (status, verified) = run("flash.verify", &source, "verify-source");
+    assert_eq!(status, Some(9), "{verified}");
+    assert_eq!(verified["result"]["state"], "succeeded", "{verified}");
+    let report = &verified["result"]["maintenanceResult"];
+    assert_eq!(
+        report["schema"], "arkforge.flash-verification/v1",
+        "{report}"
+    );
+    assert_eq!(
+        (&report["verified"], &report["skipped"], &report["failed"]),
+        (&json!(8), &json!(1), &json!(0)),
+        "{report}"
+    );
+    let userdata = report["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["target"] == "userdata")
+        .unwrap();
+    assert_eq!(userdata["outcome"], "typedSkip", "{report}");
+    assert_eq!(writes(&fakes.calls()), flash_writes);
+
+    // The original ramdisk restored and independently read back whole.
+    let (status, restored) = run("flash.restore-boot-loop", &source, "restore");
+    assert_eq!(status, Some(0), "{restored}");
+    assert_eq!(restored["result"]["state"], "succeeded", "{restored}");
+    assert_eq!(restored["result"]["outcomeUnknown"], false, "{restored}");
+    let report = &restored["result"]["maintenanceResult"];
+    assert_eq!(
+        report["schema"], "arkforge.boot-loop-restoration/v1",
+        "{report}"
+    );
+    assert_eq!(report["outcome"], "verified", "{report}");
+    assert_eq!(report["verification"]["verified"], 1, "{report}");
+    let restoration = job_of(&restored).unwrap_or_else(|| panic!("{restored}"));
+    let restoration_writes = writes(&fakes.calls());
+    assert_eq!(restoration_writes, flash_writes + 1);
+
+    // An independent verification of the restoration: complete (exit 0).
+    let (status, verified) = run("flash.verify", &restoration, "verify-restored");
+    assert_eq!(status, Some(0), "{verified}");
+    let report = &verified["result"]["maintenanceResult"];
+    assert_eq!(
+        (&report["verified"], &report["skipped"], &report["failed"]),
+        (&json!(1), &json!(0), &json!(0)),
+        "{report}"
+    );
+
+    // The same restoration request reads its existing Job: nothing is
+    // written again.
+    let (status, repeated) = run("flash.restore-boot-loop", &source, "restore");
+    assert_eq!(status, Some(0), "{repeated}");
+    assert_eq!(job_of(&repeated).as_deref(), Some(restoration.as_str()));
+    assert_eq!(writes(&fakes.calls()), restoration_writes);
+    maintenance::assert_measured(&["flash.verify@1", "flash.restore-boot-loop@1"]);
 }
 
 /// The Job an answer names, wherever the entry point put it.

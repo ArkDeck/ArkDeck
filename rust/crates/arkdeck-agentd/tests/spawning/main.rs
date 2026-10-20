@@ -129,6 +129,8 @@ mod diagnostic_session_cli;
 mod flash_broker_control;
 mod flash_execution_control;
 mod flash_host_facts_control;
+#[cfg(windows)]
+mod flash_maintenance_cli;
 mod flash_socket_control;
 #[cfg(windows)]
 mod gj1_device_leaves;

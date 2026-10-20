@@ -8,12 +8,13 @@ increment is published on protected main
 development RC uses that source; implementation counts and actual acceptance
 results remain distinct.
 
-There are now 165 Windows CLI features: 149 `implemented`, 14 `partial` and 2
+There are now 165 Windows CLI features: 151 `implemented`, 12 `partial` and 2
 `notImplemented`. The three added since 2026-10-14 are the Flash maintenance
 operations `flash.verify@1`, `flash.restore-boot-loop@1` (CHG-2026-084) and
-`flash.recommission@1` (CHG-2026-086). Each is `partial` because it is reached
-only through the generic Runtime leaves; the other 162 features keep their
-status. The 68 App capabilities are separately Windows-required
+`flash.recommission@1` (CHG-2026-086). The first two have their own
+`flash verify` and `flash restore-boot-loop` leaves, now measured through the
+signed CLI on Windows. `flash.recommission@1` is `partial` because only the
+generic Runtime leaves reach it. The 68 App capabilities are separately Windows-required
 under accepted ruling 10: 59 `implemented` software targets, one `partial`
 installed-update target and eight accepted `deferred` rich TraceViewer targets.
 There are 233 Windows-required entries and 33 non-App macOS-only entries, 266
@@ -41,8 +42,8 @@ remaining blockers are external inputs, maintainer review or quiet-host time:
    package passed native qualification on 2026-10-18. Production publisher
    signing, clean-host packaging and installed acceptance remain open.
 4. **Generic leaves (dependency).** These are `job plan|submit|run`, `agent run|resume`,
-   `human-action resume`, `capture.diagnostic-session@1` and the three
-   maintenance operations. They are counted only after 1 and 3 close.
+   `human-action resume`, `capture.diagnostic-session@1` and
+   `flash.recommission@1`. They are counted only after 1 and 3 close.
 5. **Release (`TASK-XPA-022`, external).** Production signing, clean-host install
    and a formal update feed remain open. A same-publisher, higher-version signed
    MSIX is needed for `app.settings.updates`.
@@ -111,7 +112,7 @@ board window), **now** (Swift-oracle parity work we can do now), **dependency** 
 | `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | external | Windows loader, doctor, exact Artifact inspection, summary/CPU analysis Jobs and export pass with the recipe-built parser and host-trusted signed CLI. Production signed publication, clean-host and installed acceptance remain open; absent/invalid distributions keep typed refusals |
 | `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` (AF-W1) and the production-signed Windows ArkTrace distribution prevent completion |
 | `flash.dayu200` | 4 | external | The Windows Runtime composes the signed ArkForge bundle and has completed real typed nine-partition flashes (2026-10-19). Formal GJ-4 acceptance still requires AF-W1 and a matched release Bundle |
-| `flash.verify@1`, `flash.restore-boot-loop@1` | 4 | dependency | Real Windows results on 2026-10-19: independent verification, original-ramdisk restoration and a real boot-loop fault recovery. Reached only through `agent run`, so counted with the generic leaves |
+| `flash.verify@1`, `flash.restore-boot-loop@1` | 4 | done | Signed CLI over the fake lane after a `flash run`: partial verification (exit 9, userdata mounted writable), original-ramdisk restoration under one capability (exit 0), verification of the restoration (exit 0), and a repeat that writes nothing. Partition reads are the production closed reads over the fake HDC; the identity observation is synthetic, as Windows resolves a USB connector only from the host's device tree (`flash_maintenance_cli.rs`). Real Windows device results on 2026-10-19 are recorded separately |
 | `flash.recommission@1` | 4 | dependency | Windows Runtime only (macOS lacks the historical process-lifetime proof). Generic; CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
 | `runtime.service.install`, `runtime.service.update` | — | closed | Keep ruling 42: the client-started daemon has no installer. Runtime RC updates continue through reinstall (ruling 78); delegated decision of 2026-10-05 keeps these leaves `notImplemented` |
 
