@@ -579,9 +579,9 @@ fn agent_resume_completes_a_paused_execution_over_the_signed_test_daemon() {
     assert_eq!(calls(&fake_root).len(), before, "nothing is sent again");
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
-    // Measured, but not counted: a resume submits the execution's operation
-    // (the shared generic leaves' ruling of 2026-10-04).
-    assert_windows_status(&["agent.resume"], "partial");
+    // A resume submits the execution's operation: counted with the shared
+    // generic leaves (the ruling of 2026-10-04).
+    assert_windows_status(&["agent.resume"], "implemented");
 }
 
 /// GJ-1's human-action loop through the real CLI, as the Swift human-action
@@ -768,7 +768,7 @@ fn the_human_action_loop_runs_over_the_signed_test_daemon() {
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
     assert_windows_status(&["agent.abandon"], "implemented");
-    // Measured, but not counted: like `agent resume`, a resolved action's
-    // resume submits the execution's operation (the ruling of 2026-10-04).
-    assert_windows_status(&["human-action.resume"], "partial");
+    // Like `agent resume`, a resolved action's resume submits the
+    // execution's operation: counted with the shared generic leaves.
+    assert_windows_status(&["human-action.resume"], "implemented");
 }

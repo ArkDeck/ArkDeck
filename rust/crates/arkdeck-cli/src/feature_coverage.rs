@@ -303,6 +303,10 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("workspace.project.update", leaf("workspace.project.update")),
 ];
 
+/// Generic Catalog operations no Windows CLI run has measured through the
+/// generic leaves, which stay `partial` there although those leaves count.
+const WINDOWS_UNMEASURED_GENERIC: &[&str] = &["flash.recommission@1"];
+
 /// Swift `FeatureCoverage.localRoots` and its siblings: the leaves that are
 /// §18 `local`, bounded, versioned host-side product resources shared with
 /// the App, which never change Runtime authority. Every other executable leaf
@@ -379,6 +383,22 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["signing", "update", "support-bundl
 /// windows_*_process.rs` signed-CLI tests, each of which checks that what it
 /// measured is `implemented` here; TASK-XPA-018).
 const WINDOWS_MEASURED_LEAVES: &[&str] = &[
+    // The shared generic leaves (the lead's ruling of 2026-10-04: counted
+    // once every operation they reach on Windows answers as Swift does).
+    // Every direct Catalog operation is now measured on Windows, and these
+    // leaves are driven by the same signed CLI: `agent run` and `job
+    // plan|submit|run` of the full restore and its `flash.dayu200` alias
+    // (`flash_socket_control.rs`), `job submit` of the diagnostic session
+    // (`diagnostic_session_cli.rs`), and `agent resume` and `human-action
+    // resume` over the Swift human-action oracle (`gj1_device_leaves.rs`).
+    // `flash.recommission@1` has no Swift answer and no Windows CLI
+    // measurement; it stays partial ([`WINDOWS_UNMEASURED_GENERIC`]).
+    "job.plan",
+    "job.submit",
+    "job.run",
+    "agent.run",
+    "agent.resume",
+    "human-action.resume",
     // Alias reconciliation over the Swift flash-host-reads and
     // post-flash-alias oracles through the signed CLI (TASK-XPA-010).
     "flash.reconcile-alias",
@@ -560,14 +580,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // there, the private text never persisted (`gj1_inputs.rs`).
     "artifact.import.keyboard-input",
     "input.keyboard",
-    // Not `agent resume` (nor `human-action resume`), although
-    // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
-    // oracle's `connect` scenario: once its action resolves, a resume
-    // submits the execution's operation through the same admission as
-    // `agent run` and `job submit`, so its answer depends on that
-    // operation, and these shared generic leaves are not counted until
-    // every operation they reach on Windows answers as Swift does (the
-    // lead's ruling of 2026-10-04, as for `flash run` below).
+    // `agent resume` and `human-action resume`, which `gj1_device_leaves.rs`
+    // runs end to end over the Swift human-action oracle's `connect`
+    // scenario, are listed with the shared generic leaves at the head of
+    // this list: a resume submits the execution's operation through the
+    // same admission as `agent run` and `job submit`.
     // `agent abandon`, over the Swift human-action oracle's `trust` scenario
     // (`gj1_device_leaves.rs`): an execution paused on the device's trust
     // prompt, abandoned under its current generation (a stale one refused),
@@ -735,8 +752,8 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // and Rockchip host and an in-process fake HDC
     // (`tests/spawning/flash_socket_control.rs`). No board is flashed. The
     // shared generic leaves the same test drives (`agent run`, `job plan|
-    // submit|run`) are not counted until every operation they reach on
-    // Windows answers as Swift does (the lead's ruling of 2026-10-04 for
+    // submit|run`) count since every operation they reach on Windows is
+    // measured (the lead's ruling of 2026-10-04 for
     // GJ-2/3).
     "flash.run",
     "flash.bootloader-status",
@@ -1078,11 +1095,17 @@ impl Entry {
         {
             "notImplemented"
         } else if leaves.is_empty() {
-            // A generic Catalog operation is reached through `job submit`.
-            if self.classification == "generic" {
-                "partial"
-            } else {
+            // A generic Catalog operation is reached through `job submit`:
+            // implemented where that leaf is measured and a Windows CLI run
+            // reached the operation through it.
+            if self.classification != "generic" {
                 "notImplemented"
+            } else if WINDOWS_MEASURED_LEAVES.contains(&"job.submit")
+                && !WINDOWS_UNMEASURED_GENERIC.contains(&self.feature.as_str())
+            {
+                "implemented"
+            } else {
+                "partial"
             }
         } else if self.classification != "blocked"
             && leaves.iter().all(|leaf| {
@@ -1588,12 +1611,14 @@ mod tests {
             .collect();
         // Original d02b2288 contract: 162 Windows-required + 33 macOS-only,
         // independent of the later Device App layer. No frozen oracle is
-        // repinned; the only status change since is `trace.inspect` and both
-        // ArkTrace analyzers measured on Windows (TASK-XPA-021).
+        // repinned; the only status changes since are `trace.inspect` and
+        // both ArkTrace analyzers measured on Windows (TASK-XPA-021), and the
+        // shared generic leaves and the generic operations they reach counted
+        // there (the ruling of 2026-10-04).
         assert_eq!(rows.len(), 195);
         assert_eq!(
             arkdeck_contract::sha256_hex(&serde_json::to_vec(&rows).unwrap()),
-            "8b17d9f3bc26ed27378d192796b539eb3070a76e1ca71f2e174a99b463d322a7"
+            "a0bd4c286dd0cbccf7cbcd1dd81315d746a8316c6daa2bc85ed4e2125b205069"
         );
     }
 
@@ -1624,19 +1649,20 @@ mod tests {
             ("diagnostics.export", "implemented"),
             ("trace.inspect", "implemented"),
             ("device.observations", "implemented"),
-            ("job.submit", "partial"),
-            ("agent.run", "partial"),
-            ("agent.resume", "partial"),
+            ("job.submit", "implemented"),
+            ("agent.run", "implemented"),
+            ("agent.resume", "implemented"),
             ("runtime.storage.root", "implemented"),
             ("help", "implemented"),
             ("completion", "implemented"),
             ("capability.install", "implemented"),
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
-            ("human-action.resume", "partial"),
+            ("human-action.resume", "implemented"),
             ("agent.abandon", "implemented"),
             // A generic Catalog operation reached through `job submit`.
-            ("flash.dayu200", "partial"),
+            ("flash.dayu200", "implemented"),
+            ("flash.recommission@1", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),
             ("artifact.import.flash-bundle", "implemented"),

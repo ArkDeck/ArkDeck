@@ -8,16 +8,23 @@ increment is published on protected main
 development RC uses that source; implementation counts and actual acceptance
 results remain distinct.
 
-There are now 165 Windows CLI features: 154 `implemented`, 9 `partial` and 2
+There are now 165 Windows CLI features: 162 `implemented`, 1 `partial` and 2
 `notImplemented`. The three added since 2026-10-14 are the Flash maintenance
 operations `flash.verify@1`, `flash.restore-boot-loop@1` (CHG-2026-084) and
 `flash.recommission@1` (CHG-2026-086). The first two have their own
 `flash verify` and `flash restore-boot-loop` leaves, now measured through the
-signed CLI on Windows. `flash.recommission@1` is `partial` because only the
-generic Runtime leaves reach it. `trace.inspect` and both ArkTrace analyzers
+signed CLI on Windows. `flash.recommission@1` is the one `partial` feature:
+only the generic Runtime leaves reach it, and no Windows CLI run has measured
+it through them (it has no Swift answer). `trace.inspect` and both ArkTrace analyzers
 are also measured through the signed CLI, with the reviewed
 development-signed ArkTrace distribution (the user's ruling of 2026-10-20
-that a development-signed package counts as measurement). The 68 App capabilities are separately Windows-required
+that a development-signed package counts as measurement). With every direct
+Catalog operation measured, the shared generic leaves (`job plan|submit|run`,
+`agent run|resume`, `human-action resume`) and the generic operations a
+Windows CLI run reached through them (`flash.dayu200`,
+`capture.diagnostic-session@1`) are counted under the lead's ruling of
+2026-10-04. These counts are software measurements: none is a
+`REAL_DEVICE_PASS`, and GJ-4 still needs AF-W1. The 68 App capabilities are separately Windows-required
 under accepted ruling 10: 59 `implemented` software targets, one `partial`
 installed-update target and eight accepted `deferred` rich TraceViewer targets.
 There are 233 Windows-required entries and 33 non-App macOS-only entries, 266
@@ -47,9 +54,10 @@ remaining blockers are external inputs, maintainer review or quiet-host time:
    through the signed CLI with it. Production publisher signing, clean-host
    packaging and installed acceptance remain open for release; they no longer
    gate the CLI counts.
-4. **Generic leaves (dependency).** These are `job plan|submit|run`, `agent run|resume`,
-   `human-action resume`, `capture.diagnostic-session@1` and
-   `flash.recommission@1`. They are counted only after item 1 closes.
+4. **Generic leaves (counted).** `job plan|submit|run`, `agent run|resume`,
+   `human-action resume`, `flash.dayu200` and `capture.diagnostic-session@1`
+   are counted. `flash.recommission@1` stays `partial` until a Windows CLI
+   run measures it through `job submit`.
 5. **Release (`TASK-XPA-022`, external).** Production signing, clean-host install
    and a formal update feed remain open. A same-publisher, higher-version signed
    MSIX is needed for `app.settings.updates`.
@@ -109,17 +117,17 @@ board window), **now** (Swift-oracle parity work we can do now), **dependency** 
 | `input.keyboard@1` | 1 | done | Measured: `artifact import keyboard-input` and `input keyboard` through the real CLI against the macOS Rust owner test's answers (`keyboard_input_run.rs`, #2473), ported into the shared fake (`gj1_inputs.rs`); no Swift oracle exists; Windows `implemented` |
 | `capture.screen-sequence@1` (`screen record`) | 1 | done | Measured: every `screen-sequence` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`), capability names relabelled as in the GJ-2/3 replays; Windows `implemented` |
 | `port-forward.create@1`, `.remove@1` | 1 | done | Measured: every `port-forward` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
-| `capture.diagnostic-session@1` | 1 | dependency | Reached through `job submit` alone (a generic leaf); count only after every reachable operation has parity. Its live control `diagnostic.session.mark|status|stop` is measured over the `diagnostic-session` oracle through the real CLI (`diagnostic_session_cli.rs`, TASK-XPA-005) |
+| `capture.diagnostic-session@1` | 1 | done | Reached through `job submit` alone (a generic leaf), measured there through the signed CLI and counted with the generic leaves. Its live control `diagnostic.session.mark|status|stop` is measured over the `diagnostic-session` oracle through the real CLI (`diagnostic_session_cli.rs`, TASK-XPA-005) |
 | `runtime.tool.select` | 1 | done | Signed CLI over the test-only tuple/impact ports verifies immutable approval, one managed replacement, restart settlement, action show/reconcile/list, dedupe and selected generation two (`account_tool_selection.rs`). Production HDC tuple/health trust is unchanged; delegated minor decision of 2026-10-05, pending the next rulings batch |
 | `workspace.continuation.run`, `.submit` | 5 | done | Signed CLI over the `workspace-continuation` oracle verifies submit, run, retained bytes and refusal/repeat paths (`workspace_continuation_cli.rs`). `health` lists assembled provider ports without consulting availability or initializing durable owners; cross-platform regression checks unchanged Session owner bytes |
 | `workspace.symbolize-crash@1` and named crash capture | 1, 5 | done | Measured by the signed CLI (`workspace_symbolize_leaf.rs`): the Swift oracle's crash resolves to its ArkTS source, and a named crash captured by the Windows daemon is symbolized through its lease. `crashLogs: true` alone selects the index; `crashLogName` selects the dump. The former's `missing` dump row is expected, not a Windows defect |
 | `flash.reconcile-alias` | 4 | done | Signed CLI checks 21 `flash-host-reads` alias exchanges and the `post-flash-alias` reissued lineage, exact private/archive bytes, restart durability and zero HDC dispatch (`flash_alias_cli.rs`) |
 | `debug.template@1`, `debug.template.run` | 2 | done | Signed CLI checks all four closed template Jobs, sensitive/raw binary Artifacts, failure paths and unknown-intent restart/reconcile without replay (`debug_template_cli.rs`). Delegated reference: macOS Rust `debug_template_run.rs` owner semantics plus existing Swift `debug-probe` normal payloads; pending next rulings batch |
 | `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | done | Signed CLI against a daemon composed with the reviewed development-signed ArkTrace distribution: a capture's Trace inspected, and summary and CPU analysis Jobs run to completion with one derived Artifact each, the capture's Artifacts unchanged (`windows_trace_export_process.rs`; host inputs, skipped without them). Production signed publication, clean-host and installed acceptance remain release work; absent/invalid distributions keep typed refusals |
-| `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` (AF-W1) prevents completion |
-| `flash.dayu200` | 4 | external | The Windows Runtime composes the signed ArkForge bundle and has completed real typed nine-partition flashes (2026-10-19). Formal GJ-4 acceptance still requires AF-W1 and a matched release Bundle |
+| `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | done | Every direct Catalog operation they reach is measured on Windows; the signed CLI drives them over the full restore, its alias, the diagnostic session and the human-action oracle (`flash_socket_control.rs`, `diagnostic_session_cli.rs`, `gj1_device_leaves.rs`). Counted under the lead's ruling of 2026-10-04 |
+| `flash.dayu200` | 4 | done (software) | `agent run --operation flash.dayu200` over the fake lane through the signed CLI. The Windows Runtime composes the signed ArkForge bundle and has completed real typed nine-partition flashes (2026-10-19). Formal GJ-4 acceptance still requires AF-W1 and a matched release Bundle |
 | `flash.verify@1`, `flash.restore-boot-loop@1` | 4 | done | Signed CLI over the fake lane after a `flash run`: partial verification (exit 9, userdata mounted writable), original-ramdisk restoration under one capability (exit 0), verification of the restoration (exit 0), and a repeat that writes nothing. Partition reads are the production closed reads over the fake HDC; the identity observation is synthetic, as Windows resolves a USB connector only from the host's device tree (`flash_maintenance_cli.rs`). Real Windows device results on 2026-10-19 are recorded separately |
-| `flash.recommission@1` | 4 | dependency | Windows Runtime only (macOS lacks the historical process-lifetime proof). Generic; CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
+| `flash.recommission@1` | 4 | now | Windows Runtime only (macOS lacks the historical process-lifetime proof). Generic, with owner-level tests only; a Windows CLI run through `job submit` would count it. CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
 | `runtime.service.install`, `runtime.service.update` | — | closed | Keep ruling 42: the client-started daemon has no installer. Runtime RC updates continue through reinstall (ruling 78); delegated decision of 2026-10-05 keeps these leaves `notImplemented` |
 
 No item is blocked only on the board: each device leaf above replays a Swift oracle through the
@@ -249,9 +257,9 @@ historical context and unchanged Job inventories. Native cross-process locking
 and the published `conflict` refusal remain in force. See the
 [published installed readback run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-installed-readback-2026-10-13-run.md).
 
-The presently actionable CLI increments above are measured. Remaining generic
-leaves depend on AF-W1; service
-install/update keep their existing closed decision.
+The presently actionable CLI increments above are measured, except
+`flash.recommission@1`. Service install/update keep their existing closed
+decision.
 
 The host workspace Session publication repair is released in #2597, protected
 main `d238a55c7b693adc7edbf6314699e920f0ee1e08`. It retains the original complete

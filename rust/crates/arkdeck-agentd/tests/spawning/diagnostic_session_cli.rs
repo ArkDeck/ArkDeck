@@ -320,6 +320,6 @@ fn a_diagnostic_session_is_marked_and_stopped_over_the_signed_test_daemon() {
         "implemented",
     );
     // The operation itself is reached through `job submit` alone: a generic
-    // leaf, counted only under the shared generic leaves' ruling.
-    assert_windows_status(&["capture.diagnostic-session@1"], "partial");
+    // leaf, counted with the shared generic leaves (the ruling of 2026-10-04).
+    assert_windows_status(&["capture.diagnostic-session@1"], "implemented");
 }
