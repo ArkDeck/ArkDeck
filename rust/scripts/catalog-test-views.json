@@ -93,7 +93,7 @@
     "crates/arkdeck-agentd/tests/spawning/flash_execution_control.rs": "26ff6d9328109592c4b744be95e279116b015695db79cc21fd1f7b008cae0d9c",
     "crates/arkdeck-agentd/tests/spawning/flash_host_facts_control.rs": "5b710a625a654ba2da7bc8a4818d77d219e278560117c09bcb2492ab4937a8f1",
     "crates/arkdeck-agentd/tests/spawning/flash_maintenance_cli.rs": "7179326cfabf94da7b4aba7bfa713f3a0deb4812422203a4ff4a91a2f8bab768",
-    "crates/arkdeck-agentd/tests/spawning/flash_socket_control.rs": "13610724f79bdc3518866ee8c5c9cbcd78bc5b93d6cac06a89eab2458badb7d7",
+    "crates/arkdeck-agentd/tests/spawning/flash_socket_control.rs": "818c5a8df14d2e6ccb6a0190e7969ff8d2f5ead6f5bda17139292157e6f9ed24",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_leaves.rs": "ba19de652d3e3662acd5ea57a81cfc8fb4a32dfe1a96c70dd18489afe937ce95",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_reads.rs": "81471780cc5a1d7ba53587d629376aab7d8f74fdbbbf73cce6447747a0a6116e",
     "crates/arkdeck-agentd/tests/spawning/gj1_inputs.rs": "d1986f815b0fba8710c8bb22d207fbae699a39138284f2267f0b6643f000578d",

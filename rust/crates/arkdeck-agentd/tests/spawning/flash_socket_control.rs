@@ -26,7 +26,7 @@
 use crate::flash_execution_control::{Root, execution_fakes, flash_host, request};
 use arkdeck_control::Control;
 use arkdeck_platform::{LocalEndpoint, LocalListener};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -931,7 +931,7 @@ fn maintenance_over_the_cli(
     );
     assert_eq!(
         (&report["verified"], &report["skipped"], &report["failed"]),
-        (&json!(8), &json!(1), &json!(0)),
+        (&Value::from(8), &Value::from(1), &Value::from(0)),
         "{report}"
     );
     let userdata = report["targets"]
@@ -965,7 +965,7 @@ fn maintenance_over_the_cli(
     let report = &verified["result"]["maintenanceResult"];
     assert_eq!(
         (&report["verified"], &report["skipped"], &report["failed"]),
-        (&json!(1), &json!(0), &json!(0)),
+        (&Value::from(1), &Value::from(0), &Value::from(0)),
         "{report}"
     );
 
