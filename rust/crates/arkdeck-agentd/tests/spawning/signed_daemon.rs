@@ -145,9 +145,7 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
         let (now, precise) = clock
             .split_once('|')
             .ok_or("the test clock is <now>|<precise now>")?;
-        crate::host::TEST_CLOCK
-            .set((now.to_owned(), precise.to_owned()))
-            .map_err(|_| "the test clock is taken once")?;
+        crate::host::set_test_clock(now, precise);
     }
     let host = Host::from_environment();
     let host = match std::env::var_os(HELPER) {

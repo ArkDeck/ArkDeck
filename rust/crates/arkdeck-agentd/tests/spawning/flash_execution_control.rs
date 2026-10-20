@@ -634,7 +634,12 @@ pub(crate) fn flash_host_with(
         .with_flash_host_facts(
             FlashHostFacts::new(&root.0, census)
                 .with_rockusb(rockusb)
-                .with_normal_identity_observer(fixture_normal_identity),
+                .with_normal_identity_observer(fixture_normal_identity)
+                // The recommission state the Windows composition names, the
+                // Job state, and its fresh identity chain observed as the
+                // ordinary one is, with the Loader serial a real read proves.
+                .with_recommission_state(&root.0.join("jobs"))
+                .with_recommission_identity_observer(fixture_recommission_identity),
         )
         .with_flash_planning(FlashPlanning::new(
             None,
@@ -646,6 +651,25 @@ pub(crate) fn flash_host_with(
             Arc::new(FakeHost(fakes.clone())),
             "org.openharmony.dayu200@1.0.0".into(),
         )
+}
+
+/// The fixture's identity chain for a recommission: its normal hardware
+/// observation with a synthetic dual-source Loader serial proof, as the
+/// hoststore recommission owner tests' facts name it. Never a real read.
+#[cfg(windows)]
+fn fixture_recommission_identity(
+    hdc: &dyn arkdeck_provider_hdc::HdcDispatch,
+    usb: &dyn arkdeck_provider_hdc::UsbProbe,
+    key: &str,
+    expected: &str,
+) -> Result<arkdeck_provider_hdc::NormalHardwareIdentity, &'static str> {
+    let mut identity = fixture_normal_identity(hdc, usb, key, expected)?;
+    identity.vendor_serial = Some(arkdeck_provider_hdc::VendorSerialProof {
+        serial_sha256: arkdeck_contract::sha256_hex(b"factory-loader-serial"),
+        source_sha256: arkdeck_contract::sha256_hex(b"synthetic-dual-source-receipt"),
+        source_byte_count: 32,
+    });
+    Ok(identity)
 }
 
 /// The old oracle's synthetic hardware observation. Its literal identity is

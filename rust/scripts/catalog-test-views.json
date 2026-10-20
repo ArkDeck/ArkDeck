@@ -49,7 +49,7 @@
     "crates/arkdeck-agentd/src/flash_plan_control.rs": "c8f7f10aca7ccac915908b4d406dfda0b0f8b98161036bf2f190c60057e463cf",
     "crates/arkdeck-agentd/src/hdc_status_control.rs": "b11467b2f6cb2ff1d562d5298bfa9cb7be8bb2f6fa536ddd680822d25fbfda0c",
     "crates/arkdeck-agentd/src/hilog_summary_analyzer.rs": "6a650c97d4d49800fab347821a0d128caea2bd413279aaf46ee07cd4fed4f6cc",
-    "crates/arkdeck-agentd/src/host.rs": "145d9020a31ef0beefdd8d465acd709cc7b8a9875494573cedb0857462d13b3a",
+    "crates/arkdeck-agentd/src/host.rs": "72576c4bac2096f406e7d0e6bededa9aa520ffa612b6da19aff4310c984efc15",
     "crates/arkdeck-agentd/src/host_tests.rs": "e2a4a9d0521b183de4f6696b4f16cece9dc8911f8fa4c44d94018643ec5f49f8",
     "crates/arkdeck-agentd/src/lib.rs": "bf962254b34c36f4de7a1fe97ddede3dd87f15cefe7ddd4c65c8c41d0750e857",
     "crates/arkdeck-agentd/src/loader_binding_control.rs": "e88ba38eb35e887d4482402c33ba1d4027c57966c14a41fed638773888b471ca",
@@ -90,10 +90,10 @@
     "crates/arkdeck-agentd/tests/spawning/diagnostic_session_cli.rs": "601bfc7ac6900c1229598b533c5fdb8c5e5450df61bc73d935fc4a27c0028dca",
     "crates/arkdeck-agentd/tests/spawning/flash_alias_cli.rs": "fda59a6500456ad5793b17a19c9d6b61d532ab066111270ce9d40f62c12259d1",
     "crates/arkdeck-agentd/tests/spawning/flash_broker_control.rs": "f71628f8e939e4bc82e3674d89627773fa516d5c9b0debbc9682cb0f8e8ffa8e",
-    "crates/arkdeck-agentd/tests/spawning/flash_execution_control.rs": "26ff6d9328109592c4b744be95e279116b015695db79cc21fd1f7b008cae0d9c",
+    "crates/arkdeck-agentd/tests/spawning/flash_execution_control.rs": "0fcdbce60d3247c144559a14390ec209a5190f26a73f5a226286df592c497e84",
     "crates/arkdeck-agentd/tests/spawning/flash_host_facts_control.rs": "5b710a625a654ba2da7bc8a4818d77d219e278560117c09bcb2492ab4937a8f1",
     "crates/arkdeck-agentd/tests/spawning/flash_maintenance_cli.rs": "7179326cfabf94da7b4aba7bfa713f3a0deb4812422203a4ff4a91a2f8bab768",
-    "crates/arkdeck-agentd/tests/spawning/flash_socket_control.rs": "818c5a8df14d2e6ccb6a0190e7969ff8d2f5ead6f5bda17139292157e6f9ed24",
+    "crates/arkdeck-agentd/tests/spawning/flash_socket_control.rs": "2b862cfbb8a5cb84f3cb49e6e88635a457a618939280e7a0728a7f0be0b324be",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_leaves.rs": "97d586af6270590d47d26a87cc3700d42fb142d606f81cf2310a98a2cb048351",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_reads.rs": "81471780cc5a1d7ba53587d629376aab7d8f74fdbbbf73cce6447747a0a6116e",
     "crates/arkdeck-agentd/tests/spawning/gj1_inputs.rs": "d1986f815b0fba8710c8bb22d207fbae699a39138284f2267f0b6643f000578d",
@@ -101,7 +101,7 @@
     "crates/arkdeck-agentd/tests/spawning/job_archive_cli.rs": "d084d06c5eed8f2ba05659862a08c02fee0bc3cfa92c9591c373ae61fdc4ae4d",
     "crates/arkdeck-agentd/tests/spawning/main.rs": "a03eb46667bbb5e2d1029413a47a2219cace28e05ac404977fbd69cc6156093e",
     "crates/arkdeck-agentd/tests/spawning/managed_hdc_server.rs": "09383cb5ddec6e6ea2df8d10d3a6b9440c57a7d56598bec012c4b7be08c9c15f",
-    "crates/arkdeck-agentd/tests/spawning/signed_daemon.rs": "88525261496fc1d5d028fb3db5e9a26cbaa57d4872b555f7cb62f40a93d28373",
+    "crates/arkdeck-agentd/tests/spawning/signed_daemon.rs": "1a0834e95778e3453271a99ddde9051b8e5bc4fcfa9f269bfc6b1039ab152aab",
     "crates/arkdeck-agentd/tests/spawning/target_observation_control.rs": "2fe77bf592b070d1e53076a5406c5f5bc5087a760e03b43dc03357bf32f34a20",
     "crates/arkdeck-agentd/tests/spawning/trace_probe_control.rs": "42970b3e199400f3715c5c874ca4812a3f9a74f71b0d51f4cde16dca5aae281d",
     "crates/arkdeck-agentd/tests/spawning/workspace_continuation_cli.rs": "bf5f8d24edbc92db822efe07fd806a39bc153b6cad3a98c3fb1d564575be63b8",
@@ -182,7 +182,7 @@
     "crates/arkdeck-cli/src/error_registry.rs": "8c67f5133e04e8993a3103b76f98447a39fe38b0f34769a0ef771887fa36c354",
     "crates/arkdeck-cli/src/failure_mapping.rs": "37eb7c7f0823022c393f9ffbb77f030fefa89cba36abe6d8c795f7a581d3c308",
     "crates/arkdeck-cli/src/feature_coverage/windows_app.rs": "67fdd84624feb33c819ada70339ac665a6167f65d6980df8b3bd638a0dfeca32",
-    "crates/arkdeck-cli/src/feature_coverage.rs": "fcce19e1b577be1dd504bfaa3934ac24eceae04a9a5bbf97161d0082a96d12f1",
+    "crates/arkdeck-cli/src/feature_coverage.rs": "ff22f6180e8b30eb2f188ba844a4f2d8c52052d682d8045bd9adc631a9b93073",
     "crates/arkdeck-cli/src/flash_leaves.rs": "38fd1408501dc1ee90108d5060a6d7fa452bcde8bb191c9760b912386ab4a9ae",
     "crates/arkdeck-cli/src/flash_maintenance.rs": "0c63893b41c1630fb587cce01e64021f9768ba4d53a952995603a41439be2984",
     "crates/arkdeck-cli/src/hdc_control.rs": "4fbc96c931d9237186da5015a6cf16a45b1375efa0bc16b53e157a91087e922b",
@@ -7643,7 +7643,8 @@
         "debug_read_control::debug_reads_execute_only_closed_commands_on_an_adopted_route": "both",
         "app_ingress_fake_hdc::uidump_missing_received_file_is_not_published_or_replayed": "both",
         "flash_execution_control::missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch": "both",
-        "flash_socket_control::flash_maintenance_verifies_and_restores_over_the_control_socket": "policy"
+        "flash_socket_control::flash_maintenance_verifies_and_restores_over_the_control_socket": "policy",
+        "flash_socket_control::flash_recommission_recovers_a_retained_unknown_restore_over_the_control_socket": "recommission"
       },
       "ignored": [
         "flash_broker_control::flash_broker_process_fixture",
@@ -7757,7 +7758,8 @@
           "workspace_symbolize_leaf::diagnostics_capture_publishes_the_named_crash_log",
           "workspace_symbolize_leaf::the_real_cli_symbolizes_a_devices_crash_with_the_daemons_own_mode",
           "flash_execution_control::missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch",
-          "flash_socket_control::flash_maintenance_verifies_and_restores_over_the_control_socket"
+          "flash_socket_control::flash_maintenance_verifies_and_restores_over_the_control_socket",
+          "flash_socket_control::flash_recommission_recovers_a_retained_unknown_restore_over_the_control_socket"
         ],
         "linux": []
       },

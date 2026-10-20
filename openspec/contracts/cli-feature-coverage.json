@@ -2833,7 +2833,7 @@
       "feature": "flash.recommission@1",
       "implementationStatusByPlatform": {
         "macos": "partial",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "Windows Runtime only; macOS lacks the historical process-lifetime proof",
