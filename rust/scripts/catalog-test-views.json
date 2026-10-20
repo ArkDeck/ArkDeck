@@ -182,7 +182,7 @@
     "crates/arkdeck-cli/src/error_registry.rs": "8c67f5133e04e8993a3103b76f98447a39fe38b0f34769a0ef771887fa36c354",
     "crates/arkdeck-cli/src/failure_mapping.rs": "37eb7c7f0823022c393f9ffbb77f030fefa89cba36abe6d8c795f7a581d3c308",
     "crates/arkdeck-cli/src/feature_coverage/windows_app.rs": "67fdd84624feb33c819ada70339ac665a6167f65d6980df8b3bd638a0dfeca32",
-    "crates/arkdeck-cli/src/feature_coverage.rs": "79438bf333013a694f639d1cda9ba86bddc79874ee55137ba3e915605ffbf6e2",
+    "crates/arkdeck-cli/src/feature_coverage.rs": "fcce19e1b577be1dd504bfaa3934ac24eceae04a9a5bbf97161d0082a96d12f1",
     "crates/arkdeck-cli/src/flash_leaves.rs": "38fd1408501dc1ee90108d5060a6d7fa452bcde8bb191c9760b912386ab4a9ae",
     "crates/arkdeck-cli/src/flash_maintenance.rs": "0c63893b41c1630fb587cce01e64021f9768ba4d53a952995603a41439be2984",
     "crates/arkdeck-cli/src/hdc_control.rs": "4fbc96c931d9237186da5015a6cf16a45b1375efa0bc16b53e157a91087e922b",

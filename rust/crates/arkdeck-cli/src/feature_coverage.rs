@@ -1662,12 +1662,21 @@ mod tests {
             ("agent.abandon", "implemented"),
             // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "implemented"),
-            ("flash.recommission@1", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),
             ("artifact.import.flash-bundle", "implemented"),
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
+        }
+        // No Windows CLI run reaches the recommission (only Catalogs that
+        // publish it list it).
+        if document["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["feature"] == "flash.recommission@1")
+        {
+            assert_eq!(windows(&document, "flash.recommission@1"), "partial");
         }
         // The client-started service: served but for its installation.
         for (feature, status) in [
