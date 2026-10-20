@@ -1549,6 +1549,31 @@ impl Host {
         self
     }
 
+    /// Test builds on Windows only: Flash maintenance over the composed
+    /// lane and Job owner, with `reads` for the device readbacks. Windows
+    /// resolves a USB connector only from the host's own device tree, which
+    /// no fixture has; the production daemon has no such seam and composes
+    /// `NativeMaintenanceReads` over its registered HDC.
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub fn with_test_maintenance_reads(
+        self,
+        reads: std::sync::Arc<dyn arkdeck_hoststore::MaintenanceReads>,
+    ) -> Self {
+        if let (Some(planning), Some(jobs), Some(runtime)) =
+            (&self.flash_planning, &self.jobs, &self.flash_runtime)
+        {
+            planning.install_maintenance(std::sync::Arc::new(
+                arkdeck_hoststore::MaintenanceContext::new(
+                    jobs.clone(),
+                    runtime.lane.clone(),
+                    reads,
+                ),
+            ));
+        }
+        self
+    }
+
     /// Test builds on Windows only: the fake HDC and its tool digest, when a
     /// test composed one ([`Self::with_test_hdc`]).
     #[cfg(all(windows, test))]
