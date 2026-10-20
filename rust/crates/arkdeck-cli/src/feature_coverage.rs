@@ -606,6 +606,16 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // `windows_trace_export_process.rs`).
     "trace.cache.status",
     "trace.cache.purge",
+    // A capture's Trace inspected, and both host-only ArkTrace analyzer Jobs
+    // run to completion with their derived Artifacts, by the same CLI against
+    // a signed daemon composed with a reviewed Windows ArkTrace distribution
+    // (TASK-XPA-021). The distribution, its development-signed publisher and
+    // a qualified private root are this host's inputs, as the DevEco
+    // toolchain is for signing; without them the test checks nothing
+    // (`windows_trace_export_process.rs`).
+    "trace.inspect",
+    "analyze.trace",
+    "analyze.trace-summary",
     // The client-started service (TASK-XPA-002, decision 11), through the
     // real CLI against a signed daemon it starts itself
     // (`arkdeck-agentd/tests/windows_service_uninstall_process.rs`):
@@ -1577,11 +1587,13 @@ mod tests {
             })
             .collect();
         // Original d02b2288 contract: 162 Windows-required + 33 macOS-only,
-        // independent of the later Device App layer. No frozen oracle is repinned.
+        // independent of the later Device App layer. No frozen oracle is
+        // repinned; the only status change since is `trace.inspect` and both
+        // ArkTrace analyzers measured on Windows (TASK-XPA-021).
         assert_eq!(rows.len(), 195);
         assert_eq!(
             arkdeck_contract::sha256_hex(&serde_json::to_vec(&rows).unwrap()),
-            "0146aaeedba0d30f00d550e79b431178b9929d78b7b7e81d5715497e55df4469"
+            "8b17d9f3bc26ed27378d192796b539eb3070a76e1ca71f2e174a99b463d322a7"
         );
     }
 
@@ -1610,7 +1622,7 @@ mod tests {
             ("workspace.preset.register", "implemented"),
             ("trace.cache.purge", "implemented"),
             ("diagnostics.export", "implemented"),
-            ("trace.inspect", "partial"),
+            ("trace.inspect", "implemented"),
             ("device.observations", "implemented"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),

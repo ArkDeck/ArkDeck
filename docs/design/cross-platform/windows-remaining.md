@@ -8,13 +8,16 @@ increment is published on protected main
 development RC uses that source; implementation counts and actual acceptance
 results remain distinct.
 
-There are now 165 Windows CLI features: 151 `implemented`, 12 `partial` and 2
+There are now 165 Windows CLI features: 154 `implemented`, 9 `partial` and 2
 `notImplemented`. The three added since 2026-10-14 are the Flash maintenance
 operations `flash.verify@1`, `flash.restore-boot-loop@1` (CHG-2026-084) and
 `flash.recommission@1` (CHG-2026-086). The first two have their own
 `flash verify` and `flash restore-boot-loop` leaves, now measured through the
 signed CLI on Windows. `flash.recommission@1` is `partial` because only the
-generic Runtime leaves reach it. The 68 App capabilities are separately Windows-required
+generic Runtime leaves reach it. `trace.inspect` and both ArkTrace analyzers
+are also measured through the signed CLI, with the reviewed
+development-signed ArkTrace distribution (the user's ruling of 2026-10-20
+that a development-signed package counts as measurement). The 68 App capabilities are separately Windows-required
 under accepted ruling 10: 59 `implemented` software targets, one `partial`
 installed-update target and eight accepted `deferred` rich TraceViewer targets.
 There are 233 Windows-required entries and 33 non-App macOS-only entries, 266
@@ -38,12 +41,15 @@ remaining blockers are external inputs, maintainer review or quiet-host time:
    retained archive), CHG-2026-085 (retained-archive maintenance) and CHG-2026-086 (expired
    unknown recommission) are `in-progress`. Each awaits maintainer review or
    current-Catalog acceptance through the published Runtime.
-3. **ArkTrace production distribution (external).** The development-signed
-   package passed native qualification on 2026-10-18. Production publisher
-   signing, clean-host packaging and installed acceptance remain open.
+3. **ArkTrace production distribution (external, release only).** The
+   development-signed package passed native qualification on 2026-10-18, and
+   `trace inspect`, `analyze trace-summary` and `analyze trace` are measured
+   through the signed CLI with it. Production publisher signing, clean-host
+   packaging and installed acceptance remain open for release; they no longer
+   gate the CLI counts.
 4. **Generic leaves (dependency).** These are `job plan|submit|run`, `agent run|resume`,
    `human-action resume`, `capture.diagnostic-session@1` and
-   `flash.recommission@1`. They are counted only after 1 and 3 close.
+   `flash.recommission@1`. They are counted only after item 1 closes.
 5. **Release (`TASK-XPA-022`, external).** Production signing, clean-host install
    and a formal update feed remain open. A same-publisher, higher-version signed
    MSIX is needed for `app.settings.updates`.
@@ -109,8 +115,8 @@ board window), **now** (Swift-oracle parity work we can do now), **dependency** 
 | `workspace.symbolize-crash@1` and named crash capture | 1, 5 | done | Measured by the signed CLI (`workspace_symbolize_leaf.rs`): the Swift oracle's crash resolves to its ArkTS source, and a named crash captured by the Windows daemon is symbolized through its lease. `crashLogs: true` alone selects the index; `crashLogName` selects the dump. The former's `missing` dump row is expected, not a Windows defect |
 | `flash.reconcile-alias` | 4 | done | Signed CLI checks 21 `flash-host-reads` alias exchanges and the `post-flash-alias` reissued lineage, exact private/archive bytes, restart durability and zero HDC dispatch (`flash_alias_cli.rs`) |
 | `debug.template@1`, `debug.template.run` | 2 | done | Signed CLI checks all four closed template Jobs, sensitive/raw binary Artifacts, failure paths and unknown-intent restart/reconcile without replay (`debug_template_cli.rs`). Delegated reference: macOS Rust `debug_template_run.rs` owner semantics plus existing Swift `debug-probe` normal payloads; pending next rulings batch |
-| `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | external | Windows loader, doctor, exact Artifact inspection, summary/CPU analysis Jobs and export pass with the recipe-built parser and host-trusted signed CLI. Production signed publication, clean-host and installed acceptance remain open; absent/invalid distributions keep typed refusals |
-| `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` (AF-W1) and the production-signed Windows ArkTrace distribution prevent completion |
+| `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | done | Signed CLI against a daemon composed with the reviewed development-signed ArkTrace distribution: a capture's Trace inspected, and summary and CPU analysis Jobs run to completion with one derived Artifact each, the capture's Artifacts unchanged (`windows_trace_export_process.rs`; host inputs, skipped without them). Production signed publication, clean-host and installed acceptance remain release work; absent/invalid distributions keep typed refusals |
+| `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` (AF-W1) prevents completion |
 | `flash.dayu200` | 4 | external | The Windows Runtime composes the signed ArkForge bundle and has completed real typed nine-partition flashes (2026-10-19). Formal GJ-4 acceptance still requires AF-W1 and a matched release Bundle |
 | `flash.verify@1`, `flash.restore-boot-loop@1` | 4 | done | Signed CLI over the fake lane after a `flash run`: partial verification (exit 9, userdata mounted writable), original-ramdisk restoration under one capability (exit 0), verification of the restoration (exit 0), and a repeat that writes nothing. Partition reads are the production closed reads over the fake HDC; the identity observation is synthetic, as Windows resolves a USB connector only from the host's device tree (`flash_maintenance_cli.rs`). Real Windows device results on 2026-10-19 are recorded separately |
 | `flash.recommission@1` | 4 | dependency | Windows Runtime only (macOS lacks the historical process-lifetime proof). Generic; CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
@@ -244,7 +250,7 @@ and the published `conflict` refusal remain in force. See the
 [published installed readback run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-installed-readback-2026-10-13-run.md).
 
 The presently actionable CLI increments above are measured. Remaining generic
-leaves depend on AF-W1 and a production-signed Windows ArkTrace distribution; service
+leaves depend on AF-W1; service
 install/update keep their existing closed decision.
 
 The host workspace Session publication repair is released in #2597, protected

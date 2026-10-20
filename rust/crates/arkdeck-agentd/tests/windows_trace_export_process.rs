@@ -241,7 +241,11 @@ struct Daemon {
 
 impl Daemon {
     fn start(executable: &Path, root: &Path) -> Self {
-        let mut child = daemon(executable, root).spawn().unwrap();
+        Self::start_command(daemon(executable, root))
+    }
+
+    fn start_command(mut command: Command) -> Self {
+        let mut child = command.spawn().unwrap();
         let stdout = child.stdout.take().unwrap();
         let (sender, lines) = mpsc::channel();
         std::thread::spawn(move || {
@@ -652,26 +656,7 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let root = Root::new().with_recorded_job(JOB);
     let before = Root::tree(&root.artifacts());
     let exports = root.exports();
-    let signed = root.0.join("signed-bin");
-    std::fs::create_dir(&signed).unwrap();
-    let daemon = signed.join("arkdeck-agentd.exe");
-    std::fs::copy(env!("CARGO_BIN_EXE_arkdeck-agentd"), &daemon).unwrap();
-    let script =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/windows-dev-identity.ps1");
-    let signing = Command::new(pwsh())
-        .args(["-NoProfile", "-NonInteractive", "-File"])
-        .arg(&script)
-        .arg("sign")
-        .arg("-Thumbprint")
-        .arg(&thumbprint)
-        .arg("-Path")
-        .arg(&daemon)
-        .stdin(Stdio::null())
-        .output()
-        .unwrap();
-    assert!(signing.status.success(), "{signing:?}");
-    let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
-    let pin = pin["pin"].as_str().unwrap().to_owned();
+    let (daemon, pin) = signed_daemon(&root, &thumbprint);
 
     let mut running = Daemon::start(&daemon, &root.0);
     let pipe = running.serving();
@@ -711,6 +696,219 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
         "nothing was exported"
     );
     assert_measured(&["trace.cache.status", "trace.cache.purge"]);
+}
+
+/// A copy of the daemon below `root`, signed with the host-trusted
+/// development signer `thumbprint`, and the signer pin the CLI verifies.
+fn signed_daemon(root: &Root, thumbprint: &std::ffi::OsStr) -> (PathBuf, String) {
+    let signed = root.0.join("signed-bin");
+    std::fs::create_dir(&signed).unwrap();
+    let daemon = signed.join("arkdeck-agentd.exe");
+    std::fs::copy(env!("CARGO_BIN_EXE_arkdeck-agentd"), &daemon).unwrap();
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/windows-dev-identity.ps1");
+    let signing = Command::new(pwsh())
+        .args(["-NoProfile", "-NonInteractive", "-File"])
+        .arg(&script)
+        .arg("sign")
+        .arg("-Thumbprint")
+        .arg(thumbprint)
+        .arg("-Path")
+        .arg(&daemon)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(signing.status.success(), "{signing:?}");
+    let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
+    (daemon, pin["pin"].as_str().unwrap().to_owned())
+}
+
+/// The inputs the reviewed-distribution qualification below needs: the
+/// development signer, a reviewed ArkTrace descriptor, a private parent whose
+/// ancestry ArkTrace qualifies, and a real Trace.
+const DISTRIBUTION_INPUTS: [&str; 4] = [
+    "ARKDECK_DEV_SIGNER_THUMBPRINT",
+    "ARKDECK_WINDOWS_TRACE_TEST_DESCRIPTOR",
+    "ARKDECK_WINDOWS_TRACE_TEST_STATE",
+    "ARKDECK_WINDOWS_TRACE_TEST_SOURCE",
+];
+
+/// The recorded capture's Target, which its Trace's binding names.
+const TARGET: &str = "TGT-3ba3f5f43b92";
+
+/// The recorded capture's Artifacts with its Trace replaced by `trace` (its
+/// index row's digest and length with it), and the capture's Job admitted,
+/// never run, in the root's Job state: what a capture leaves for
+/// inspection. No device, HDC or capability is involved.
+fn with_captured_trace(root: Root, trace: &[u8]) -> Root {
+    let artifacts = HostDirectory::open_or_create_private(&root.artifacts()).unwrap();
+    let job = artifacts.create_private_child(JOB).unwrap();
+    for entry in std::fs::read_dir(recorded(JOB)).unwrap() {
+        let file = entry.unwrap().file_name().into_string().unwrap();
+        let bytes = std::fs::read(recorded(JOB).join(&file)).unwrap();
+        let bytes = if file == "index.json" {
+            let mut index: Value = serde_json::from_slice(&unexpired(&bytes)).unwrap();
+            for row in index["artifacts"].as_array_mut().unwrap() {
+                if row["artifactID"] == TRACE {
+                    row["sha256"] = json!(sha256_hex(trace));
+                    row["byteCount"] = json!(trace.len());
+                }
+            }
+            serde_json::to_vec_pretty(&index).unwrap()
+        } else if file == TRACE {
+            trace.to_vec()
+        } else {
+            bytes
+        };
+        job.create_document(&file, &bytes).unwrap();
+        if file != "index.json" {
+            job.seal_document(&file).unwrap();
+        }
+    }
+    let request = json!({"documentType": "runtime-operation-request", "schemaVersion": "1.0.0",
+        "requestId": "windows-trace-cli", "idempotencyKey": "windows-trace-cli",
+        "target": {"targetId": TARGET}, "operation": {"id": "capture.diagnostics", "version": 1},
+        "inputs": {}, "requestedOutputs": ["rawArtifacts"]});
+    let typed = arkdeck_hoststore::OperationRequest::decode(&serde_json::to_vec(&request).unwrap())
+        .unwrap();
+    let canonical = typed.canonical_value();
+    let record: arkdeck_hoststore::JobRecord = serde_json::from_value(json!({
+        "jobID": JOB, "request": canonical, "originalSubmissionRequest": canonical,
+        "operationReference": "capture.diagnostics@1",
+        "catalogDigest": arkdeck_contract::CATALOG_DIGEST, "providerID": "hdc",
+        "createdAtUTC": "2026-10-20T00:00:00Z", "actualEffect": "readOnly",
+        "materializedPlanDigest": "f".repeat(64), "state": "preflight",
+        "outcomeUnknown": false, "timeline": ["jobCreated", "queued->preflight"], "skipReasons": {},
+    }))
+    .unwrap();
+    HostDirectory::open(&root.0)
+        .unwrap()
+        .private_child("jobs-state")
+        .unwrap();
+    arkdeck_hoststore::JobStore::open_owner(&root.0.join("jobs-state"))
+        .unwrap()
+        .admit(&record, &typed.fingerprint())
+        .unwrap();
+    root
+}
+
+/// `trace inspect`, `analyze trace-summary` and `analyze trace` through the
+/// real CLI against the signed daemon composed with a reviewed Windows
+/// ArkTrace distribution (`ARKDECK_ARKTRACE_DESCRIPTOR`): the inspection of
+/// the capture's Trace, and both host-only analyzer Jobs run to completion,
+/// each publishing its one derived Artifact, while the capture's Artifacts
+/// stay byte for byte. Without every input in [`DISTRIBUTION_INPUTS`] this
+/// test says so and checks nothing: ordinary CI has no signer or ArkTrace
+/// distribution, and nothing stands in for them.
+#[test]
+fn trace_inspection_and_analysis_run_through_the_cli_with_a_reviewed_distribution() {
+    let [
+        Some(thumbprint),
+        Some(descriptor),
+        Some(state),
+        Some(source),
+    ] = DISTRIBUTION_INPUTS.map(|name| std::env::var_os(name).filter(|value| !value.is_empty()))
+    else {
+        eprintln!(
+            "SKIPPED: {} are not all set, so no reviewed ArkTrace distribution, private root \
+             and Trace qualify the daemon; nothing was checked",
+            DISTRIBUTION_INPUTS.join(", ")
+        );
+        return;
+    };
+    let _turn = turn();
+    let nonce = u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap());
+    let name = format!("cli-qualification-{nonce:016x}");
+    HostDirectory::open(Path::new(&state))
+        .unwrap()
+        .private_child(&name)
+        .unwrap();
+    let trace = std::fs::read(&source).unwrap();
+    let root = with_captured_trace(Root(PathBuf::from(&state).join(name)), &trace);
+    let before = Root::tree(&root.artifacts().join(JOB));
+    let (daemon, pin) = signed_daemon(&root, &thumbprint);
+    let mut command = self::daemon(&daemon, &root.0);
+    command.env("ARKDECK_ARKTRACE_DESCRIPTOR", &descriptor);
+    let mut running = Daemon::start_command(command);
+    let pipe = running.serving();
+
+    let (status, inspected) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "trace",
+            "inspect",
+            "--job",
+            JOB,
+            "--artifact",
+            TRACE,
+            "--allow-sensitive",
+        ],
+    );
+    assert_eq!(status, Some(0), "{inspected}");
+    let report = &inspected["result"];
+    assert_eq!(
+        report["source"]["artifactDigest"],
+        sha256_hex(&trace),
+        "{report}"
+    );
+    assert_eq!(report["deviceEvidenceCreated"], false, "{report}");
+
+    let lease = format!("lease-v1:{JOB}:{TRACE}");
+    for (leaf, inputs) in [
+        ("trace-summary", json!({"sourceArtifactRef": lease})),
+        (
+            "trace",
+            json!({"sourceArtifactRef": lease, "kind": "cpu", "startNs": 0,
+                "endNs": 1_000_000_000u64, "timeoutMs": 60000, "maxRows": 1000,
+                "maxEvents": 10000, "maxOutputBytes": 8_388_608, "thresholdNs": 1_000_000,
+                "limit": 20}),
+        ),
+    ] {
+        let file = root.0.join(format!("{leaf}-inputs.json"));
+        std::fs::write(&file, serde_json::to_vec(&inputs).unwrap()).unwrap();
+        let (status, analyzed) = cli(
+            &daemon,
+            &pin,
+            &pipe,
+            &[
+                "analyze",
+                leaf,
+                "--target",
+                TARGET,
+                "--inputs-file",
+                file.to_str().unwrap(),
+            ],
+        );
+        assert_eq!(status, Some(0), "{leaf}: {analyzed}");
+        let job = analyzed["result"]["jobID"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{leaf}: {analyzed}"))
+            .to_owned();
+        let (status, result) = cli(&daemon, &pin, &pipe, &["job", "result", "--job", &job]);
+        assert_eq!(status, Some(0), "{leaf}: {result}");
+        assert_eq!(
+            result["result"]["job"]["state"], "succeeded",
+            "{leaf}: {result}"
+        );
+        assert_eq!(
+            result["result"]["job"]["actualEffect"], "hostOnly",
+            "{leaf}: {result}"
+        );
+        assert_eq!(
+            result["result"]["artifacts"].as_array().map(Vec::len),
+            Some(1),
+            "{leaf}: {result}"
+        );
+    }
+    running.stop(&root.0);
+    assert_eq!(Root::tree(&root.artifacts().join(JOB)), before);
+    assert_measured(&[
+        "trace.inspect",
+        "analyzer.analyze-trace@1",
+        "analyzer.summarize-trace@1",
+    ]);
 }
 
 /// Every coverage entry for each of `leaves` is Windows `implemented` in the
