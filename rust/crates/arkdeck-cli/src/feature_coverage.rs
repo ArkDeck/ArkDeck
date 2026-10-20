@@ -303,10 +303,6 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("workspace.project.update", leaf("workspace.project.update")),
 ];
 
-/// Generic Catalog operations no Windows CLI run has measured through the
-/// generic leaves, which stay `partial` there although those leaves count.
-const WINDOWS_UNMEASURED_GENERIC: &[&str] = &["flash.recommission@1"];
-
 /// Swift `FeatureCoverage.localRoots` and its siblings: the leaves that are
 /// §18 `local`, bounded, versioned host-side product resources shared with
 /// the App, which never change Runtime authority. Every other executable leaf
@@ -391,8 +387,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // (`flash_socket_control.rs`), `job submit` of the diagnostic session
     // (`diagnostic_session_cli.rs`), and `agent resume` and `human-action
     // resume` over the Swift human-action oracle (`gj1_device_leaves.rs`).
-    // `flash.recommission@1` has no Swift answer and no Windows CLI
-    // measurement; it stays partial ([`WINDOWS_UNMEASURED_GENERIC`]).
+    // `flash.recommission@1`, which has no Swift answer, is measured through
+    // `job plan|submit|run` over a retained unknown full restore that `job
+    // archive` archived (`flash_socket_control.rs`).
     "job.plan",
     "job.submit",
     "job.run",
@@ -1096,13 +1093,11 @@ impl Entry {
             "notImplemented"
         } else if leaves.is_empty() {
             // A generic Catalog operation is reached through `job submit`:
-            // implemented where that leaf is measured and a Windows CLI run
-            // reached the operation through it.
+            // implemented where that leaf is measured, as a Windows CLI run
+            // reached each one through it.
             if self.classification != "generic" {
                 "notImplemented"
-            } else if WINDOWS_MEASURED_LEAVES.contains(&"job.submit")
-                && !WINDOWS_UNMEASURED_GENERIC.contains(&self.feature.as_str())
-            {
+            } else if WINDOWS_MEASURED_LEAVES.contains(&"job.submit") {
                 "implemented"
             } else {
                 "partial"
@@ -1580,7 +1575,7 @@ mod tests {
             assert_eq!(entry["requiredPlatforms"], json!(PLATFORMS));
             assert_eq!(
                 entry["implementationStatusByPlatform"],
-                json!({"macos":"partial", "windows":"partial"})
+                json!({"macos":"partial", "windows":"implemented"})
             );
         }
         let rows: Vec<_> = document["entries"]
@@ -1668,15 +1663,15 @@ mod tests {
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
         }
-        // No Windows CLI run reaches the recommission (only Catalogs that
-        // publish it list it).
+        // The recommission, through `job submit` on Windows alone (only
+        // Catalogs that publish it list it).
         if document["entries"]
             .as_array()
             .unwrap()
             .iter()
             .any(|entry| entry["feature"] == "flash.recommission@1")
         {
-            assert_eq!(windows(&document, "flash.recommission@1"), "partial");
+            assert_eq!(windows(&document, "flash.recommission@1"), "implemented");
         }
         // The client-started service: served but for its installation.
         for (feature, status) in [
@@ -1695,7 +1690,12 @@ mod tests {
             let statuses = &entry["implementationStatusByPlatform"];
             if statuses["windows"] == "implemented" {
                 assert_eq!(entry["classification"], entry["targetClassification"]);
-                assert_eq!(statuses["macos"], "implemented");
+                // Windows is never ahead of macOS, but for the recommission,
+                // which macOS cannot serve: its legacy process lifetime is
+                // unproved there (`implementation_status`).
+                if entry["feature"] != "flash.recommission@1" {
+                    assert_eq!(statuses["macos"], "implemented");
+                }
             }
         }
     }

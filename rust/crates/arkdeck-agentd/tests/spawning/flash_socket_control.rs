@@ -187,6 +187,11 @@ enum Entry {
     /// the daemon's maintenance context and closed partition reads.
     #[cfg(windows)]
     Maintenance,
+    /// `job plan|submit|run` of `flash.recommission@1` over a retained
+    /// unknown full restore that `job archive preview|apply` archived once
+    /// its capability lineage expired.
+    #[cfg(windows)]
+    Recommission,
 }
 
 fn inputs_file(directory: &Path, exchange: &str) -> (PathBuf, Value) {
@@ -230,6 +235,8 @@ fn run_case(entry: Entry, outcome: &str) {
                 Entry::BindLoader => "bind",
                 #[cfg(windows)]
                 Entry::Maintenance => "maintenance",
+                #[cfg(windows)]
+                Entry::Recommission => "recommission",
             },
         )
         .env("ARKDECK_TEST_FLASH_SOCKET_OUTCOME", outcome)
@@ -528,6 +535,8 @@ fn flash_socket_process_fixture() {
         Ok("bind") => Entry::BindLoader,
         #[cfg(windows)]
         Ok("maintenance") => Entry::Maintenance,
+        #[cfg(windows)]
+        Ok("recommission") => Entry::Recommission,
         other => panic!("no entry named: {other:?}"),
     };
     let unknown = std::env::var("ARKDECK_TEST_FLASH_SOCKET_OUTCOME").as_deref() == Ok("unknown");
@@ -548,6 +557,11 @@ fn flash_socket_process_fixture() {
     #[cfg(windows)]
     if matches!(entry, Entry::Maintenance) {
         maintenance_over_the_cli(&root, &fakes, &sockets);
+        return;
+    }
+    #[cfg(windows)]
+    if matches!(entry, Entry::Recommission) {
+        recommission_over_the_cli(&root, &fakes, &sockets);
         return;
     }
     let host = flash_host(&root, &fakes);
@@ -664,7 +678,7 @@ fn flash_socket_process_fixture() {
         // Served before the Flash host is composed.
         Entry::BindLoader => unreachable!(),
         #[cfg(windows)]
-        Entry::Maintenance => unreachable!(),
+        Entry::Maintenance | Entry::Recommission => unreachable!(),
         Entry::FlashReads => {
             let public = serve_public(&sockets.0, &["rockusb-loader", "hdc-normal", "maskrom"]);
             let (status, access) = cli(&socket, &["flash", "device-access"]);
@@ -976,6 +990,157 @@ fn maintenance_over_the_cli(
     assert_eq!(job_of(&repeated).as_deref(), Some(restoration.as_str()));
     assert_eq!(writes(&fakes.calls()), restoration_writes);
     maintenance::assert_measured(&["flash.verify@1", "flash.restore-boot-loop@1"]);
+}
+
+#[cfg(windows)]
+#[test]
+fn flash_recommission_recovers_a_retained_unknown_restore_over_the_control_socket() {
+    run_case(Entry::Recommission, "completed");
+}
+
+/// `job plan`, then `job submit` of the plan it reviewed and `job run` of the
+/// Job admitted, through the CLI: the request's admission and run answers.
+#[cfg(windows)]
+fn plan_submit_run(
+    socket: &Path,
+    directory: &Path,
+    label: &str,
+    mut request: Value,
+) -> (String, Value) {
+    let file = directory.join(format!("{label}.json"));
+    let file_argument = file.to_string_lossy().into_owned();
+    fs::write(&file, request.to_string()).unwrap();
+    let (status, plan) = cli(socket, &["job", "plan", "--request-file", &file_argument]);
+    assert_eq!(status, Some(0), "{plan}");
+    request["reviewedPlanDigest"] = plan["result"]["materializedPlanDigest"].clone();
+    assert!(request["reviewedPlanDigest"].is_string(), "{plan}");
+    fs::write(&file, request.to_string()).unwrap();
+    let (status, admitted) = cli(socket, &["job", "submit", "--request-file", &file_argument]);
+    assert_eq!(status, Some(0), "{admitted}");
+    let job_id = job_of(&admitted).unwrap_or_else(|| panic!("{admitted}"));
+    (job_id.clone(), job(socket, "run", &job_id))
+}
+
+/// The hoststore recommission owner tests' sequence (`tests/flash_run/
+/// recommission.rs`), through the CLI against the daemon's owners: the
+/// oracle's full restore ends with an unknown outcome at the fixture's
+/// clock; five hours later, its capability lineage expired, `job archive
+/// preview|apply` retains it as unknown and publishes its Session; then
+/// `job plan|submit|run` of `flash.recommission@1` naming it is admitted
+/// with one independent budget and recovers the board, leaving the retained
+/// history unknown and unchanged. A repeated submit reads the same Job and
+/// dispatches nothing.
+#[cfg(windows)]
+fn recommission_over_the_cli(
+    root: &Root,
+    fakes: &execution_fakes::Fakes,
+    sockets: &SocketDirectory,
+) {
+    // The hoststore Flash run owner tests' clock, then the instant they
+    // archive and recommission at.
+    crate::host::set_test_clock("2026-09-25T00:00:00Z", "2026-09-25T00:00:00.000Z");
+    for name in ["session-owner", "Sessions"] {
+        arkdeck_platform::HostDirectory::open_or_create_private(&root.0.join(name)).unwrap();
+    }
+    let host = flash_host(root, fakes).with_storage(
+        arkdeck_hoststore::SessionStore::open(
+            &root.0.join("session-owner"),
+            &root.0.join("Sessions"),
+        )
+        .unwrap(),
+        arkdeck_hoststore::ArtifactUsage::open(
+            &root.0.join("artifacts"),
+            crate::host::ARTIFACT_QUOTA,
+        )
+        .unwrap(),
+    );
+    serve(host, &sockets.socket());
+    let socket = sockets.socket();
+    let mut recorded: Value = serde_json::from_str(&request("canonical.full")).unwrap();
+    fakes.begin(execution_fakes::Script {
+        perform: "outcomeUnknown".into(),
+        ..Default::default()
+    });
+    let (source, run) = plan_submit_run(&socket, &sockets.0, "source", recorded.clone());
+    assert_eq!(run["result"]["state"], "waitingForRecovery", "{run}");
+    assert_eq!(run["result"]["outcomeUnknown"], true, "{run}");
+    let history = || {
+        [
+            "job-record.json",
+            "journal.jsonl",
+            "arkforge-runtime-state.json",
+        ]
+        .map(|name| fs::read(root.0.join("jobs/jobs").join(&source).join(name)).unwrap())
+    };
+
+    crate::host::set_test_clock("2026-09-25T05:00:00Z", "2026-09-25T05:00:00.000Z");
+    let (status, preview) = cli(&socket, &["job", "archive", "preview", "--job", &source]);
+    assert_eq!(status, Some(0), "{preview}");
+    assert_eq!(preview["result"]["canArchive"], true, "{preview}");
+    let review = preview["result"]["reviewSha256"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let (status, archived) = cli(
+        &socket,
+        &[
+            "job",
+            "archive",
+            "apply",
+            "--job",
+            &source,
+            "--user-confirmation-id",
+            "fixture-retain-unknown",
+            "--expected-review-sha256",
+            &review,
+        ],
+    );
+    assert_eq!(status, Some(0), "{archived}");
+    assert_eq!(archived["result"]["sessionPublished"], true, "{archived}");
+    assert_eq!(archived["result"]["outcomeUnknown"], true, "{archived}");
+    let retained = history();
+
+    fakes.begin(execution_fakes::Script::default());
+    recorded["requestId"] = Value::from("recommission-cli");
+    recorded["idempotencyKey"] = Value::from("idem-recommission-cli");
+    recorded["operation"]["id"] = Value::from("flash.recommission");
+    recorded["inputs"]["retainedJobId"] = Value::from(source.as_str());
+    let (recovery, run) = plan_submit_run(&socket, &sockets.0, "recommission", recorded.clone());
+    assert_eq!(run["result"]["state"], "recovered", "{run}");
+    assert_eq!(run["result"]["outcomeUnknown"], false, "{run}");
+    let calls = fakes.calls();
+    let count = |prefix: &str| {
+        calls
+            .0
+            .iter()
+            .filter(|call| call.starts_with(prefix))
+            .count()
+    };
+    assert_eq!((count("prepare "), count("perform ")), (1, 1), "{calls:?}");
+    assert_eq!(
+        job(&socket, "status", &recovery)["result"]["state"],
+        "recovered"
+    );
+    // The retained Job stays unknown, its history untouched.
+    assert_eq!(
+        job(&socket, "status", &source)["result"]["outcomeUnknown"],
+        true
+    );
+    assert_eq!(history(), retained);
+    // One independent epoch: the same request reads its Job, nothing runs.
+    let file = sockets.0.join("recommission.json");
+    let (status, again) = cli(
+        &socket,
+        &["job", "submit", "--request-file", &file.to_string_lossy()],
+    );
+    assert_eq!(status, Some(0), "{again}");
+    assert_eq!(
+        job_of(&again).as_deref(),
+        Some(recovery.as_str()),
+        "{again}"
+    );
+    assert_eq!(fakes.calls(), calls, "a recovered epoch never redispatches");
+    crate::flash_maintenance_cli::assert_measured(&["flash.recommission@1"]);
 }
 
 /// The Job an answer names, wherever the entry point put it.

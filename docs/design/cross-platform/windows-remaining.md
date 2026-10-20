@@ -8,21 +8,22 @@ increment is published on protected main
 development RC uses that source; implementation counts and actual acceptance
 results remain distinct.
 
-There are now 165 Windows CLI features: 162 `implemented`, 1 `partial` and 2
+There are now 165 Windows CLI features: 163 `implemented`, 0 `partial` and 2
 `notImplemented`. The three added since 2026-10-14 are the Flash maintenance
 operations `flash.verify@1`, `flash.restore-boot-loop@1` (CHG-2026-084) and
 `flash.recommission@1` (CHG-2026-086). The first two have their own
 `flash verify` and `flash restore-boot-loop` leaves, now measured through the
-signed CLI on Windows. `flash.recommission@1` is the one `partial` feature:
-only the generic Runtime leaves reach it, and no Windows CLI run has measured
-it through them (it has no Swift answer). `trace.inspect` and both ArkTrace analyzers
+signed CLI on Windows. `flash.recommission@1` is reached only through the
+generic Runtime leaves; `job plan|submit|run` of it recovers a retained unknown
+full restore through the signed CLI. It has no Swift answer and stays `partial`
+on macOS, which lacks the historical process-lifetime proof. `trace.inspect` and both ArkTrace analyzers
 are also measured through the signed CLI, with the reviewed
 development-signed ArkTrace distribution (the user's ruling of 2026-10-20
 that a development-signed package counts as measurement). With every direct
 Catalog operation measured, the shared generic leaves (`job plan|submit|run`,
 `agent run|resume`, `human-action resume`) and the generic operations a
 Windows CLI run reached through them (`flash.dayu200`,
-`capture.diagnostic-session@1`) are counted under the lead's ruling of
+`capture.diagnostic-session@1`, `flash.recommission@1`) are counted under the lead's ruling of
 2026-10-04. These counts are software measurements: none is a
 `REAL_DEVICE_PASS`, and GJ-4 still needs AF-W1. The 68 App capabilities are separately Windows-required
 under accepted ruling 10: 59 `implemented` software targets, one `partial`
@@ -55,9 +56,9 @@ remaining blockers are external inputs, maintainer review or quiet-host time:
    packaging and installed acceptance remain open for release; they no longer
    gate the CLI counts.
 4. **Generic leaves (counted).** `job plan|submit|run`, `agent run|resume`,
-   `human-action resume`, `flash.dayu200` and `capture.diagnostic-session@1`
-   are counted. `flash.recommission@1` stays `partial` until a Windows CLI
-   run measures it through `job submit`.
+   `human-action resume`, `flash.dayu200`, `capture.diagnostic-session@1` and
+   `flash.recommission@1` are counted. The recommission's CHG-2026-086
+   acceptance and maintainer review remain item 2.
 5. **Release (`TASK-XPA-022`, external).** Production signing, clean-host install
    and a formal update feed remain open. A same-publisher, higher-version signed
    MSIX is needed for `app.settings.updates`.
@@ -127,7 +128,7 @@ board window), **now** (Swift-oracle parity work we can do now), **dependency** 
 | `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | done | Every direct Catalog operation they reach is measured on Windows; the signed CLI drives them over the full restore, its alias, the diagnostic session and the human-action oracle (`flash_socket_control.rs`, `diagnostic_session_cli.rs`, `gj1_device_leaves.rs`). Counted under the lead's ruling of 2026-10-04 |
 | `flash.dayu200` | 4 | done (software) | `agent run --operation flash.dayu200` over the fake lane through the signed CLI. The Windows Runtime composes the signed ArkForge bundle and has completed real typed nine-partition flashes (2026-10-19). Formal GJ-4 acceptance still requires AF-W1 and a matched release Bundle |
 | `flash.verify@1`, `flash.restore-boot-loop@1` | 4 | done | Signed CLI over the fake lane after a `flash run`: partial verification (exit 9, userdata mounted writable), original-ramdisk restoration under one capability (exit 0), verification of the restoration (exit 0), and a repeat that writes nothing. Partition reads are the production closed reads over the fake HDC; the identity observation is synthetic, as Windows resolves a USB connector only from the host's device tree (`flash_maintenance_cli.rs`). Real Windows device results on 2026-10-19 are recorded separately |
-| `flash.recommission@1` | 4 | now | Windows Runtime only (macOS lacks the historical process-lifetime proof). Generic, with owner-level tests only; a Windows CLI run through `job submit` would count it. CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
+| `flash.recommission@1` | 4 | done (software) | Windows Runtime only (macOS lacks the historical process-lifetime proof). Signed CLI over the fake lane: a full restore ends unknown, `job archive preview\|apply` retains it once its capability lineage expired (the test clock moves five hours), and `job plan\|submit\|run` of the recommission recovers it with one independent budget, leaving the retained history unchanged; a repeated submit dispatches nothing (`flash_socket_control.rs`). The identity chain is a synthetic observation. CHG-2026-086 current-Catalog acceptance and maintainer review are still open |
 | `runtime.service.install`, `runtime.service.update` | — | closed | Keep ruling 42: the client-started daemon has no installer. Runtime RC updates continue through reinstall (ruling 78); delegated decision of 2026-10-05 keeps these leaves `notImplemented` |
 
 No item is blocked only on the board: each device leaf above replays a Swift oracle through the
@@ -257,9 +258,8 @@ historical context and unchanged Job inventories. Native cross-process locking
 and the published `conflict` refusal remain in force. See the
 [published installed readback run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-installed-readback-2026-10-13-run.md).
 
-The presently actionable CLI increments above are measured, except
-`flash.recommission@1`. Service install/update keep their existing closed
-decision.
+The presently actionable CLI increments above are measured. Service
+install/update keep their existing closed decision.
 
 The host workspace Session publication repair is released in #2597, protected
 main `d238a55c7b693adc7edbf6314699e920f0ee1e08`. It retains the original complete

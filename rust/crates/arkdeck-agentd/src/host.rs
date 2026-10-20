@@ -4455,30 +4455,45 @@ use arkdeck_hoststore::{runtime_now as clock_now, runtime_precise_now as clock_p
 /// Test builds on Windows only: the fixed clock (`now`, `precise now`) a
 /// process of the signed test daemon (`tests/spawning/signed_daemon.rs`)
 /// takes before it composes anything, so a replay of a Swift oracle reads the
-/// oracle's own clock. The production daemon has no such clock.
+/// oracle's own clock; a fixture that needs time to pass (a capability
+/// lineage that expires) moves it forward between requests
+/// ([`set_test_clock`]). The production daemon has no such clock.
 #[cfg(all(windows, test))]
-pub(crate) static TEST_CLOCK: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
+static TEST_CLOCK: std::sync::RwLock<Option<(String, String)>> = std::sync::RwLock::new(None);
+
+/// Sets the test clock ([`TEST_CLOCK`]) every later Runtime read takes; only
+/// the spawning tests call it.
+#[cfg(all(windows, test))]
+#[allow(dead_code)]
+pub(crate) fn set_test_clock(now: &str, precise: &str) {
+    *TEST_CLOCK.write().unwrap() = Some((now.to_owned(), precise.to_owned()));
+}
+
+#[cfg(all(windows, test))]
+fn test_clock() -> Option<(String, String)> {
+    TEST_CLOCK.read().unwrap().clone()
+}
 
 #[cfg(all(windows, test))]
 fn clock_now() -> Option<String> {
-    match TEST_CLOCK.get() {
-        Some((now, _)) => Some(now.clone()),
+    match test_clock() {
+        Some((now, _)) => Some(now),
         None => arkdeck_hoststore::runtime_now(),
     }
 }
 
 #[cfg(all(windows, test))]
 fn clock_precise_now() -> Option<String> {
-    match TEST_CLOCK.get() {
-        Some((_, precise)) => Some(precise.clone()),
+    match test_clock() {
+        Some((_, precise)) => Some(precise),
         None => arkdeck_hoststore::runtime_precise_now(),
     }
 }
 
 pub(crate) fn utc_now() -> String {
     #[cfg(all(windows, test))]
-    if let Some((now, _)) = TEST_CLOCK.get() {
-        return now.clone();
+    if let Some((now, _)) = test_clock() {
+        return now;
     }
     timestamp(
         SystemTime::now()
