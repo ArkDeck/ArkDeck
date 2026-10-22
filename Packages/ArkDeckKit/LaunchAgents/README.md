@@ -23,7 +23,7 @@ HDC 执行路径。
 3. 从已签名 CLI helper 运行：
 
    ```text
-   arkdeck runtime service install --hdc /absolute/path/to/hdc
+   arkdeck runtime service install --bundle <bundle-id> --bundle-generation <n> --tool <tool-id> --tool-generation <n>
    arkdeck runtime service status
    arkdeck doctor
    ```
