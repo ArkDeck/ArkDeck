@@ -1,0 +1,96 @@
+name: ArkForge pin bump
+
+# Compare the ArkForge revision pinned in rust/Cargo.toml with ArkForge's
+# default-branch commit. When the pin is an ancestor of that commit, rewrite
+# every arkforge crate to the same full revision, refresh Cargo.lock, run
+# rust/scripts/check-arkforge-pin.py --run-vectors, and open one pull request.
+# The pin is a commit, never a tag or a branch name.
+#
+# The pull request is pushed with GITHUB_TOKEN. GitHub does not start push
+# workflows from that token, so guard and swift do not run for the bump until
+# the branch is pushed again by a credential that triggers Actions. The vector
+# run in this workflow is the check that happens before the pull request opens.
+
+on:
+  schedule:
+    # 06:00 UTC, clear of the 17:00 performance lane and the 18:00 UI lane.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: arkforge-pin-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout main with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth=1 origin main
+          git checkout --detach origin/main
+          git rev-parse HEAD
+
+      - name: Activate workspace toolchain
+        run: |
+          set -eu
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy --no-self-update
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+
+      - name: Bump the pin when ArkForge main is ahead
+        id: bump
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh rust/scripts/arkforge-pin-bump.sh
+
+      - name: Run pinned ArkForge vectors
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: python3 rust/scripts/check-arkforge-pin.py --run-vectors
+
+      - name: Open the bump pull request
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVISION: ${{ steps.bump.outputs.revision }}
+        run: |
+          set -eu
+          test -n "$REVISION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="agent/arkforge-rev-${REVISION}"
+          git add rust/Cargo.toml rust/Cargo.lock
+          git diff --cached --quiet && exit 1
+          git commit \
+            -m "chore: bump the ArkForge pin to ${REVISION}" \
+            -m "Every arkforge crate uses this one revision. Cargo.lock was updated with cargo update -p for those crates. check-arkforge-pin.py --run-vectors passed in the scheduled workflow before this pull request was opened." \
+            -m "Stack-Base: main"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "HEAD:refs/heads/${branch}"
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --base main --json number --jq '.[0].number // ""')
+          if [ -n "$existing" ]; then
+            echo "pull request #${existing} already exists"
+            exit 0
+          fi
+          body="${RUNNER_TEMP}/arkforge-pin-pr-body.md"
+          cat > "$body" <<EOF
+          Scheduled comparison found ArkForge's default branch ahead of rust/Cargo.toml.
+
+          Every arkforge-* crate is pinned at ${REVISION}, a commit rather than a tag or branch. rust/Cargo.lock was updated with cargo update -p for those crates. python3 rust/scripts/check-arkforge-pin.py --run-vectors passed in this workflow before the pull request was opened.
+
+          This branch was pushed with GITHUB_TOKEN, which does not start push workflows. guard and swift appear after the branch is pushed again by a credential that triggers Actions.
+          EOF
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --title "chore: bump the ArkForge pin to ${REVISION}" \
+            --body-file "$body"
