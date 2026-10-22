@@ -20,7 +20,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   }
 
   private func driverSource() throws -> String {
-    try repositorySource("scripts/manual_ui_flash/manual_ui_flash.swift")
+    try repositorySource("tools/experiments/manual_ui_flash/manual_ui_flash.swift")
   }
 
   private func runCandidateValidator(_ candidateURL: URL) throws -> (
@@ -44,7 +44,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       "swift", "-module-cache-path", cache.path,
       repositoryRoot().appending(
         path:
-          "scripts/manual_ui_flash/manual_ui_flash.swift"
+          "tools/experiments/manual_ui_flash/manual_ui_flash.swift"
       ).path,
     ] + arguments
     process.standardOutput = output
@@ -199,7 +199,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
   func testDefaultCandidateTracksTheCurrentWorkspaceFlow() throws {
     let candidateURL = repositoryRoot().appending(
-      path: "scripts/manual_ui_flash/manual_ui_flash_candidate.json")
+      path: "tools/experiments/manual_ui_flash/manual_ui_flash_candidate.json")
     let object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
     let actions = try XCTUnwrap(object["actions"] as? [[String: Any]])
@@ -224,7 +224,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   func testStandaloneValidatorAcceptsNovelCompositionAndRejectsAuthorityField() throws {
     let candidateURL = repositoryRoot().appending(
       path:
-        "scripts/manual_ui_flash/manual_ui_flash_candidate.json")
+        "tools/experiments/manual_ui_flash/manual_ui_flash_candidate.json")
     let accepted = try runCandidateValidator(candidateURL)
     XCTAssertEqual(accepted.status, 0, accepted.stderr)
     XCTAssertTrue(accepted.stdout.contains("CANDIDATE_VALID:"))
@@ -267,7 +267,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   /// either document.
   func testCandidateAndDebugSessionDocumentsAreTheCurrentV1() throws {
     let candidateURL = repositoryRoot()
-      .appending(path: "scripts/manual_ui_flash/manual_ui_flash_candidate.json")
+      .appending(path: "tools/experiments/manual_ui_flash/manual_ui_flash_candidate.json")
     let object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
     XCTAssertEqual(object["schemaVersion"] as? String, "1.0.0")
@@ -304,7 +304,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   func testCandidateProgramCannotNameTargetArchivePlanValueOrSubmit() throws {
     let data = try Data(
       contentsOf: repositoryRoot()
-        .appending(path: "scripts/manual_ui_flash/manual_ui_flash_candidate.json"))
+        .appending(path: "tools/experiments/manual_ui_flash/manual_ui_flash_candidate.json"))
     let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     XCTAssertEqual(
       Set(object.keys),
@@ -381,7 +381,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(source.contains("\"rev-parse\", \"origin/main^{commit}\""))
     XCTAssertTrue(
       source.contains(
-        "\"origin/main:scripts/manual_ui_flash/manual_ui_flash.swift\""))
+        "\"origin/main:tools/experiments/manual_ui_flash/manual_ui_flash.swift\""))
     XCTAssertTrue(source.contains("guard reviewed == current"))
     XCTAssertTrue(source.contains("let protectedMainCommitOID = try protectedMainActuatorCommit()"))
     XCTAssertTrue(

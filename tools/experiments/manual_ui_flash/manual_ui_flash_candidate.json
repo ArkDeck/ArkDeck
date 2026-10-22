@@ -1,0 +1,25 @@
+{
+  "documentType": "manual-ui-flash-candidate-program",
+  "schemaVersion": "1.0.0",
+  "applicationActivation": "activateAndRaise",
+  "activationSettleMilliseconds": 100,
+  "controlTimeoutSeconds": 20,
+  "planTimeoutSeconds": 180,
+  "actions": [
+    {
+      "kind": "perform",
+      "identifier": "app.navigation.flash",
+      "delivery": "pointerClick",
+      "fallbackStrings": ["Flash", "刷机"]
+    },
+    {"kind": "waitForPresence", "identifier": "flash.workspace.imageAction"},
+    {"kind": "choosePinnedArchive", "delivery": "pointerClick"},
+    {
+      "kind": "perform",
+      "identifier": "flash.workspace.details",
+      "delivery": "accessibilityPress",
+      "fallbackStrings": []
+    },
+    {"kind": "waitForPinnedPlan"}
+  ]
+}
