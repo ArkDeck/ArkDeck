@@ -1,3 +1,5 @@
+include!("services_runtime.rs");
+
 impl HostServices for Host {
     fn registered_provider_ids(&self) -> Vec<&'static str> {
         let mut providers = Vec::new();
@@ -1218,5 +1220,5 @@ impl HostServices for Host {
         )
         .continue_cleanup_debt(params)
     }
-    include!("services_runtime.rs");
+    host_services_runtime_methods!();
 }

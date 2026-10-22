@@ -1,3 +1,5 @@
+macro_rules! host_services_runtime_methods {
+    () => {
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
     /// Job this owner is running is cancelled by its run, which alone writes
     /// the Job's Journal. A run of a Job no run holds waits the cancellation
@@ -1152,3 +1154,5 @@
         state.snapshot = Some(snapshot.clone());
         Ok(snapshot)
     }
+    };
+}
