@@ -118,7 +118,7 @@ doctor 与 runtime drift 验证；operation 只有在这些检查全部通过后
 继续可用，安装时一次性传入两个受验证的绝对目录：
 
 ```text
-arkdeck runtime service install --hdc /absolute/path/to/hdc \
+arkdeck agentd install --hdc /absolute/path/to/hdc \
   --workspace-project /absolute/path/to/WaterFlowLayoutDemo \
   --deveco-sdk /Applications/DevEco-Studio.app/Contents/sdk
 ```
