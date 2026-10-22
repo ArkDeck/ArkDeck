@@ -32,10 +32,15 @@ jobs:
         run: |
           set -eu
           git init .
+          # check-sdd parses every openspec JSON, and the Golden Journey
+          # record tests parse command_registry.json. Those files are Git
+          # LFS. Same materialization as actions/checkout with lfs: true.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune --depth=1 origin \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
+          git lfs pull
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Install dependencies
