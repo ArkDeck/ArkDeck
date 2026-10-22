@@ -118,7 +118,7 @@ final class DebugWorkspaceViewModel {
       }
   }
 
-  fileprivate func runtimeArtifactRows(
+  func runtimeArtifactRows(
     operationReference: String,
     targetID: String?
   ) -> [DebugRuntimeArtifactRow] {
