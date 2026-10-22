@@ -107,7 +107,7 @@ TASK-XPA-017）；Swift 不再承载运行时语义，ArkForge 只以提交修�
 - 一个 OpenHarmony `hdc` 可执行文件（真机工作流需要）
 - 一台已完成首次信任授权的 USB 直连设备
 
-在仓库根目录构建并测试 Rust 运行时：
+在仓库根目录构建并测试 Rust 运行时。根目录 [`justfile`](./justfile) 包装同一组入口（`just build`、`just test`、`just lint`、`just ci`）：
 
 ```bash
 git clone https://github.com/ArkDeck/ArkDeck.git
@@ -190,7 +190,7 @@ Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages
 
 ## 参与贡献
 
-先读 [AGENTS.md](./AGENTS.md)：它说明了工作如何组织、交付前要跑哪些检查。[`openspec/`](./openspec/) 下的安全不变量是契约而不是建议，削弱它们的改动不会被合入。
+先读 [CONTRIBUTING.md](./CONTRIBUTING.md)。[AGENTS.md](./AGENTS.md) 是 Agent 与维护者的边界。[`openspec/`](./openspec/) 下的安全不变量是契约而不是建议，削弱它们的改动不会被合入。漏洞按 [SECURITY.md](./SECURITY.md) 私下报告。社区规范见 [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)，值得记录的变更收集在 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 协议
 
