@@ -1,4 +1,3 @@
-impl HostServices for Host {
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
     /// Job this owner is running is cancelled by its run, which alone writes
     /// the Job's Journal. A run of a Job no run holds waits the cancellation
@@ -1153,4 +1152,3 @@ impl HostServices for Host {
         state.snapshot = Some(snapshot.clone());
         Ok(snapshot)
     }
-}
