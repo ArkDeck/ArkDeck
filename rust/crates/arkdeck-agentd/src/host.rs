@@ -402,7 +402,6 @@ fn windows_runner<'a>(
 
 // HostServices answers. Included so this stays the same module.
 include!("host/services.rs");
-include!("host/services_runtime.rs");
 
 #[cfg(any(target_os = "macos", windows))]
 impl Host {
