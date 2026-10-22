@@ -75,7 +75,7 @@ Its crates (`arkforge-client` and what it needs; `arkforge-artifact` for bounded
 preboot archive inspection; `arkforge-authority-api`,
 `arkforge-core` and `arkforge-ipc` for tests) come from
 `https://github.com/ArkDeck/ArkForge.git`, the one `allow-git` entry in
-`deny.toml`, at exactly the revision `Packages/ArkDeckKit/Package.swift` pins,
+`deny.toml`, at exactly the revision `rust/Cargo.toml` pins,
 and each is named in `[bans] allow`. They carry no third-party dependency and
 declare `Apache-2.0`. cargo-vet treats a crate from a non-registry source as
 first-party, so none of them has an audit or exemption entry; were a
