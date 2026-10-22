@@ -1267,7 +1267,7 @@ class StatusVocabularyAgreementTests(unittest.TestCase):
     def _host_loop_vocabulary(self) -> set[str]:
         import re
         source = (
-            check_sdd.REPO / "scripts" / "host_loop" / "test_discovery_contract.py"
+            check_sdd.REPO / "tools" / "experiments" / "host_loop" / "test_discovery_contract.py"
         ).read_text(encoding="utf-8")
         match = re.search(
             r"self\.assertLessEqual\(\{c\.status for c in self\.found\},\s*\{([^}]*)\}",

@@ -209,8 +209,8 @@ def check_suite(suite: str):
             ["python3", "scripts/test_check_sdd.py"],
             ["python3", "scripts/test_agent_pr_identity.py"],
             ["python3", "scripts/ci/test_agent_pr.py"],
-            ["python3", "-m", "unittest", "discover", "-s", "scripts/host_loop", "-t", "scripts"],
-            ["python3", "-m", "unittest", "discover", "-s", "scripts/gj_record", "-t", "scripts"],
+            ["python3", "-m", "unittest", "discover", "-s", "tools/experiments/host_loop", "-t", "tools/experiments"],
+            ["python3", "-m", "unittest", "discover", "-s", "tools/experiments/gj_record", "-t", "tools/experiments"],
             ["node", "docs/design/arkdeck-ds/scripts/check-tokens.mjs"],
         ]
     else:

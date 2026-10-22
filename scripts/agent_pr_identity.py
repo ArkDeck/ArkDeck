@@ -43,8 +43,8 @@ from pathlib import Path
 from typing import Sequence
 
 
-# Byte-identical to scripts/host_loop/instance.py TASK_TOKEN_TEXT;
-# scripts/host_loop/test_token_parity.py fails if the two ever drift.
+# Byte-identical to tools/experiments/host_loop/instance.py TASK_TOKEN_TEXT;
+# tools/experiments/host_loop/test_token_parity.py fails if the two ever drift.
 TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"
 TASK_TOKEN_RE = re.compile(rf"(?<![A-Z0-9-])({TASK_TOKEN_TEXT})(?![A-Z0-9-])")
 FULL_OID_RE = re.compile(r"^[0-9a-fA-F]{40}$")

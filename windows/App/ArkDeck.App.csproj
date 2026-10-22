@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     ArkDeck for Windows (TASK-XPA-007 walking skeleton): WinUI 3 on Windows App SDK 2.5.1,
-    self-contained, x64 only (r13). Shell and pins from SPK-4 (windows/spikes/spk4); every
+    self-contained, x64 only (r13). Shell and pins from SPK-4 (tools/experiments/windows-spikes/spk4); every
     value on screen is a daemon projection read through ArkDeck.ClientKit by ArkDeck.App.Core.
     Strings: Strings/*/Resources.resw, generated from spec/ui-semantics
     (windows/scripts/generate-ui-strings.py). Tokens: Themes/ArkDeckTokens.xaml, generated from

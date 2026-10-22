@@ -4,7 +4,7 @@
 Source of truth: docs/design/arkdeck-ds/src/tokens.css (light `:root`, dark
 `@media (prefers-color-scheme: dark)`; the `[data-theme]` overrides must repeat those
 values and are checked). Output: windows/App/Themes/ArkDeckTokens.xaml. Derived from the
-SPK-4 spike generator (windows/spikes/spk4/tokens/gen_xaml_tokens.py), plus ruling 16.
+SPK-4 spike generator (tools/experiments/windows-spikes/spk4/tokens/gen_xaml_tokens.py), plus ruling 16.
 
 Usage:
     python windows/scripts/generate-xaml-tokens.py           # rewrite the XAML

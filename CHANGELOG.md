@@ -16,3 +16,12 @@ GitHub Releases. History before this file is the git log on `main`.
 - Public contributor entry points: `CONTRIBUTING.md`, `SECURITY.md`,
   `CODE_OF_CONDUCT.md`, GitHub issue and pull request templates, and a root
   `justfile` that wraps the existing build, test, lint, and CI commands.
+
+### Changed
+
+- Archived `PRODUCT-LOOP.md`, `docs/PLAN.md`, `docs/reviews/`, and the
+  top-level `evidence/runs/` notes under `docs/archive/`.
+- Replaced the 300KB `rust/README.md` log with a short navigation page. The
+  log is `docs/rust/development-log.md`.
+- Moved `host_loop`, `gj_record`, and `windows/spikes` to `tools/experiments/`.
+  Removed one-off capture directories under `scripts/` that no workflow called.

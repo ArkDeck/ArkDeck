@@ -12,7 +12,7 @@
 - 先检查 diff 并保留用户修改，定位相关实现、测试和任务（包括请求未点名、但行为取决于它的
   调用方、消费方与对照实现），再读取下表对应资料；不通读全部 specs、change 或 skills，也不
   重复加载未变内容。历史命令、版本和状态与当前实现核对。
-- 使用用户的语言，简要说明实际修改、验证与阻塞。产品迭代按 `PRODUCT-LOOP.md` §19
+- 使用用户的语言，简要说明实际修改、验证与阻塞。产品迭代按 `docs/archive/PRODUCT-LOOP.md` §19
   汇报；完成即交付，不主动追加治理、重构、无关功能或为“下一轮建议”制造任务。
 - 同一工作流连续产出的 PR 默认使用 stacked PR：首层以最新 `main` 为 base，后续层从相邻
   下层分支继续，并以该分支为 base；每层只提交一个可独立审阅的增量。下层更新后由底向上
@@ -30,7 +30,7 @@
 
 | 任务 | 入口 |
 | --- | --- |
-| 产品能力与优先级 | [PRODUCT-LOOP.md](PRODUCT-LOOP.md) 对应 Golden Journey；`Packages/ArkDeckKit/Sources/`、`ArkDeckApp/` |
+| 产品能力与优先级 | [PRODUCT-LOOP.md](docs/archive/PRODUCT-LOOP.md) 对应 Golden Journey；`Packages/ArkDeckKit/Sources/`、`ArkDeckApp/` |
 | Operation、Runtime、Provider、Artifact | 对应 `openspec/specs/`、`openspec/contracts/`、`Catalog/` 与 integration/platform profile |
 | 身份、副作用准入、恢复、隐私 | [Constitution](openspec/constitution.md) 对应 Safety invariant / `POL-*`，再读相关 contract |
 | 新 operation 或已发布 operation 的破坏性修改、新 provider、新 integration/device profile、destructive 准入安全策略变化 | 同车 OpenSpec change + 维护者 PR review；读取 [enforcement](openspec/governance/enforcement.md)、[verification policy](openspec/verification/policy.md) 与所属 change |
@@ -39,12 +39,12 @@
 | 维护 AGENTS.md、项目 skill 或排查指令冲突 | [指令维护](scripts/agent-guides/instructions.md) |
 
 表中操作指南仅在命中对应任务时读取，是本文件的按需说明；无需预先加载全部链接。
-仓内资料冲突时：Constitution Safety invariants / `POL-*` > `PRODUCT-LOOP.md` > 本文件及其操作指南 >
+仓内资料冲突时：Constitution Safety invariants / `POL-*` > `docs/archive/PRODUCT-LOOP.md` > 本文件及其操作指南 >
 current specs/contracts 与 approved scoped delta > integration/platform profile >
-enforcement/policy 与 change 设计 > 代码和注释。`docs/PLAN.md` 仅是历史设计输入。
+enforcement/policy 与 change 设计 > 代码和注释。`docs/archive/PLAN.md` 仅是历史设计输入。
 
 安全不变量冲突时停止受影响的危险推进，给出条款与冲突，交维护者裁决；普通流程冲突按
-`PRODUCT-LOOP.md` 执行并记录一行兼容说明，不自动创建 change。其他同层冲突采用对当前
+`docs/archive/PRODUCT-LOOP.md` 执行并记录一行兼容说明，不自动创建 change。其他同层冲突采用对当前
 Golden Journey 风险最小的解释并说明。旧 E0/E1/E2 或确认流程不得覆盖 `POL-AGENT-002`
 的现行 Runtime authority 规则。
 

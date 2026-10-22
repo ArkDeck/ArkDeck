@@ -1,0 +1,4774 @@
+# Rust runtime development
+
+This file is the archived append-only development log. Current build commands
+are in [rust/README.md](../../rust/README.md).
+
+
+
+TASK-XPA-002 supplies a separate development daemon and the `doctor`,
+`operation list` and `device candidates` CLI leaves. It consumes the Swift
+contract of this checkout, described by the committed manifest
+[`spec/baselines/swift-single-v1.json`](../spec/baselines/swift-single-v1.json)
+and the generated bindings, both regenerated from the working tree. The
+manifest is a development baseline. SVC release acceptance, Windows platform
+acceptance and production Runtime migration remain separate requirements.
+
+## Build and check
+
+From `rust/`, rustup selects the committed toolchain, the `stable` channel in
+`rust-toolchain.toml`. The workspace requires Rust 1.99.0 or newer (Edition 2024):
+
+```sh
+cargo fmt --all --check
+cargo fetch --locked
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+python scripts/generate-contract.py --check
+python scripts/test_contract_checks.py
+python scripts/check-contracts.py
+```
+
+`cargo fetch --locked` needs read access to ArkForge's private repository: its
+crates are taken from it at the single revision `rust/Cargo.toml` pins. The
+Swift package no longer pins ArkForge; that pin was removed with the Swift
+Runtime (CHG-2026-074, TASK-XPA-017). Locally,
+`CARGO_NET_GIT_FETCH_WITH_CLI=true` lets Cargo fetch with your Git credentials;
+CI fetches with the read-only deploy key, present for that step alone
+(`scripts/ci/arkforge-cargo-fetch.sh`). `python scripts/check-arkforge-pin.py
+--run-vectors` checks that every ArkForge crate and `Cargo.lock` share that
+one full revision (never a tag or branch) and reruns ArkForge's own wire and
+StepPermit vectors at it.
+
+`arkdeck-agentd` is a binary; its unit tests (declared by `src/main.rs`) run in
+parallel and start no child process. macOS has no `SOCK_CLOEXEC`, so a child
+that `std::process::Command` spawns while another test is still making a socket
+keeps it, bound and listening once it is, for as long as the child lives: a
+released port or dropped listener stays held. A test whose path starts a child
+— a compiler, a fake `hdc` run directly or through the daemon's HDC dispatch —
+belongs in `tests/spawning`, which compiles the daemon's modules from their
+sources and runs one test at a time (`turn()`), as do the integration tests
+that listen or take a lock in their own process while spawning.
+On Windows two things run there:
+- `flash_host_facts_control.rs` (TASK-XPA-010): the Swift Flash host facts
+  oracle through `Control` and the daemon's own host, over the shared fake's
+  answers ported in process (`arkdeck-provider-hdc/tests/common/oracle_fake.rs`).
+- The signed test daemon, `signed_daemon.rs` (TASK-XPA-009). That binary compiles
+  the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
+  signed with the development signer. It serves a development root on its pipe,
+  and the real `arkdeck.exe` drives it with the production peer check.
+  `gj23_replay.rs` drives both GJ-2/3 oracles (63 and 40 exchanges) through it.
+  For that, the test daemon alone takes three inputs: the oracle's clock, the
+  replay root's own Job state as the mutation root, and the recorded code-sign
+  helper's facts.
+  and the real `arkdeck.exe` drives it with the production peer check. Started
+  with a board (`SignedDaemon::start_with_board`), it also reads a synthetic
+  USB census naming one HDC-normal DAYU200 by the fixture's serial, through the
+  production census relations (`Host::with_usb_registry_relations`), so the
+  fake's device is proved the adopted Target's.
+- `gj1_device_leaves.rs` (TASK-XPA-005): GJ-1's device leaves through that
+  daemon, end to end. `target observe` pauses without the board, keeps its run
+  owner-only below the account's local application data, and resumes after a
+  restart with the board (`agent resume --resume-token`). `target observe` and
+  `diagnostics capture` complete, and each Job's calls are the Swift oracle's.
+  The operation's other leaves (`screen capture`, `ui-dump capture`,
+  `ui-dump component-detail`, `debug logs`, `trace capture`) complete there
+  too, over the Trace legs' fake, their device mutations proved against the
+  test daemon's own Job state (`MUTATION_ROOT`).
+  `agent resume --resume-reference` completes an agent execution paused for a
+  person to connect the device, as the Swift human-action oracle's `connect`
+  scenario records it: the oracle's own Job and Artifacts.
+  The oracle's `trust` scenario runs there too: `agent abandon` of an
+  execution paused on the device's trust prompt (a stale generation refused),
+  after which its expired action refuses both `agent resume` and
+  `human-action resume`; and `human-action resume` of a completed execution's
+  action answers it.
+
+Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
+into test builds only. The production Windows daemon composes an HDC only for a
+registered Windows HDC tuple.
+
+A module that binary compiles keeps its unit tests beside it only inside
+`daemon_unit_tests!`. `src/main.rs` expands that block under `cfg(test)`, and
+`tests/spawning` expands it to nothing.
+
+Clippy and the workspace tests are the only checks that compile this checkout.
+`generate-contract.py --check` regenerates the manifest and bindings from the
+checkout and requires no difference; `check-contracts.py` builds its own
+source views. A workspace that does not build, or whose tests fail, passes
+those two.
+
+Hosted CI waits for the inexpensive Rust policy job before allocating native
+hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
+job-owned source path, preserving mtimes only for identical bytes. The cache
+key includes the compiler, runner image, dependency manifests and build flags,
+among them `CARGO_INCREMENTAL`: both native jobs set it to `0`, because each
+compiles a target once and compiler incremental state never survives to
+another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
+of it written per Windows workspace job and 4.0 GB on macOS);
+only successful protected-main runs save it, at most once per UTC day for the
+same compatibility key. Main restores only an exact compatibility match; a run
+off main, which never saves, may fall back to main's newest entry for the same
+host, runner image, compiler, flags and cache root whatever the dependency
+manifests, and Cargo rebuilds what differs. Before saving, CI removes compiler
+incremental scratch state (not linked products, debug symbols or fingerprints)
+and records per-view sizes in `cache-size.json`. A separate successful-main
+workflow retains the newest Rust archive per runner/cache format, plus the
+newest of one other runner image (the image is in clear in the key) while the
+retained Rust archives fit 5 GB, without deleting SwiftPM, Xcode or
+policy-tool entries. Restored Git refs/config are discarded and rebuilt from
+the current checkout. Published and candidate views
+retain separate source directories and Cargo targets. In hosted CI the
+workspace tests and `check-contracts.py` run as two jobs side by side on each
+host, each with its own cache root and therefore its own cache key, so neither
+restores or saves the other's build products. Local checks use
+one chat-owned target through `scripts/run-cargo.py`, retaining it across tasks,
+branches and source snapshots. The same owner lock covers checks and maintenance.
+
+### Local target capacity and shared compilation cache
+
+From the repository root, inspect this chat's cache before collecting scratch:
+
+```sh
+python3 rust/scripts/run-cargo.py cache-stats --max-total-size 20GiB
+python3 rust/scripts/run-cargo.py cache-compact --max-total-size 20GiB
+python3 rust/scripts/run-cargo.py cache-compact --max-total-size 20GiB --apply
+```
+
+`cache-compact` previews by default. With `--apply`, it removes incremental
+scratch only when the reported total exceeds the budget. It uses the existing
+CI compactor for the main target and the published/candidate contract targets,
+including both debug and release scratch. Linked products, dependency outputs,
+debug symbols, fingerprints, source views and validation evidence stay intact.
+The workspace already disables dev incremental compilation and uses line tables
+with no dependency debuginfo; scratch left by older configurations can still
+occupy space. No maintenance command synchronizes sources or invokes Cargo.
+
+The JSON report counts the entire owner cache once, with nested contract targets
+shown as breakdowns, and optionally adds `ARKDECK_CARGO_MBX_CACHE_ROOT` once.
+Counting uses file metadata and never follows internal links. `logicalBytes`
+and `allocatedBytes` differ on APFS; allocated file blocks are not exclusive
+physical usage when files share blocks, and unavailable block counts are null.
+The budget is a collection target, not a quota. `overBudget` and
+`budgetAchievable` report whether retained products prevent reaching it; the
+command never deletes another owner's target or linked products to force a fit.
+The shared-store count is an observation; another chat may be building there.
+
+An optional native macOS arm64 pilot uses
+[mbx 1.22.0](https://github.com/jdx/mr-boxington/releases/tag/v1.22.0) to share
+compiler results while retaining each owner's regular target directory:
+
+```sh
+export ARKDECK_CARGO_MBX=/absolute/path/to/mbx
+export ARKDECK_CARGO_MBX_SHA256=ea4c2ff0fb24c303e6f43467af97d5106f8330ff50a8c517f967ac645430a4ed
+export ARKDECK_CARGO_MBX_CACHE_ROOT=/absolute/external/shared-store
+export ARKDECK_CARGO_MBX_MAX_TOTAL_SIZE=2GiB
+python3 rust/scripts/run-cargo.py check -p arkdeck-contract
+```
+
+Download the official `mbx-aarch64-apple-darwin.tar.gz` asset and verify its
+release checksum before extracting. For v1.22.0, the archive SHA-256 is
+`e548b5758498cf822a180b6328597e6aded8fe9bb3046cd918399172ae30dde2`, and the
+extracted executable SHA-256 is
+`ea4c2ff0fb24c303e6f43467af97d5106f8330ff50a8c517f967ac645430a4ed`.
+The runner checks the executable digest and exact mbx version, and fails on an
+invalid opt-in configuration. The store must be disjoint from the source and
+owner cache. It can be reused by multiple local chats. Build/check/test/clippy/run
+use mbx; fmt, metadata, fetch, policy tools, lockfile generation and `exec` retain
+their existing path. The committed rustup channel, `--locked`, two build jobs and
+native-target guard remain in effect. Child Cargo calls inside `exec` are not
+wrapped by this pilot.
+
+The runner fixes the [mbx collection budget](https://mr-boxington.jdx.dev/configuration#single-cache-budget)
+to 2 GiB by default, with a 5 GiB free-space safeguard. This budget covers mbx's
+managed data, not the runner-owned target. It disables target adoption/lanes,
+incremental state, workspace-path remapping and hardlink restoration. APFS
+reflinks can share output blocks; keep target and store on the same filesystem
+for that benefit. Compiler cache misses still compile normally. Contract test
+targets that embed fixtures from outside the `rust/` workspace may report an
+unmapped path and compile without storing that result; the check still runs.
+The pilot rejects CI environments and disables remote cache access through mbx's local-only
+`write-only` policy; hosted CI keeps its trusted-main cache workflow. Unset
+`ARKDECK_CARGO_MBX` to use ordinary Cargo again; no global setup or PATH change
+is required. No repository-wide cleanup or measured performance improvement is
+implied by enabling the pilot.
+
+On macOS, `scripts/run-workspace-tests.py` compiles the complete default test
+inventory, then asks Cargo to run two queues with the same workspace features.
+Only five audited integration targets with unique temporary roots may overlap
+the conservative queue; fixed-oracle, port and spawning tests remain together.
+New targets default to that queue. Custom harnesses and doctests still run;
+either queue or doctest failure fails the lane. The `rust-test-timings-xcode-27`
+artifact records compilation, queue and doctest durations and complete logs for
+the checkout, and `rust-contract-test-timings-xcode-27` for the published and
+candidate views. With one worker (Windows and Linux CI, and local runs) the
+same script asks Cargo for every default target except the integration tests
+whose crate-level `#![cfg(...)]` is false on this host (`rustc --print cfg`),
+which would build to harnesses that run nothing; a cfg it cannot decide fails
+the run, and every kept target must appear in Cargo's `Running` lines. Clippy
+`--all-targets` still checks every target on every host. Run
+`python scripts/test_ci_execution.py` to verify
+the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
+
+The two added CLI targets (`domain_leaves` and `runtime_service`) use random
+private account roots, Unix sockets and joined fake Runtime threads. They add
+about 20 seconds of work to the shorter queue in the #2295 sample; shared HDC,
+TCP allocation, spawning and deadline-sensitive targets stay conservative.
+No test assertion, deadline or worker limit changes.
+
+Policy installation keeps cargo-deny 0.20.2 and cargo-vet 0.10.2 pinned. On a
+cache miss, cargo-deny comes from its SHA-256-pinned official Linux release.
+Because cargo-vet 0.10.2 has no upstream binary release, a checksum-verified
+artifact from a successful same-repository main push of Swift CI supplies it;
+otherwise CI retains `cargo install --locked --version 0.10.2 cargo-vet`.
+Only main publishes that 30-day artifact, renewing after 21 days. Both tools'
+versions are checked before the unchanged dependency policy checks run.
+
+The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
+`jsonschema==4.26.0`. The repository's unified planner also runs these checks,
+`cargo deny` and `cargo vet`; see [dependency policy](supply-chain/README.md).
+The committed policy combines imported source audits with fifteen bounded publisher
+trust entries and no exemptions. Both dependency checks must pass.
+
+The shared runner checks two independent task-owned source views: current Rust
+against the published inputs read from Git at the merge-base with `origin/main`,
+and current Rust against this checkout's candidate inputs. Each runs clippy,
+the full test suite, native process checks, binary builds and the same
+black-box check. Candidate generation stays in its temporary view; it cannot
+update the committed manifest. Both views replay every recorded shape and
+verify their exact input hashes, directory membership and per-method counts.
+The recorded shape count is in `spec/baselines/swift-single-v1.json`. A change
+that edits a consumed input runs `python scripts/generate-contract.py --write`
+in that same change; `--check` and the corpus parity tests refuse a checkout
+whose inputs and manifest disagree. Nothing compares the manifest with
+`origin/main`, so a merge elsewhere never invalidates a branch, and the
+published view moves only when a branch rebases.
+
+Method schema definitions are checked recursively before values are evaluated,
+including alternatives and absent properties. Unknown keywords, unsupported
+patterns and malformed constraints remain failures even under `oneOf` or `not`.
+The closed vocabulary includes `oneOf`, `const`, `not`, `minLength` and `pattern`:
+`oneOf` requires exactly one match; constants use structural JSON equality;
+`minLength` counts Unicode scalar values and accepts a nonnegative JSON integer
+bound through `u64::MAX`. These follow the relevant
+[JSON Schema assertions](https://json-schema.org/draft/2020-12/json-schema-validation)
+and [applicators](https://json-schema.org/draft/2020-12/json-schema-core#section-10.2.1).
+The only supported patterns are the two exact definitions in
+[`schema_patterns.json`](crates/arkdeck-contract/src/schema_patterns.json):
+lowercase SHA-256 and canonical ASCII decimal from zero through `i64::MAX`.
+They match the whole string, including its end; no general regex engine is used.
+
+The black-box check starts only its own daemon with a unique endpoint and HDC
+configuration removed. It saves the actual outputs, input manifests and provenance
+under `target/readonly-check/<run>/{published,candidate}/`
+and validates schemas after all commands finish and the daemon exits. When the
+checkout's inputs are byte-identical to the published pin, the published view
+is recorded as covered by the candidate view (`publishedView` in
+`summary.json`) and the native checks run once; any drift runs both views. On Unix it
+records every current method, malformed frames and the three CLI leaves. On
+Unix and, through a daemon signed with the host-trusted development signer, on Windows,
+the machine output of `doctor` (plain, `--deep`, `--require-healthy`), `operation list`
+and `device candidates` must equal `tests/fixtures/readonly-machine-output` (recorded
+on the macOS lane) byte for byte once `observedAt` reads as its label; rewrite it with
+`--write-machine-output`. On
+Windows an unsigned build must refuse the actual daemon identity before sending
+frames. Positive installed-daemon authentication and DAYU200 acceptance require
+the [Windows SPK-3 harness](scripts/windows-spk3.ps1) and its real host conditions.
+
+## Try the current host path
+
+Run `cargo run -p arkdeck-agentd` from `rust/`, then in a second terminal:
+
+```sh
+cargo run -p arkdeck-cli -- --output json doctor
+cargo run -p arkdeck-cli -- --output json operation list
+cargo run -p arkdeck-cli -- --output json device candidates
+```
+
+The CLI verifies health on the authenticated connection before the business
+request. It never reconnects to or replays a lost request. On macOS and Unix it
+never starts a daemon (the LaunchAgent manages the installed one); on Windows it
+starts the daemon it needs when that daemon's pipe is absent (decision 11, see
+the Windows paragraph below). A normal
+`doctor` returns its report even when readiness is false; `--require-healthy`
+returns exit 69 for that report. All 30 Catalog operations are unavailable
+because this phase has no operation execution provider. Without a usable HDC
+observation provider, candidates returns a structured refusal, not an empty
+successful snapshot. The wire method is `device.observations`.
+
+`doctor` also names what start-up recovery could not read, as Swift's report
+does (TASK-XPA-014): one `runtime.jobRecordUnreadable` blocker per Job recovery
+set aside, with the reason it gave, and, for a deep report,
+`runtime.durableRecordsUnreadable` counting every undecodable record in the
+index with a bounded sample of their identities
+(`JobStore::unreadable_records`, Swift's `unreadableDurableRecords`, whose
+sample stops at sixteen). Both come before the Catalog's findings, as in Swift;
+recovery already answered the first, and only the deep report reads the ledger.
+`tests/doctor_report.rs` reproduces every recorded report of Swift's `doctor`
+corpus, the one naming an undecodable record included.
+
+`arkdeck commands --output json` needs no daemon (TASK-XPA-018): it answers Swift's
+registry projection (`CLIRegistryProjection`, published as
+`openspec/contracts/cli-command-registry.yaml`) for exactly the leaves this CLI
+serves, from `crates/arkdeck-cli/src/command_registry.json`, which
+`CLIRustCommandRegistryCopyContractTests` holds to Swift's projection.
+`scripts/copy-command-registry.py` refreshes that copy from the published registry
+(`--check` only reports drift).
+`crates/arkdeck-cli/tests/argv_fixtures.rs` replays the argv fixture of every
+served leaf through the parser. The fixtures are the ones the CLI renders for the
+machine-contract bundle (`machine_contracts::argv_fixture`); `tests/machine_contracts.rs`
+holds them byte for byte to the documents Swift publishes, through the digest table
+`tests/fixtures/contracts-bundle/owned.json`. After an export changes the bundle,
+`scripts/refresh-contract-digests.py` rewrites that table from the committed files
+(`--check` only reports drift). The export renders every product of the bundle, and
+`arkdeck maintainer contracts export|check --contracts-directory <dir> --fixtures-directory <dir>`
+writes it, or holds a bundle to it; Swift's export stays the one that publishes it until
+M5. The feature coverage and the App's capability registry read the App's table from
+`crates/arkdeck-cli/src/app_capability_registry.json`, which
+`scripts/copy-app-capability-registry.py` refreshes from the published registry
+(`--check` likewise). TASK-XPA-018's `cli-parity-audit.py` classifies the 256
+coverage entries from the leaves the CLI serves.
+
+The Unix default endpoint is a private development socket under the temporary
+directory, separate from the published Swift socket. Windows uses a local
+logon-scoped named pipe and requires an installed daemon identity. Development
+composition accepts these process-environment inputs:
+
+| Input | Meaning |
+| --- | --- |
+| `ARKDECK_ENDPOINT` | Absolute physical Unix socket path in a `0700` parent, or local `\\.\pipe\arkdeck-*` name. |
+| `ARKDECK_DAEMON_PATH` | Expected installed daemon executable; defaults to the CLI's sibling daemon. |
+| `ARKDECK_DAEMON_SIGNER_SHA256` | Windows development signer: the trusted signing certificate's DER SHA-256, configured from installation evidence. |
+| `ARKDECK_DAEMON_PACKAGE_FAMILY` | Windows MSIX daemon: the exact installed package family. |
+| `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` | Windows production xcopy daemon: the exact subject `O=` of its Artifact Signing leaf certificate. Set together with the next input. |
+| `ARKDECK_DAEMON_PUBLISHER_EKU` | Windows production xcopy daemon: the Artifact Signing certificate-profile identity EKU, `1.3.6.1.4.1.311.97.<profile>` (never the shared Public Trust marker `1.3.6.1.4.1.311.97.1.0`). |
+| `ARKDECK_HDC_PATH` / `ARKDECK_HDC_SHA256` | Exact existing tool selection; both are required and the platform tuple must already be registered. |
+
+Every Windows form keeps the pipe-owner SID check and the server PID → image
+path → held-handle file identity check; the inputs above only choose what vouches
+for that image (maintainer ruling 17, 2026-09-30). The MSIX daemon is pinned by
+its package family. The xcopy daemon signed by Azure Artifact Signing, whose leaf
+certificates are renewed daily and valid for 72 hours, is pinned by publisher
+identity: `WinVerifyTrust` accepts it (generic Authenticode policy, whole-chain
+revocation from cache only), its chain ends at Microsoft Identity Verification
+Root Certificate Authority 2020 (DER SHA-256
+`5367f20c7ade0e2bca790915056d086b720c33c1fa2a2661acf787e3292e1270`, compiled
+into `arkdeck-platform/src/windows/publisher.rs` with its update path), and the
+leaf's single `O=` and its identity EKU equal the two publisher inputs. The
+development signer keeps its certificate-hash pin. Any one configured pin that
+holds admits the image; none configured, or a publisher identity with only one
+of its two inputs or a malformed value, refuses with zero frames. No input skips
+the check.
+
+These are local host configuration, never control request fields or capability
+authority. An arbitrary configured hash cannot register a Windows HDC tool.
+On Windows, the one registered tuple is DevEco Studio 26.0.0.43's `hdc.exe`
+(CHG-2026-078, `c2`, `3.2.0g`; `WINDOWS_HDC_TUPLES`). A development root starts
+it as its managed server (`ARKDECK_DEVELOPMENT_HDC_PATH` with
+`ARKDECK_DEVELOPMENT_HDC_SERVER=managed`). The account daemon does not select
+it yet: the Windows tool-selection owner is not composed. Registering another
+Windows tool needs its own Windows tool and output provenance and a separately
+scoped integration change; see the
+[delivery record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/xpa-002-readonly-foundation.md).
+On macOS, `ARKDECK_RUNTIME_COMPOSITION=production` selects the
+[production composition](#macos-production-composition-task-xpa-017-not-activated)
+instead, which refuses `ARKDECK_ENDPOINT` and `ARKDECK_HDC_SHA256`; nothing sets
+it before the M5 cutover.
+
+On Windows the daemon owns a state root and stops and drains like the Unix
+daemon (TASK-XPA-002 S5, `crates/arkdeck-agentd/src/windows_lifecycle.rs`).
+Without input it is the account's daemon over `%LOCALAPPDATA%\ArkDeck\Agentd`,
+resolved with `SHGetKnownFolderPath(FOLDERID_LocalAppData)` for its own token
+(the variable is not read) and created owner-only (owner and a protected DACL of
+the user SID and SYSTEM); `cargo run -p arkdeck-agentd` therefore creates that
+directory. An existing `ArkDeck` or `Agentd` directory whose DACL grants anyone
+but the user and SYSTEM anything (or has no DACL) refuses the start; its access is
+never rewritten. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
+user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
+text) instead; beside the lifecycle only the
+[Target owners](#windows-target-owners-task-xpa-004) and the workspace
+project owner ([Workspace provider](#workspace-provider-task-xpa-015)) are
+composed over either root, and every input from which
+the isolated macOS owner composes an owner (development HDC, USB relations,
+code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
+inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
+keeps the read-only foundation over a private pipe that owns no state root, as
+the black-box check runs it. Before anything else is created or probed, a
+daemon with a root takes, in order: the single-instance guard, a named mutex
+`Local\ArkDeck.Agentd.<user SID>` (`Local\ArkDeck.Agentd.Dev.<user SID>.<root
+file id>`) with the same owner-only DACL, refused if an existing object is not
+the user's; the owner lock, `LockFileEx` on a byte far beyond the end of
+`instance.lock` (`.owner.lock` in a development root); its stop event
+`<guard>.Stop.<pid>`; and its pipe with `FILE_FLAG_FIRST_PIPE_INSTANCE`
+(`\\.\pipe\arkdeck-agentd-<logon SID>`, or `…-dev-<logon SID>-<root file id>`,
+which an `ARKDECK_ENDPOINT` beside a development root must equal). It then
+reports the `instance.json` its predecessor left (`previous instance: pid …,
+started …`) and replaces it atomically (a POSIX-semantics rename) with its own,
+in Swift's shape. A second start over a held root answers `already running`
+from that document and exits 0. The guard is in the session namespace: a
+`Global\` mutex needs no privilege (only a `Global\` file mapping does), but it
+could be squatted by any other account, and the exclusion across the logon
+sessions of one account is already the owner lock's, which the kernel releases
+when its holder dies. The daemon stops for its stop event (set by
+`InstanceScope::request_stop`, SIGTERM's counterpart; only the user can set it)
+or a console Ctrl+C or Ctrl+Break, and drains as on Unix: the pipe closes, the
+frames being answered finish, then every open connection is ended, within one
+20-second deadline. After a complete drain it releases the owner lock and then
+the guard, on the thread that took it, and prints `arkdeck-agentd stopped`; one
+the deadline cut short exits holding them. A successor that finds the guard
+abandoned (`WAIT_ABANDONED`, its holder died with it) says so and starts as the
+start after a crash that every start already is; nothing is replayed.
+`tests/windows_lifecycle_process.rs` drives these over development roots.
+
+The Windows daemon is started by its client and is single-instance (CHG-2026-074
+r12 decision 11; TASK-XPA-002, `crates/arkdeck-client/src/start.rs`, the
+implementation choices proposed for maintainer review in the
+[run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/client-started-daemon-run.md)).
+Before a command sends anything, the CLI resolves the daemon it may start: the
+account's (no `ARKDECK_ENDPOINT`), or a development root's
+(`ARKDECK_DEVELOPMENT_STATE_ROOT`, reached on the root's own pipe; an
+`ARKDECK_ENDPOINT` beside it must be that pipe). A private `ARKDECK_ENDPOINT`
+names a daemon no client starts. Only when that pipe is absent does the client
+take the starters' turn (a named mutex `<guard>.Start` beside the guard, so
+concurrent starters launch one daemon), look at the pipe again, and launch the
+pinned image (`ARKDECK_DAEMON_PATH` or the CLI's sibling). Before launch it checks
+that file: a trusted Authenticode signature that satisfies a configured signing
+pin, the pinned certificate or the publisher identity (maintainer ruling 17). A
+package family can only be proved on a running process. With no identity
+configured, or a publisher identity with only one of its two inputs, nothing is
+launched. The image is held against replacement while it is launched
+detached: `DETACHED_PROCESS`, no console window, no inherited handle and no
+standard streams, the image alone as its argument array, in its own directory,
+with the caller's environment minus `ARKDECK_ENDPOINT`. The client waits up to 20
+seconds for the pipe. It then makes the same check every connection makes: the
+pipe owner SID and the server process's image path and signer pin, publisher
+identity or package family. A process that fails that check is reported with the PID this client
+started (`runtimeUnavailable`, `details.daemonStart.outcome` `identityRefused`)
+and is never trusted. A daemon that finds the root held exits `already running`,
+and the holder's pipe is used. No frame is sent while starting, and a request
+lost later is never replayed. Nothing starts a daemon again within a command.
+
+`runtime service status|verify|restart` are the Windows forms of the LaunchAgent
+leaves (`crates/arkdeck-cli/src/runtime_service_windows.rs`). They use the macOS
+envelopes and exit statuses, with `daemonService` where macOS has
+`launchAgent`. None of them starts anything except restart's successor.
+`status` reports the installed image (`daemonImage`), the state root (its kind,
+path, presence, and `accessFindings`: grants to anyone but the user and SYSTEM)
+and the pipe. It also reports the daemon's `health` over a verified connection
+when the pipe exists.
+
+`verify` succeeds (`runtimeVerified: true`) when the image is the pinned one and
+the account's root is absent (the first start creates it owner-only) or
+owner-only. A daemon that runs must also prove its identity and answer `health`
+(`runtime`, else `null`). Otherwise the document comes with exit 69. `--job`,
+`--target` and `--execution-id` are `unsupportedOnPlatform` for now.
+
+`restart` refuses a service that is not ready or has no running daemon (69) and
+current Jobs as macOS does (75). A daemon that composes no Job owner has none.
+Otherwise it sets the running daemon's stop event and waits, within
+`--maximum-wait-seconds` (default 30), for its single-instance guard. It then
+starts the successor through the client start path and proves a new PID, the
+same catalog digest and the same closed Jobs (`restartProof`). A drain its
+deadline cut short leaves the guard abandoned: `restart.drain` says
+`deadlineElapsed`, the guard stays abandoned, and the successor starts as after
+a crash.
+
+`install`, `update` and the `agentd` spellings stay macOS-only. `uninstall`
+stops the client-started daemon through its stop event and answers
+`arkdeck-windows-daemon-uninstall/v1`; the installed files are the
+package's to remove (#2411).
+`tests/windows_client_start_process.rs` (in `arkdeck-agentd`) and the CLI's
+`tests/windows_runtime_service.rs` drive these. The signed paths use a copy of
+the daemon signed with the host-trusted development signer
+(`ARKDECK_DEV_SIGNER_THUMBPRINT`, `scripts/windows-dev-identity.ps1`) and are
+skipped, saying so, without one.
+
+## Isolated macOS History owner
+
+The Rust daemon directly serves `history.filter.list/save/delete` when
+`ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing physical `0700` directory and
+`ARKDECK_ENDPOINT` is directly inside it. The root must be separate from installed
+ArkDeck state. This mode refuses Swift pairing and HDC configuration, and a kernel
+directory lock prevents a second daemon. An interrupted daemon can restart on the
+same endpoint; saved generations persist. Installed Runtime ownership is unchanged.
+
+Use the existing CLI leaves against that endpoint:
+
+```sh
+cargo run -p arkdeck-cli -- --output json history filter list
+cargo run -p arkdeck-cli -- --output json history filter save --expected-generation 1 --search build
+cargo run -p arkdeck-cli -- --output json history filter delete --expected-generation 2
+```
+
+The same development Runtime serves `runtime storage status`, `runtime storage
+policy --expected-generation <n> --total-quota-bytes <bytes>
+--safety-margin-bytes <bytes> --retention-days <days>`, and `runtime storage root
+--expected-generation <n> --root <existing-private-directory>` (or `--default`).
+It owns `session-state/session-storage.json` and the `sessions` retention catalog.
+Custom Session roots must stay inside the development root and disjoint from
+state and immutable Artifacts. Artifact indexed usage is verified before Session
+configuration mutation, including retained payload identity and SHA-256. Unknown Session bytes
+remain visible as incomplete measurement; corrupt or lost initialized catalogs
+are preserved for inspection. A storage request waits for the storage lock
+(`session-state/.session-storage.lock`) and for the selected root's retention
+catalog lock, as Swift's `RuntimeSessionStorageStore` and
+`SessionRetentionCatalog` do: one made while a Session publication or another
+request holds either is answered once it is released. So do the Session
+resources, export and cleanup below. A cleanup takes the Job owner's activity
+guard, for its census of active Sessions, only under the storage lock, which it
+waits for first (`SessionStore::preview_cleanup` with an `ActiveSessions`):
+nothing that holds that guard waits for the storage lock, so the two never wait
+for each other (`session_owner::cleanup::lock_order_tests`). Swift takes its
+census as a snapshot before the storage lock; this Runtime keeps the guard
+through the removal, so no Job becomes active between the census and it.
+`storage_lock_wait_oracle` replays Swift's answers. Artifact publication and
+installed activation are still pending migration.
+
+Run `python3 rust/scripts/check-session-owner.py` after building the binaries for
+actual socket/CLI, nonempty Session census, restart/CAS, requests made while the
+storage lock is held, pin retention, damaged catalog, isolated-root refusal and
+corrupt-payload-before-mutation checks. Its fixtures are explicitly simulated host
+data and provide no device evidence.
+
+The isolated owner also serves `session list [--page-size <n>] [--cursor <cursor>]`,
+`session show --session <id>`, and `session pin|unpin --session <id>
+--expected-generation <catalog-generation>`. Catalog generations can start at
+zero; they are distinct from the storage configuration generation. Repeating an
+already satisfied pin state does not advance the catalog. A stale generation or
+an incomplete whole-root measurement prevents pin publication. A first `list`
+page takes the storage lock before its snapshot pager, as Swift's does, and a
+cursor's page reads its snapshot under no storage lock, so a first page waiting
+for the lock holds up no cursor.
+
+Pages are immutable private snapshots with query-bound cursors and bounded
+retention (32 snapshots, 64 MiB total, 16 MiB per snapshot, 1 MiB per page). They
+survive restart and active-root changes. A reclaimed cursor fails explicitly;
+it never rescans. Ordering uses the published completion timestamp, with Session
+ID ordering for ties, so hidden fractional seconds cannot create an invalid page.
+`python3 rust/scripts/check-session-resources.py` verifies the actual owner and CLI;
+`--cli-path Packages/ArkDeckKit/.build/debug/arkdeck` checks the current Swift CLI
+against the same Rust owner.
+
+The same isolated daemon also serves these existing commands:
+
+```sh
+arkdeck session cleanup preview
+arkdeck session cleanup apply --preview-id <id> --preview-digest <sha256>
+arkdeck session export preview --session <id> --destination <new-directory>
+arkdeck session export apply --preview-id <id> --preview-digest <sha256>
+```
+
+Export preview excludes raw/partial Artifacts by default; add `--allow-sensitive`
+only to the preview when those bytes are intended for export. Apply binds that
+choice to the exact preview tuple, revalidates source and destination, and
+publishes into a new directory without replacing an existing destination.
+Completed retries return the stored result. An uncertain publication remains
+non-replayable across restart. Source Sessions are preserved.
+
+Cleanup preview shows the quota plan, including pinned/active protection, and
+refuses incomplete inventories. Preview and apply require the Job owner's activity
+guard directly through the configured `JobStore`. An absent or unreadable Job
+inventory never means an empty active set. Both manifest Session identities and
+`session-{jobId}` associations are protected. An unindexed or unsafe Job directory
+refuses cleanup; indexed durable history is retained until its outcome can be
+interpreted by the migrated Job owner.
+The guard remains held through exact preview comparison, applying-intent publication,
+descriptor-relative deletion, catalog reconciliation and durable result publication.
+A stale preview refuses before deletion. An interrupted applying record returns
+`outcomeUnknown` across restart and never replays; completed retries return the stored
+receipt. The process harnesses
+`rust/scripts/check-session-export.py` and `rust/scripts/check-session-cleanup.py`
+exercise the real daemon/control/CLI paths with newly created host fixtures;
+both accept `--cli-path` to check the current Swift CLI consumer.
+
+Use the generation actually returned by `list`. Conflicts require a fresh read;
+lost mutation replies report `outcomeUnknown` and are never automatically replayed.
+No old state is imported, rewritten or removed. Current response schemas include
+saved filters, tombstones, nullable identities and the existing owner error codes.
+From the repository root, `python3 rust/scripts/check-history-owner.py` checks the
+real daemon/CLI, restart, concurrent CAS, cross-process lock contention and unsafe
+records in disposable host roots. Candidate contract CI includes this check.
+
+The isolated macOS Runtime also serves `runtime tool inspect --tool <reference>`
+and `runtime bundle inspect --bundle <reference>`. Tool references include the
+existing HDC and DevEco toolchain families. The host opens existing Bootstrap
+indexes below its fixed `bootstrap` directory and rechecks native content under
+the shared registry lock. Reads preserve indexes, retained bytes, quarantine and
+selection; execution assessment remains `notPerformed`. Session root selection
+excludes the Bootstrap directory.
+
+The CLI uses the authenticated client boundary and validates the exact requested
+identity and returned projection. It cannot pass registry paths. The additive
+Swift RPC producers supply actual recording-backed contracts, regenerated into
+the manifest by the same change.
+The isolated Rust owner also accepts `runtime tool register --kind deveco --root
+<installed-app-Contents>`. It verifies native signed content without executing it,
+then publishes the existing Swift registry format under the shared Bootstrap
+lock. Re-registration preserves the reference and metadata; uncertain publication
+returns `outcomeUnknown` without replay. The current Swift registration CLI uses
+the typed RPC for DevEco. Rust HDC registration through the same typed method
+merged in PR #1860 (`d00e4ec`); the Swift HDC registration path remains in process.
+`runtime tool select` is parsed and checked as Swift's CLI does and answered as
+Swift's daemon answers it without a tool-selection owner (below); the selection
+writes themselves and installed activation remain pending.
+
+The existing `runtime tool list` and `runtime tool remove` leaves now use typed
+Runtime calls in both CLI consumers. The Rust owner merges HDC and DevEco
+inventory into immutable `toolRef:asc` pages, validates current native content
+before continuation, and preserves restart/cursor behavior. Retirement accepts
+an exact reference and expected generation `1`, rejects retained references,
+keeps content unchanged, and returns the same generation `2` receipt on repeat.
+A missing or inconsistent publication receipt is `outcomeUnknown`, with no replay.
+Run `rust/scripts/check-tool-list.py` and `rust/scripts/check-tool-retirement.py`
+with the configured Python interpreter against candidate binaries. Both use
+fresh temporary registries; `--native-registry` copies an explicit temporary
+Swift-produced registry to cover DevEco alongside HDC, and `--cli-path` selects
+the Swift consumer. These checks do not activate the installed Runtime. Every
+isolated host check (`check-*-register.py`, `check-*-list.py`,
+`check-*-retirement.py`) works in one fresh `/private/tmp` run directory of
+daemon logs, frames and reports (`rust/scripts/run-directory.py`): a passing run
+removes it, a failed run keeps it and names it on stderr, and `--keep-run-dir`
+keeps a passing run's directory too, for example to read its registry back
+natively.
+
+For an explicit native macOS check, build the candidate binaries in release mode
+and run `python3 rust/scripts/check-deveco-register.py --bin-dir <release-dir>
+--source-root /Applications/DevEco-Studio.app/Contents`. The harness works in a
+fresh temporary registry, kept only after a failure or with `--keep-run-dir`,
+checks restart/idempotence and verifies that installed
+Bootstrap metadata and source content remain unchanged. `--cli-path <swift-cli>`
+checks the Swift registration consumer against the Rust owner. Missing native
+content is reported as SKIP; this is separate from portable contract CI and is
+not device acceptance.
+
+The Swift `ArkDeckBootstrap` target and its owner comparison test are deleted
+(TASK-XPA-017), and with them the `tool_registry_read` comparison example; the
+recorded registry oracles live on as the Rust replays above.
+
+The macOS `ArtifactReadStore` library lists, inspects and reads existing Job
+Artifact publications with full-payload digest verification and bounded range
+allocation. Typed inspect/read result conversion matches actual Swift producer
+recordings, including missing content and observation windows. It preserves the
+frozen index format and never writes verification caches. The current
+`artifact.inspect` and `artifact.read` RPC handler requires a successful Job-owner
+snapshot callback before touching content. The Rust CLI uses the existing
+`artifact inspect|read --job <id> --artifact <id>` commands; reads first inspect
+metadata, then bind one bounded range to its owner, digest, length and offset.
+`--allow-sensitive`, `--raw` and a bounded `--timeout` preserve the current CLI
+behavior. The development Host composes the Job read owner and refuses requests
+when it is unavailable; import leases, Artifact writes and installed owner cutover remain
+pending. `python3 rust/scripts/check-artifact-read-owner.py` runs the read-library
+checks; `cargo test -p arkdeck-cli --test artifact_resources` checks current
+producer metadata, argv, raw encoding and failure classifications.
+
+The isolated development composition also answers `artifact.quota` (TASK-XPA-013)
+as a Swift daemon answers it before it has cached a total: `artifact_quota.rs`
+classifies every Artifact root entry first (the Import owner's directory and a
+regular cleanup ledger are skipped, any other directory is a Job, anything else
+refuses), reads each Job's index as Swift `loadIndex` does (an absent or dangling
+index has no rows), decodes it as Swift's synthesized `Codable` does (unknown
+members ignored, Swift's `DecodingError` descriptions), and checks each row's
+identity and each published payload's type, size and digest in order. Every
+refusal is `internalError` with Swift's rendering of the store error. Unlike
+Swift, which reseals a payload that is not `0400` and writes its verification
+caches while it hashes, the Rust read writes nothing, and it keeps no total
+between reads. `arkdeck artifact quota` sends the method without parameters, as
+Swift's CLI does. `rust/tests/fixtures/artifact-quota/` is the oracle Swift
+`ArtifactQuotaOracleContractTests` records over 27 roots its store writes in
+temporary directories (re-record with
+`ARKDECK_RUST_ARTIFACT_QUOTA_RECORD=/private/tmp/<new>`); `tests/artifact_quota.rs`
+reproduces every answer and leaves every root untouched, and
+`scripts/check-artifact-quota.py` compares a fresh Swift daemon and a fresh Rust
+owner, and both CLIs, over each root. The Windows daemon answers it as the
+macOS one does, from its storage owner's `ArtifactUsage` (TASK-XPA-005) over
+the Artifact root, with the same walk;
+only the reads under it go through the host store, which follows no reparse
+point and requires the owner-only single-link payload the Windows Artifact
+owners read. `tests/windows_artifact_quota.rs` rebuilds the 27 oracle roots on
+NTFS (links as junctions, `0000` as an empty DACL) and reproduces every answer,
+with the host's error number in a message.
+
+Before it serves, the isolated daemon sweeps its Artifact root once, as Swift's
+daemon runs `collectGarbage` at startup (`collect_expired_artifacts`,
+`artifact_retention.rs`). Outside the Jobs it keeps, a row whose deadline has
+passed (`deadline <= now`, parsed as Swift parses it) and that is not pinned is
+removed from its index first, then its payload is unlinked; a pinned or
+undated row never goes, and nothing is evicted for quota. The sweep keeps more
+than Swift does, never less: every Job the Job owner's census cannot prove
+settled (`job_retention_census.rs`: not terminal, of unknown outcome, or a
+terminal record or journal that does not verify), every Job the cleanup ledger
+says still owes a cleanup, and each exact Artifact an active Job names as an
+input lease. It prints `reclaimed N expired artifact(s)` when it reclaims
+anything, and a failure (an unexpected root entry, a payload that no longer
+verifies, an unreadable census or ledger) is printed and never stops the
+daemon. `tests/artifact_retention.rs` and `agentd/tests/artifact_retention_process.rs`
+check it over real Job owners and a real daemon.
+
+A Job product is published in three steps: its payload under the derived name,
+the payload sealed owner read-only, then the whole index rewritten. A process
+killed after any of them leaves a consistent index, naming the product with its
+sealed, verified bytes or not at all, and a quota that counts only what the
+index names (`tests/artifact_publication_process_death.rs`, a real analyzer Job
+run in a child process and SIGKILLed at each step through
+`ArtifactReadStore::open_with_fault`). A retried publication recovers a payload
+left before its index, sealing it first as Swift's `validateStoredPayload` does.
+
+## Contract and ownership boundaries
+
+The isolated macOS host serves `trace cache status` and `trace cache purge` from
+its fixed `trace-cache/traces` directory, with private staging in the sibling
+`trace-cache/staging`. Inventory reports actual byte counts and respects the
+existing key locks and entry leases; unaccounted entries remain active.
+Purge also requires existing owner evidence and a complete guarded Job and
+Artifact census. Unreconciled Job history, any retained Artifact namespace or
+file, and any upload record, identity or payload in the Import namespace
+preserve all cache entries and private residuals; the Import owner's idle
+`.imports-v1` skeleton alone does not. Unsafe or unreadable owners refuse
+maintenance before any deletion. The Artifact census reads the whole store,
+each directory listing bounded at 100 000 entries and the store as a whole not
+at all. Artifact writers take only the census's lock, so a large store slows a
+purge and never refuses a publication.
+An inactive census permits only inode-bound
+derived cache quarantine/removal under the existing leases. Original Trace
+Artifacts remain untouched. Callers cannot pass a cache path, Session root
+selection excludes the entire cache parent, and uncertain CLI results never
+replay purge. Database preparation and installed cache ownership remain pending.
+The paired native receipt requires ArkTrace with the directory-hinted owner
+target fix (ArkTrace PR #25); the previously pinned `e6e3133d` skips every
+Ready entry, so parity checks against it record that mismatch rather than pass.
+
+On Windows (TASK-XPA-021) the same owner (`TraceCacheStore`, `trace_inventory`,
+`trace_maintenance`) runs on NTFS over `arkdeck_platform::PreparedTraceRemoval`'s
+Windows port: every entry opened relative to its held parent without following
+a reparse point, the quarantine a POSIX rename that never replaces an entry,
+each removal deleting through a handle whose identity was just compared with
+the capture. NTFS refuses to rename a directory while a handle is open inside
+it, so the quarantine lets go of the moved tree's handles for the rename and
+opens them again, each required to be the captured directory; for the same
+reason a prepared tree's ancestors cannot be moved away meanwhile. The Windows
+daemon composes the owner over `trace-cache/traces` in a development root and,
+for the account, over `%LOCALAPPDATA%\ArkDeck\Trace	races` (beside its
+`staging`), the counterpart of the macOS App's `Caches/ArkDeck/Trace`, which
+the daemon creates owner-only because the App, the daemon and the CLI share
+one physical `%LOCALAPPDATA%` (ruling 8; the account-location decision in
+`runs/TASK-XPA-005/windows-account-locations-run.md`); `trace.cache.status`
+answers there, and `trace.cache.purge` purges as on macOS, while the Job
+owner holds its active-Session census and the Artifact owner its Trace
+retention census (TASK-XPA-018, `runs/TASK-XPA-018/windows-non-hdc-leaves-run.md`).
+`trace export` is the
+Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
+it; the daemon's Job store proves the Trace's Job first, and refuses a Job it
+does not hold (`resourceNotFound`).
+
+Run `python3 rust/scripts/check-trace-cache-owner.py` after building the binaries
+to check real RPC/CLI status and purge, retention, lease contention, restart,
+namespace refusals and original Artifact preservation.
+Use `--cli-path Packages/ArkDeckKit/.build/debug/arkdeck` for the current Swift
+CLI consumer. The harness uses only temporary host fixtures. For a current
+native owner/metadata fixture, run `produce-trace-maintenance-fixture.py` against
+the pinned SwiftPM objects during the coordinated native build window, then
+pass its new directory using `--native-fixture`. The producer uses synthetic
+database bytes, retains provenance, and compares the complete Rust purge receipt
+with the paired native ArkTrace receipt; it does not establish parser or device
+acceptance.
+
+`arkdeck-contract` contains generated schemas, strict framing, canonical encoders
+and digest functions. It also compiles in the shared Job-state preflight table
+(design §G.4; `spec/recovery/job-state-preflight.json`, whose copy Swift's
+`JobStatePreflightTableContractTests` records under
+`rust/tests/fixtures/job-state-preflight/`) and its two classifiers:
+`classify_restart`, `runtime service restart`'s carry-over of current Jobs as
+Swift's `RuntimeCLI.classifyAgentdRestartCurrentJobs` decides it (replayed on that
+oracle), and `cutover_preflight`, the M5 preflight over a state root's Jobs, agent
+executions and capability uses. The Rust CLI's `runtime service restart` calls
+the first; `arkdeck-agentd --cutover-preflight` decides with the second.
+`arkdeck-control` has transport-free observation and local-resource handlers.
+`arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
+code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
+boundary and holds the HDC typed actions of the device operations, which the
+Job engine in `arkdeck-hoststore` lowers its device steps through. Its closed
+Debug template lowering reads the template definitions from `arkdeck-contract`,
+their single source, which `arkdeck debug template list` also discloses.
+`arkdeck-client` owns same-connection health and refusal handling;
+`arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
+`arkdeck-provider-workspace` is the workspace provider's signing and credential
+layer and depends only on `arkdeck-platform`. `arkdeck-provider-arkforge` is the
+ArkForge lane: it launches and pairs `arkforged` through the platform crate,
+reads its release bundle through `arkdeck-contract`, and reaches it only
+through ArkForge's own `arkforge-client`; no other crate depends on an ArkForge
+crate. `arkdeck-bootstrap` owns the current-user Bootstrap registry's bundle and
+HDC tool files (`…/ArkDeck/Bootstrap/v1`: the two indexes, their content checks,
+registration, retirement and the HDC selection ledger) under the store's one
+lock, over `arkdeck-contract` and `arkdeck-platform` only; every writer of that
+store uses it — the CLI's zero-Runtime `runtime service install` and its
+`uninstall` among them — and `arkdeck-hoststore` composes the Runtime's paged
+inventories and the DevEco registry over it.
+`arkdeck-rockchip-binding` owns the Rockchip product binding's file
+(`rockchip-binding.json` under its one lock) and the DAYU200 USB personalities,
+over `arkdeck-contract` and `arkdeck-platform` only; the Runtime's binding
+owners and the CLI's zero-Runtime `flash install-binding` write that file
+through it, `arkdeck-hoststore` keeps what a binding's evidence means, and
+`arkdeck-provider-hdc` re-exports the personalities.
+The black-box check also verifies these dependency edges.
+
+The macOS cleanup path retains each signal error and the owned child PID while
+waiting for the existing terminal-child and complete process-group proof. It
+resolves a transient `EPERM` only within the cleanup budget and before reaping;
+unproven groups, other signal errors and lost child ownership remain failures.
+
+The manifest lists every registry method. Methods without a migrated host
+handler are structurally understood and refused.
+There is no Runtime capability owner, recovery, journal writer, durable target store,
+device mutation, flash lowering, Swift replacement or production cutover here.
+Unknown or incomplete outcomes never acquire invented zero-dispatch evidence.
+
+Catalog generation preserves the same canonical source bytes and SHA-256 as
+Swift. The CLI canonical encoder preserves the current Swift vectors, including
+its existing binary64 spelling below `1e-4` and above the Int64 fast path. Swift
+currently emits `1e-6` and `1e+20` where RFC 8785 would use decimal notation.
+Native Swift boundary vectors pin that known difference; this phase does not
+claim universal RFC 8785 conformity or change Swift semantics independently.
+The generated manifest records every consumed schema, corpus, source and fixture
+digest of this checkout. `generate-contract.py --check` regenerates the manifest
+and bindings from the working tree and verifies both are byte-identical; it
+consults no other commit. `check-contracts.py` reads the published inputs from
+Git at the merge-base with `origin/main` and must pass against them and against
+the checkout's current inputs. Unsupported schema vocabulary, stale Catalog
+output and native Swift oracle source drift remain failures. A candidate
+manifest is always marked `candidate` and names its source revision, input
+digest and published base commit; the committed checkout manifest names no
+commit, because it cannot name the one it is part of. No runtime protocol
+negotiation or version fallback is added.
+
+Updating the manifest is `python scripts/generate-contract.py --write` in the
+change that edits an input. Keep `origin/main` available locally so
+`check-contracts.py` can find the merge-base. Generation and host conformance
+remain separate from actual device acceptance.
+
+The Rust read-only CLI also accepts `operation describe|example --operation <reference>`
+and `job status|show|evidence|timeline --job <id> [--timeout <duration>]`,
+plus `job list` with current pagination and string filters. It consumes current Runtime
+facts, validates the returned identity/publication/nextAction relationships and
+preserves uncertain outcomes. The Rust control owner serves descriptors from the
+compiled Catalog while retaining actual Provider availability. Job reads share one total
+deadline; timeline returns one validated page and evidence retains the Runtime
+verification status and its 0/75/2 exit code. These additions do not retire
+the Swift CLI.
+
+The macOS development daemon reads the frozen v1 SQLite Job index through a
+serialized, bounded connection. `job list`, `job status`, `job show`, and
+`job timeline` use immutable paged snapshots. Artifact inspect/read first resolves
+the Job from this owner; orphan artifact directories do not establish ownership.
+Session cleanup preview/apply hold the complete Job activity census and retain
+parked unknown outcomes and uninterpreted durable history. This read phase refuses unsupported optional authority and
+recovery fields until their validators are ported. It does not admit or execute
+Jobs, alter existing SQLite records, or recover journals.
+
+`rust/scripts/check-job-read-owner.py` compares actual Rust daemon and CLI results
+with explicitly generated temporary Swift Job/Artifact fixtures and verifies
+restart persistence and a second owner refusal. The fixture-producing contract
+tests are `testRustJobOwnerCurrentSQLiteFixture` and
+`testRustArtifactOwnerCurrentFixture`; set `ARKDECK_RUST_JOB_FIXTURE_OUTPUT` or
+`ARKDECK_RUST_ARTIFACT_FIXTURE_OUTPUT` to a new temporary output path.
+
+## Portable host text and calendar (TASK-XPA-004)
+
+The Foundation owners' text and date primitives in `arkdeck-platform` answer
+the same way on every host, from pinned data rather than the host's own
+Unicode or calendar services (Win32 NLS, ICU or the Rust standard library,
+whose versions follow the operating system), and as CoreFoundation answers
+on macOS:
+
+- `host_control_character`, `host_alphanumeric`, `host_whitespace_or_newline`
+  and `host_canonical_text` (NFC) read Unicode 17.0.0 tables generated by
+  `scripts/generate-host-text-tables.py` from `UnicodeData.txt` and
+  `CompositionExclusions.txt`, pinned by SHA-256 (`--check` confirms that
+  `host_text_tables.rs` has not drifted). The generator applies the
+  differences CoreFoundation was recorded to have (Todhri unassigned, Tangut
+  ideographs not alphanumeric, U+200B white space, six Unicode 16 composites
+  never formed from parts), and `host_canonical_text` keeps CoreFoundation's
+  leading byte-order-mark drop and its limit on starters joining starters.
+- `host_gregorian_seconds`, `host_gregorian_timestamp` and
+  `host_gregorian_add_days` are Foundation's Gregorian calendar in UTC:
+  Julian before 1582-10-15, the year counted within its era, nothing before
+  Julian day 0.
+- `host_legacy_iso8601` accepts the shape the legacy `ISO8601DateFormatter`
+  writes (`yyyy-MM-dd'T'HH:mm:ss` then `Z` or `±hh:mm`) with Foundation's
+  field rules inside it. Spellings the formatter never writes but its ICU
+  parser also takes (one-digit fields, other digit scripts, `GMT`, trailing
+  text) are refused, so a registry holding one fails closed.
+
+The CoreFoundation implementations they replaced stay in the crate as the
+macOS tests' oracle (`host_*_foundation.rs`, test builds on macOS only): every
+scalar for the character sets, NFC and NFD, the composition and reordering
+sequences, the calendar across the cutover, the eras and seeded instants, and
+the formatter's shape. With them portable, the CLI's display-name, hilog and
+trace-inspection checks, the History and display-name decoders, Swift
+`String` comparisons (`swift_decoding::same_text`, strict JSON member names),
+the Session timestamp decoder and the Bootstrap tool and Bundle registries'
+registration times read the same data on Windows and Linux as on macOS; none
+keeps a non-macOS fallback. Unicode's `NormalizationTest.txt` for the pinned
+version runs with `ARKDECK_NORMALIZATION_TEST=<path> cargo test -p
+arkdeck-platform -- --ignored`, skipping the lines the recorded differences
+change.
+
+## Job event metadata reader
+
+The isolated macOS Job owner serves `job.events`; the Rust CLI accepts
+`job events --job <id> [--page-size <n>] [--after-cursor <cursor>]` with a bounded
+optional timeout. It validates the current nineteen closed Journal event kinds
+and returns metadata only. Unknown fields, corrupt complete lines, replaced
+inodes, malformed sequences and forged cursors are refused. An interrupted final
+append becomes visible only after its complete line is published.
+
+The existing `jec1` AES-256-GCM cursor format binds the Job, inode and generation,
+origin, predecessor and high-water offsets. Swift and Rust can resume each
+other's actual cursors on the same source-created journal; cursors survive daemon
+restart without rewriting Journal or SQLite records. A private 32-byte cursor
+key is created durably only for a first page; resuming without it refuses. These
+cursors confer no Runtime execution or recovery authority. Reads are bounded to
+16 MiB per record, 64 KiB buffers, 1 MiB per page and at most 1,000 events.
+
+`rust/scripts/check-job-events.py` accepts an explicit private temporary Swift
+fixture and verifies actual daemon/CLI paging, cursor forgery refusal, restart
+and unchanged Journal, SQLite and key bytes. The six additional publisher-trust
+entries use only the user-authorized fixed releases and their publication days;
+see `supply-chain/README.md`. Journal writes, watch/wait CLI behavior, full stored
+Job authority validators and installed owner cutover remain pending.
+
+## Job journal writer (TASK-XPA-014)
+
+`arkdeck_hoststore::JournalWriter` appends to a Job directory's current
+`journal.jsonl` with the Swift journal's discipline: every append holds the
+directory's `.manifest.lock`, refuses after terminal `manifest.json`
+publication, stays bound to the journal inode it opened, validates the record
+with the closed per-event decoder and the Swift replay/append rules
+(`JournalReplay.validate` and `JournalAppendValidationState`, ported as one state
+machine for all 19 kinds), and returns only after fsync + `F_FULLFSYNC` of the
+file and fsync of the directory. An unchanged file rechecks only its last record;
+any external change forces a full replay first. A torn tail is cut back only
+behind a durable `jobCreated` and before terminal publication. A failure after
+the write began is `OutcomeUnknown` and poisons the writer until it is reopened.
+`job_journal_events` spells the engine's eight record kinds exactly as Swift's
+factories do. The writer records whatever its caller decides; it holds no Job
+authority, and no daemon path uses it yet.
+
+The replay keeps the intents still outstanding as it accepts each record, so
+checking a record never looks through every intent, and a replay grows with its
+Journal rather than with its square. A cold replay of a 10,013-record Journal
+takes 0.52 s in a debug build, where it took 12.2 s (a device mutation's proof
+over one retained Session holding it: 0.52 s, where it took 10.7 s).
+`job_journal_replay::tests` replays every fixture Journal record by record and
+checks the intents kept against every intent not completed after each one.
+
+`rust/tests/fixtures/journal-writer/` is the shared oracle: four scenarios
+(succeeded, outcome unknown with reconcile, confirmed compensation, plan-only)
+as Swift `FileDurableJournal` writes them, with the facts
+`DurableJournalRecovery.inspect` derives. `cargo test -p arkdeck-hoststore
+job_journal_writer` must reproduce both from the same records, and
+`JournalRustWriterParityContractTests` holds Swift to the same bytes. Re-record
+from Swift with `ARKDECK_RUST_JOURNAL_WRITER_RECORD=/private/tmp/<new>`.
+
+On Windows the host primitive under the writer, `HostJournalAppender`, and the
+rest of the durable host store have their NTFS implementation (TASK-XPA-005,
+`crates/arkdeck-platform/README.md`): `.manifest.lock` held with `LockFileEx`,
+`FlushFileBuffers` for fsync + `F_FULLFSYNC`, the same names and bytes. The
+writer, the replay and the events reader run on Windows too; see "Job Journal
+owners on Windows".
+
+## Job Journal owners on Windows (TASK-XPA-005)
+
+With the NTFS host store and the portable host text and calendar on main,
+`arkdeck-hoststore` builds its Job Journal owners on macOS and Windows alike
+(`cfg(any(target_os = "macos", windows))`; Linux has no durable host store
+and still builds none of them): the closed Journal decoder
+(`JournalEvent`, `JOURNAL_KINDS`), the record factories
+(`job_journal_events`), the replay (`ReplayFacts`), `JournalWriter` and
+`inspect_journal`, the Job events reader (`job_events`, with its `jec1`
+cursor, hence `aes-gcm` on Windows), and the Session Manifest decoder with
+the Recovery Manifest, step-argument, strict-JSON and Swift text helpers it
+reads through. The code is the macOS code; nothing is forked by OS, and the
+Journal's bytes on NTFS are the bytes macOS writes.
+
+The GJ-1 hop at the owner level runs on every host that builds it. In
+`tests/job_journal_corpus.rs` every distinct Journal under `rust/tests/fixtures`
+(231 on this checkout, 2,907 records) is written again record by record by
+`JournalWriter` into a fresh owner-only directory; each is the recorded bytes
+and replays to the facts its recorded bytes replay to. In
+`tests/job_journal_restart.rs` (its own binary: it spawns itself), for the
+recorded `observe.device@1` Job, one process dies inside an append halfway through
+the Journal (a byte prefix of the record is left), the next repairs the torn
+tail, completes the Journal, copies it into the Session record by record and
+publishes the Session's recorded `manifest.json` write-once under
+`.manifest.lock`, then dies holding everything open; the test process then
+reads the Journals, their facts and the Manifest back as recorded, and a
+second publication and any further append are refused.
+`tests/job_journal_process_death.rs` (both write points) and the writer,
+replay and events unit tests run on Windows unchanged, their scratch roots
+made owner-only by the store (`HostDirectory::open_or_create_private`)
+because a directory the standard library creates on Windows inherits the
+temporary directory's DACL, which the store refuses.
+
+The Job store owner followed; see the next section for what it builds and
+what is still macOS-only.
+
+## Job store owner on Windows (TASK-XPA-005)
+
+`arkdeck-hoststore` builds the Job store owner on macOS and Windows: the
+SQLite admission index (`job_repository` over `job_index`, the order key
+from the portable calendar), `JobStore` with its `admit`, `persist` and
+`job-record.json` writer, `JobRecord` and its fields, the Foundation
+pretty-print writers (`session_json::encode_pretty`,
+`encode_canonical_pretty`), the operation request decoder, the recovery
+epoch document reader, and Swift's `stepSetDigest` (moved out of the Job
+plan into `job_step_digest`, which the record reader checks a consumed
+HAP's correlation with). The code is the macOS code; only three things have
+a Windows arm:
+
+- the index database's identity (`job_repository::database_identity`):
+  macOS reads the store's `document_metadata` (device, inode); Windows
+  checks the entry with the store's owner rule (`owned_kind_and_size`) and
+  takes its volume serial and file id (`file_identity`, FileIdInfo),
+  before and after, so a database replaced under the owner is not read;
+  the `-wal`, `-shm` and `-journal` companions pass the same owner,
+  single-link and regular-file rule on both;
+- a first index's file: `0600` through `OpenOptions` on macOS; on Windows the
+  store's own owner-only `create_document`, then SQLite writes the layout
+  and the file and the directory are flushed;
+- the recovery epoch probe (`job_epoch_indexes.rs`): `document_metadata` on
+  macOS, the store's owner rule on Windows.
+
+The Windows daemon composes the store over its root
+(`windows_lifecycle::Authority::compose`) in a private child `jobs-state`
+(`StateRoot::private_child`, owner-only when created, an existing one never
+re-permissioned; one that is not owner-only ends the start): the macOS
+isolated owner's name, and for the account's root too, because the host
+store cannot open `Agentd` itself (its DACL also grants SYSTEM), where
+Swift's production daemon keeps the index beside its other owners. It
+answers `job.status`, `job.show` and `job.events` (`jec1` cursors that still
+open after a restart), and `job.list` and `job.timeline` through
+`snapshot_pager` in its `cli-job-snapshots` (see "Windows Session owner,
+publication and snapshot pages" below). `runtime service restart` reads the
+current Jobs from those pages, so a restart still refuses to interrupt a
+current Job; its proof reports `jobOwner: true`. Jobs are planned, admitted
+and run through the planner, admitter and runner below; no HDC is registered
+yet. The Windows CLI coverage statuses stay `partial`.
+
+The NTFS store's document replacement (`publish_document`) now waits out,
+for about a second, a moment's holder of the replaced file (an
+anti-malware or indexing filter holding it without delete sharing), which
+made repeated `persist` calls fail `OutcomeUnknown` in most runs of the
+corpus below; a failed rename replaced nothing, so the retry cannot publish
+twice.
+
+Tests on Windows and macOS: `tests/job_store_corpus.rs` re-encodes every
+recorded `job-record.json` to its bytes, rebuilds every recorded Job index
+whose rows carry their records through `JobStore::open_owner` (admission and
+version-by-version `persist`), compares the index read back with the
+recorded projection and the published records with the recorded bytes, and
+compares the recorded Swift answers to `job.status`, `job.show` and
+`job.events` with a reader of the rebuilt store; `tests/job_store_writer.rs`
+(the Swift writer oracle) and `tests/job_store_files.rs` (companion links,
+directories, a replaced database). On Windows only,
+`arkdeck-agentd/tests/windows_job_store_process.rs` records the Swift
+`observe.device@1` Jobs into a development root, starts the real daemon,
+reads them over its pipe before and after a restart, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI against a dev-signed
+daemon.
+
+Still macOS-only: the HDC lifecycle interlock and the current-Job census (over
+`hdc_impact_source`); the Job owner's Import and Session-continuity
+censuses (its workspace census is on Windows, TASK-XPA-005 #2379); Flash
+recovery; and the reconciler. The planner, the admitter and the runner
+build on Windows (next sections).
+
+## Job planner and admitter on Windows (TASK-XPA-005)
+
+`JobPlanner` (`job_plan.rs`) and `JobAdmitter` (`job_admission.rs`) build
+on Windows with the macOS members, constructed the same way on both hosts.
+Ported with them: the HDC composition's device facts (`device_facts`), the
+device steps (`device_steps`) and cleanup debt (`cleanup_debt`), the
+per-operation device plans (debug HAP, native library, screen sequence and
+capture), the capability store and policy (`capability_store`,
+`capability_policy`; the store directory is the host store's owner-only
+directory on Windows) and `catalog_review`; the Artifact read owner comes
+from #2356. Members whose owner is not built on Windows yet are types with
+no value there, so they are always `None`: `MutationAuthority` (the Session
+root owner and the Job owner's continuity census). The analyzer profile and
+the planner's analyzer paths (`AnalyzerProfile`, `materialize`,
+`unmaterialized_analyzer`) and the workspace provider (`WorkspaceComposition`,
+`workspace_plan`, `preauthorize_workspace`) build on Windows too (see
+"Windows analyzer provider" and "Windows workspace provider"). Still
+`cfg(target_os = "macos")`: the Flash planner and admitter (the ArkForge
+lane, AF-W1), the ArkTrace cross-field check, and the authority's uses (the
+capability-gap repair, `submit_for_agent`); on Windows their stand-ins
+answer what macOS answers without the owner. On macOS only attributes were
+added.
+
+The Windows daemon composes the planner over its root with the Artifact
+owner and, where one is composed, its HDC: the HDC composition the planner,
+the admitter (with the capability authority), the runner, the reconciler,
+the cleanup-debt continuation and an agent execution's owned Job all read
+(`Host::hdc`, as on macOS), with the receive root below the account's
+temporary directory (`%TEMP%\arkdeck-receive`). That HDC exists only as a
+registered Windows HDC tuple's managed server (`windows_hdc_gate`,
+CHG-2026-078), and `operation.list` then asks after its tool identity as
+macOS does. Without one, `job.plan` and `job.submit` of `observe.device@1`
+are refused `provider hdc is not registered`, `{"phase": "preAdmission",
+"newDispatchCount": 0}`, and nothing is admitted; a retry of an existing Job
+is answered with it (`deduplicated`), the idempotency lookup coming before
+materialization. A Flash operation is `… is not materialized by the Rust
+Runtime yet`. `windows_lifecycle`'s admitted-HDC test checks the composition
+over a stand-in tuple.
+
+Tests on Windows: `arkdeck-hoststore/tests/windows_observe_device_admission.rs`
+replays the Swift `observe.device@1` oracle's `job.plan` and `job.submit`
+exchanges in process with an HDC composition over the recorded Target (a
+dispatcher that fails the test if called): every plan, fingerprint, plan
+digest and Job identity is Swift's; without an HDC provider every one is
+refused before admission. `tests/capability_read.rs` (93 reads) and
+`tests/capability_write.rs` (the M2 oracle stores rewritten byte for byte)
+now run on Windows too, over owner-only directories and without the POSIX
+permission bits. `arkdeck-agentd/tests/windows_job_admission_process.rs`
+checks the daemon over its pipe and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`,
+through `arkdeck job plan|submit` against a dev-signed daemon, before and
+after a restart.
+
+GJ-1's two device operations run on Windows host code too:
+`arkdeck-hoststore/tests/windows_gj1_replays.rs` replays the Swift
+`observe.device@1` and `capture.diagnostics@1` oracles (28 exchanges each)
+through the planner, admitter, runner, result reader and Artifact pager over
+the shared fake's two tables ported in process (`oracle_fake.rs`'s
+`ObserveDevice` and `CaptureDiagnostics` arms). Every answer is Swift's (a
+refusal's wording T2), the fake receives Swift's 11 and 16 calls in order,
+and the Jobs' index, records, Journals, Artifacts and Sessions are Swift's
+byte for byte, read with the host paths in the oracle's spelling, the
+Session platform as the oracle's and a manifest's derived values relabelled
+(`hdc_oracle::assert_read_only_replays`). The same file replays the rest of
+`capture.diagnostics@1`'s oracles: the read legs (66 exchanges, read-only),
+and the file legs (77) and the Trace legs (72) under the mutation authority
+(`hdc_oracle::assert_authorized_replays`), with the fake's read-, file- and
+Trace-leg tables in process, received files landing under the replay's
+`receive` root, and the Trace probe's concurrent calls compared exchange by
+exchange, sorted.
+
+## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
+
+`arkdeck-hoststore` builds on Windows the snapshot pager (`snapshot_pager`,
+over the host store's `document_metadata`/`remove_document`, ruling 7), the
+Session storage owner (`SessionStore`: `runtime.storage.status`, `.policy`
+and `.root`, `session.list`, `show`, `pin` and `unpin`, and the storage hold
+a publication registers under), the Session census and retention catalog
+(`session_inventory`), and the Session publication writer
+(`SessionPublisher`, its staged Session and `recover_staged`). The code is
+the macOS code; the Windows arms are:
+
+- a Session root's spelling (`session::absolute_root`): a local drive's
+  absolute path (`D:\…`), in the settings document and in a
+  `runtime.storage.root` request; macOS and Linux keep `/…`;
+- the canonical path the settings and the catalog compare
+  (`session_owner::canonical_path`): `canonicalize`, with a local drive's
+  verbatim `\\?\D:\…` spelled `D:\…`;
+- the Manifest's `platformProfile`: `PLATFORM-WINDOWS@0.2.0` on Windows,
+  the profile the Session was published under; macOS keeps
+  `PLATFORM-MACOS@0.2.0`;
+- the marker's root path is the canonical path as it is (no `/private`
+  alias to drop).
+
+The writer now closes every handle below its staged Session before renaming
+it (Windows renames no directory while a handle below it is open); nothing
+else changes, on either OS.
+
+The Session cleanup and export owners (their previews, plans, records and
+censuses) and the Artifact usage owner are on Windows too (slice H3b, below).
+Still macOS-only: the Job runners, cancellation and reconciliation that call
+the writer. `job.list` and `job.timeline` page through the Job store's pager
+on Windows, with cursors that read on across a restart; the one-page
+`job.list` answer without the pager is gone.
+
+### Windows Session cleanup, export and storage (H3b)
+
+`arkdeck-platform` removes a Session on NTFS (`PreparedSessionRemoval`,
+`windows/host_session_removal.rs`, after W1's Trace removal): the same
+bounded capture of the year/month/Session tree (owner, single link, no
+reparse point, every file digested), each removal deleting through a handle
+opened relative to its held parent and compared with the capture just
+before, so a replacement is never removed; NTFS refuses to move an ancestor
+of a prepared tree away while its handles are held. `arkdeck-hoststore`
+builds the Session cleanup and export owners (`session.cleanup.preview` and
+`apply`, `session.export.preview` and `apply`), their records and censuses,
+and `ArtifactUsage` on Windows; a Session export destination is absolute as
+the Session root is (`session::absolute_root`), and its physical spelling is
+E1's. The CLI's Session answer checks take the same Windows spelling. Their
+unit tests run on Windows (fixtures made owner-only by `test_private`;
+where Unix renames a held Sessions root away and the cleanup refuses, NTFS
+refuses the rename and the cleanup applies to the root it proved).
+
+The Windows daemon composes the Session owner (`storage` in its census):
+`session-state` and a default Sessions root `sessions` in private children of
+its root, the macOS isolated names, isolated to the development root as on
+macOS (its reserved owners' directories are never a Sessions root). The
+account keeps its settings in `Agentd\session-state` and its default Sessions
+root in `%LOCALAPPDATA%\ArkDeck\Sessions`, beside `Agentd` as macOS keeps
+`ArkDeck/Sessions` (the same decision); a start moves an earlier build's
+`Agentd\sessions` there once, in one rename, and publishes the settings that
+selected it at the new place (`SessionStore::rebase_default_root`); beside an
+existing `Sessions` an empty earlier root is removed and one holding anything
+refuses the start. `runtime.storage.status|policy|root` pair the Session
+macOS (its reserved owners' directories are never a Sessions root); the
+account's root keeps both below `Agentd` until the Windows App names its
+Sessions location. `runtime.storage.status|policy|root` pair the Session
+domain with the Artifact usage of `artifacts`, and a start removes the
+staged Sessions a crash left (`recover_staged_sessions`), as on macOS.
+`tests/windows_session_owner.rs` (hoststore) replays every frame of the
+Swift storage lock-wait oracle, its Artifact domain and
+`session.export.preview` included;
+`arkdeck-agentd/tests/windows_session_owner_process.rs` serves the recorded
+Swift Sessions over the real daemon (status, list, show, pin, export,
+cleanup, and the same cleanup receipt after a restart) and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-session-cleanup-run.md`.
+
+Tests on Windows: the pager's own tests and the Job list stream tests run
+there as on macOS (their owner-only and unsafe fixtures made by
+`test_private`; a second hard link stands for a symbolic link, which needs
+a privilege there); `session_publication_windows_tests.rs` publishes every
+recorded Swift Session again (37 recorded stores beside a Sessions tree: 76
+Sessions, 42 refusals) and compares every file, the catalog, each Job's
+proposal and Journal and each marker with Swift's bytes but for the
+platform profile and what names the Manifest's digest, reads the Sessions
+back a page at a time across reopened owners, and crashes a publication
+between its Manifest and its rename in a child process, whose staged Session
+the next start removes; `tests/windows_session_owner.rs` replays the Swift
+storage lock-wait oracle's Session domain; and
+`arkdeck-agentd/tests/windows_job_store_process.rs` pages `job.list` and
+`job.timeline` over the real daemon's pipe and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI, with cursors handed
+out before a restart read after it. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-session-pager-run.md`.
+
+## Job runner on Windows (TASK-XPA-005)
+
+`JobRunner` (`job_run.rs`) with its device lane (`device_run.rs` and its
+submodules), `JobCanceller` (`job_cancel.rs`), `JobResultReader`
+(`job_result.rs`), Artifact publication (`artifact_publication.rs`, the
+capture documents), the capability-use execution (`mutation_execution.rs`),
+the lineage repair, the Job recovery (`job_recovery.rs`, the retention census)
+and `operation_availability` build on Windows. Ported for it: a file a step
+left on the host is read for publication by `landed_file_bytes` (on Windows
+measured before and after through `measure_host_file`, no reparse point
+followed); the analyzer operations' fixed facts moved to
+`analyzer_operations.rs`, which `analyzer_composition` re-exports;
+`MutationAuthority` is the same type on Windows (its proof, the continuity
+census, is built there too: see below). The analyzer lane runs on Windows
+(see "Windows analyzer provider"), and so does the workspace lane
+(`workspace_run.rs`, see "Windows workspace provider"). Still macOS-only,
+each refused on Windows as a Job this Runtime does not execute: the ArkTrace
+analyses (their trace_streamer) and the Flash lane (`flash_run.rs`, AF-W1); a Flash Job's recovery epoch is not read on Windows, and such a Job
+is left as it is.
+
+The Windows daemon composes the runner, `job.cancel`, `job.result` and
+`job.evidence`, the capability store (`jobs-state\capabilities`), the Session
+owner (`session-state`, and `sessions` in a development root or
+`%LOCALAPPDATA%\ArkDeck\Sessions` for the account; see the Session owner
+section) and `operation.list` (the HDC operations `provider_not_registered`,
+the analyzer operations as the composed analyzers leave them), and recovers the active Jobs at its start
+(`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
+No HDC provider is composed without the registered Windows HDC tuple, so a
+device Job is refused before its run with zero dispatch; a queued Job is
+cancelled at once and its Session published. The census reads
+`jobs, capabilities, mutationAuthority, targets, artifacts, storage,
+workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache` over a
+development root and the account's root alike, the macOS census's order. The
+start's Artifact retention sweep runs as on macOS (see the mutation authority
+section below).
+
+Tests on Windows: `arkdeck-hoststore/tests/job_recovery.rs` (the five macOS
+restart and recovery cases), `tests/windows_job_runner.rs` (the recorded
+`observe.device@1` corpus's `job.result`/`job.evidence` as Swift answered, a
+queued Job cancelled as Swift cancels one with its Session published, a run
+without an HDC refused), and `arkdeck-agentd/tests/windows_job_runner_process.rs`
+(the same through the real daemon across a restart, and with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck job run|cancel|status|result`
+against a dev-signed daemon).
+
+## Mutation authority and Artifact retention sweep on Windows (TASK-XPA-005)
+
+The Job owner's mutation-state continuity census
+(`mutation_state_continuity.rs`, Swift `RuntimeStateContinuity`) builds on
+Windows, so `MutationAuthority::require_state` proves the Runtime's mutation
+state there as on macOS: the Job store is the root the composition names, no
+`AuthorizationUsage` lies beside it, its history is read-only or its
+capability checkpoint exists, and every retained Session under the default
+`Sessions` and the configured Session root replays with no unresolved device
+mutation or torn tail, no link followed (a junction is refused as a symbolic
+link is). A device mutation's admission then preauthorizes against the
+capability store as on macOS (the Runtime-issued standing capability, the
+lineage and envelope checks, the outcome-gap repair); the workspace subject
+(XPA-011) and the Flash lane (AF-W1) stay macOS-only. `capability.list` and
+`capability.inspect` answer from the store.
+
+The Windows daemon names the root a device mutation proves its state against
+(`windows_lifecycle::Authority::mutation_root`): the account's daemon its own
+`jobs-state`, as the production composition names Swift's state directory; a
+development root the account's `%LOCALAPPDATA%\ArkDeck\Agentd\jobs-state`,
+which its own Job store never is, as the macOS standalone and unacknowledged
+isolated owner name the installed root: the proof refuses before anything of
+that root is read. No development authority is composed on Windows (it needs
+a managed HDC server; `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY` still refuses
+the start). No device mutation reaches admission on Windows until the HDC
+tuple is registered.
+
+The start's Artifact retention sweep (`collect_expired_artifacts`) runs on
+Windows as on macOS, after the Job recovery and before serving. The Windows
+daemon tests that lay down recorded Artifacts whose retention lapsed lay them
+down a century later (`unexpired`), since no answer they compare names the
+deadline but as their root holds it.
+
+Tests on Windows: the continuity census's own tests and the Session cleanup's
+lock-order tests (`session_cleanup_owner.rs`), `tests/windows_artifact_retention.rs`
+(the macOS retention census cases over `observe.device@1` Jobs and the
+recorded store), the host's mutation-root test (`host_tests.rs`), and
+`arkdeck-agentd/tests/windows_mutation_retention_process.rs` (the sweep and
+the authority's census through the real daemon across a restart, and with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck artifact list|quota` and
+`arkdeck capability list` against a dev-signed daemon).
+
+## XPA-AC-7 kill matrix on Windows (TASK-XPA-005)
+
+Three test binaries measure the matrix on NTFS; no product code differs from
+macOS for it:
+- `arkdeck-hoststore/tests/windows_crash_window.rs` replays the Swift
+  crash-window oracle (`rust/tests/fixtures/crash-window`) as
+  `crash_window.rs` does on macOS. The Rust runner, in a child process, is
+  killed at the four windows (before or after an intent, before or after the
+  capability consume). The store it leaves is Swift's `crash/` byte for byte.
+  Two starts, two reconciles, a new tap and every read then answer and leave
+  what Swift's did, and nothing is dispatched after the death. The fake HDC
+  is the oracle's table answered in process; it reports the tool identity
+  current, as the macOS dispatch over the fake's verified script does.
+- `tests/windows_artifact_publication_death.rs`: a Job product's publication
+  killed after its payload, its seal and its index entry leaves no half-record
+  (the macOS test's cases, over an `observe.device@1` Job). The quota counts
+  what the indexes name, the sweep keeps the unfinished Job's products, and a
+  start recovers the Job without changing an Artifact.
+- `arkdeck-agentd/tests/windows_kill_matrix_process.rs`: the real daemon over
+  each window's crash store. Its first start is Swift's first start. The test
+  then terminates it with no drain; the next start is Swift's second, and the
+  third changes nothing. The requests after the death answer as Swift's did,
+  or, where they need the Windows HDC tuple, are refused with nothing written
+  or dispatched: a device Job's reconcile, and a new tap's admission.
+
+## Job reconciler and agent executions on Windows (TASK-XPA-005)
+
+`JobReconciler` (`job_reconcile.rs` with `job_reconcile_device.rs`), the agent
+execution owner and engine (`agent_execution.rs`) and the combined
+human-action owner (`human_action.rs`) build on Windows. The union
+control-action owner is the HDC lifecycle's and the tool selection's, not
+built on Windows yet: `absent_control_action.rs` gives Windows a
+`ControlActionResources` with no value, so the human-action owner is the same
+code and pages the executions' actions alone. Still macOS-only, each refused
+on Windows as a Job this Runtime does not reconcile: the workspace Jobs
+(signing, the workspace mutations and reads, symbolization, the sweep) and a
+delegated Flash's lane receipt (`flash_reconcile.rs`, AF-W1).
+
+The Windows daemon composes `job.reconcile` (the Session publication writer
+and the runner its runs use, the HDC composition where one is composed, and
+the Flash lane where one is installed), the agent execution owner in
+`agent-executions` and the human-action owner in `human-action-snapshots`
+(`agent.*`, `human-action.*`), on the development and the account root. An
+execution admits its Job as `job.submit` does here and observes Targets over
+the composed HDC; without one it observes none. The census
+reads `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
+workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache`.
+
+Tests on Windows: `arkdeck-hoststore/tests/windows_job_reconcile.rs` (the
+Swift restart and reconcile oracle's store, with its first Session laid down,
+replayed through the reconciler: every answer and read Swift's, but a
+refusal's wording and the Manifest digest naming `PLATFORM-WINDOWS`),
+`tests/windows_agent_human_action_records.rs` (the physical-assistance
+oracle's execution records read, run, abandoned and expired as Swift's owner
+answers), and `arkdeck-agentd/tests/windows_reconcile_agent_process.rs` (both
+through the real daemon across a restart, on the daemon's own clock, and with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` through
+`arkdeck job reconcile|agent status|human-action show` against a dev-signed
+daemon).
+
+HAR crash-resume (TASK-XPA-006, without the Windows HDC tuple):
+`tests/windows_agent_human_action_resume.rs` runs `agent_human_action_raise.rs`'s
+adoption and resume cases on NTFS, over the oracle's fake HDC answered in
+process.
+- A run that names no Target adopts the one proved device and owns one Job,
+  which the runner completes. A budget expiring during the identity readback
+  or at the Target commit, or a USB identity that changes during adoption,
+  commits no Target and no Job.
+- A process that crashes between the Target commit and the execution's own
+  commit is resumed by a new one with every owner reopened. It keeps the
+  original budget and adopts nothing twice.
+- `physicalConnection`, `deviceTrustPrompt` and `ambiguousIdentity` actions
+  are resumed only by their durable references. The original intent is
+  kept, and concurrent resumes own one Job. A changed selection is an
+  idempotency conflict, and an expired action or untrusted clock is refused
+  with no HDC call. The action ends `resolvedByFreshProbe`.
+- A process that crashes after the resume and before the Job is admitted
+  continues to one Job, or is refused once the budget has passed.
+
+The contract publishes an agent execution's `failureCode`, an agent human
+action's `selectionSchema` and `agent.run`'s orchestration refusals as Swift
+answers them (#2389), so the process test reads the pick-a-device execution
+and its action, the expired execution (its status, the execution list and its
+action) and its `orchestrationBudgetExpired` refusal over the wire, and the
+pick-a-device execution and action through the CLI.
+
+Follow-ups: the start's Artifact retention sweep is still macOS-only; the
+control actions (with the HDC lifecycle) and an execution's Target
+observation wait for the Windows HDC tuple.
+
+## Job index and record writers (TASK-XPA-014)
+
+`arkdeck_hoststore::JobStore::open_owner` opens a state root for the Rust Job
+owner. `admit` commits an idempotent admission to the unchanged v1 `runtime_job`
+index: a known idempotency key answers with its Job or a conflict, and a new key
+takes the next admission sequence at version 1 with the exact initial record
+bytes. `persist` checks that the index row describes the record, publishes
+`jobs/<jobID>/job-record.json` atomically and then advances the row's state,
+update time, version and record bytes. `JobRecord::durable_bytes` spells a
+record as Swift's `JSONEncoder([.sortedKeys, .prettyPrinted])`. The owner and the
+reader inspect a store read-only only when its shared-memory index exists, as
+Swift does. No daemon path admits Jobs yet.
+
+`rust/tests/fixtures/job-store-writer/` is the oracle Swift
+`JobStoreRustWriterParityContractTests` records: records, a Foundation
+pretty-print probe, an admission scenario and the index facts it leaves.
+`tests/job_store_writer.rs` reproduces it. Re-record from Swift with
+`ARKDECK_RUST_JOB_STORE_RECORD=/private/tmp/<new>`.
+
+## Job plan (TASK-XPA-014)
+
+The isolated development composition answers `job.plan` as Swift
+`RuntimeJobEngine.planOnly` does for `analyzer.extract-crash-signature@1`, the one
+operation this Runtime materializes so far. `OperationRequest::decode` reads the
+current request as Swift's codec does: closed members, governance and
+retired-authority refusals, then the typed members in Swift's order with Swift's
+own messages, Foundation's `DecodingError` descriptions included. Its canonical
+bytes give Swift's request fingerprint. After the catalog's typed input rules the
+planner checks the pinned analyzer (named by `ARKDECK_ANALYZER_PATH`, as for the
+Swift daemon), resolves the source Artifact lease as
+`RuntimeArtifactStore.resolveLease` does (the payload opened through no link and
+hashed, refusals spelled as Swift interpolates them), re-reads its bytes as the
+analyzer action does, and digests the materialized plan document. Nothing is
+admitted, journaled or dispatched, and every refusal carries
+`{"phase": "preAdmission", "newDispatchCount": 0}`. Unlike Swift, planning writes
+nothing: no Job directory for a missing lease, no payload-verification cache, no
+resealed payload. Every other operation, an imported Artifact lease and a Runtime
+debug attempt permit are refused with `rejected` before anything is materialized.
+
+`arkdeck job plan` sends `--request-file` verbatim or builds the current request
+from `--target`, `--operation` and `--inputs-file`, applies the catalog's binding
+rule to `--expected-binding-revision` as the Swift CLI does, and accepts only a
+complete `arkdeck.job-plan/1` projection of an unadmitted plan.
+
+`rust/tests/fixtures/job-plan-analyzer/` is the oracle Swift
+`JobPlanAnalyzerOracleContractTests` records under the fixed physical root
+`/private/tmp/arkdeck-job-plan-oracle`, because the plan digest covers the source
+Artifact's absolute path: 71 requests, four of them planned. `tests/job_plan.rs`
+rebuilds the recorded store at that root and reproduces every answer. Re-record
+from Swift with `ARKDECK_RUST_JOB_PLAN_RECORD=/private/tmp/<new>`.
+`scripts/check-job-plan.py` runs the standalone Swift daemon and the Rust owner in
+turn over one state root and compares every answer over the socket and through
+both CLIs.
+
+Catalog patterns are evaluated as Swift's `text.range(of: pattern, options:
+.regularExpression)` evaluates them (`catalog_pattern.rs`), for the syntax every
+published catalog pattern uses. A string input outside its pattern is
+`invalidInput` `input <key> does not match its catalog pattern`, an array item
+outside it `input <key> contains an item outside its catalog pattern`; a pattern
+outside that syntax is still refused as unevaluated. `input.tap@1`,
+`input.long-press@1` and `input.swipe@1` are planned as Swift plans them (M2):
+the evidence preflight's three steps, the gesture step, then the session's
+finalization. The gesture's typed action is named from the inputs and the
+provider context's clock (`HdcComposition::now`, Swift
+`ProviderExecutionContext.nowUTC`), journaled with Swift's arguments and
+lowered to the provider's `uinput` process. A frame older than the 1000 ms
+freshness bound, or a point outside the frame, is refused before authorization
+in Swift's words. `tests/pointer_input_plan.rs` replays every `job.plan` of
+`rust/tests/fixtures/pointer-input/` against the planner, message included.
+Submitting a gesture is still refused, because no Runtime capability is issued
+yet.
+
+## Job admission (TASK-XPA-014)
+
+The isolated development composition answers `job.submit` as Swift
+`RuntimeJobEngine.submitOwned` does under target control, for the operation it
+plans. `JobAdmitter` decides a retry or a conflict from the idempotency index
+before anything is materialized, checks a reviewed plan against the existing Job
+or against the fresh materialized plan, and admits a read-only Job under the
+catalog's default read-only policy and a device mutation as below. It then writes the admission
+row, the Job's journal (`jobCreated`, `queued -> preflight`) and `job-record.json`
+at the index's next version, each as Swift writes them. A refusal before the
+admission point carries `{"phase": "preAdmission", "newDispatchCount": 0}`; a
+failure after it carries empty details, as Swift's does. The isolated owner opens
+its Job store with the owner connection. Nothing is dispatched: an admitted Job
+waits in `preflight` for an executor, and a standalone Swift daemon given the
+same store recovers it and can run it.
+
+`arkdeck job submit` builds requests as `job plan` does, prints Swift's note when
+it generates the idempotency key, accepts only an acceptance that dispatched
+nothing, and reports a reply that cannot prove zero dispatch as an unknown
+outcome. It has no `--wait`: this Runtime cannot run the Job it admits yet.
+
+`rust/tests/fixtures/job-submit-analyzer/` is the oracle Swift
+`JobSubmitAnalyzerOracleContractTests` records under the `job.plan` oracle's fixed
+root: 18 requests in order over one store (four admissions), how `job.status` and
+`job.show` read each admitted Job, and the store left behind.
+`tests/job_admission.rs` reproduces the answers, the reads, the index and every
+Job file byte for byte. Re-record from Swift with
+`ARKDECK_RUST_JOB_SUBMIT_RECORD=/private/tmp/<new>`. `scripts/check-job-submit.py`
+runs the standalone Swift daemon and the Rust owner in turn over one state root,
+then hands the Rust-written store to a Swift daemon that recovers the Jobs and
+runs one.
+
+A device mutation that the catalog authorizes with a standing capability is
+admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
+- **The device hold.** A session-scoped request (a gesture, or a
+  screenshot-only capture) takes or refreshes this daemon's hold on its device
+  for its client (`DeviceHolds`). While a hold is live, another client's
+  mutation is `resourceConflict`.
+- **The capability.** A capability the caller names is used as named. Otherwise
+  the Runtime issues its own (`capability_policy.rs`):
+  1. it checks every capability's uses on the Target binding for one without a
+     settled outcome;
+  2. it finds or installs the first live generation of
+     `CAP-RT-POLICY-<fingerprint>-G<n>`, as the envelope Swift issues (a
+     gesture's subject is its frame, for an hour and 2000 uses).
+
+  The capability then passes `validateNewExecution`, or the submission is
+  `admissionDenied` in Swift's words.
+- **The Job.** It runs the request naming the capability and keeps the caller's
+  as its original submission. It carries no admission evidence until a use is
+  consumed, and nothing is consumed yet.
+- **The storage state.** The admission proves that this owner's Job root and the
+  Session root it publishes into are the account-fixed ones
+  (`MutationAuthority::require_state`, through the Session owner's status read,
+  `SessionStore::waited_status`). That read waits for the storage lock, as
+  Swift's `validateMutationState` does: a mutation submitted while the previous
+  Job's Session is being published is admitted once the publication releases
+  it. The lock is held for the read alone: the continuity scan of the roots
+  that follows takes none, and passes over a publication's staging (see
+  Session publication). The operation availability report asks the same
+  question without waiting
+  (`MutationAuthority::state_proven_now`), as Swift's availability reads no
+  storage at all. Reading that status takes the storage owner's lock and the
+  retention catalog's, so an admission leaves
+  `session-owner/.session-storage.lock`,
+  `sessions/.arkdeck-retention-catalog.json` and its lock where Swift's
+  admission leaves none: Swift reads the Session root without them and writes
+  exactly these bytes when it first publishes. A declared difference from
+  Swift, in when the files appear and in nothing else (r11 §3, incidental
+  side-effect files); the crash-window replay, whose Jobs never publish a
+  Session, is where it shows.
+- **The retained Sessions.** The proof replays each retained Session's Journal
+  and decodes its Manifest, where Swift's looks only at the Session root's
+  direct children. A Session the last complete proof let pass is not read again
+  while its files are the ones it read: the same device, inode and size, and the
+  same modification and change times to the nanosecond, each more than 2 s
+  before the proof (`SessionVerdicts`, in memory only; a refusal is never kept).
+  Over a thousand retained Sessions each holding a 9-record Swift pointer oracle
+  Journal, a proof that reads them all took 356 ms and one that reuses them
+  36 ms (debug build).
+- **A failed publication's Session.** A Session holding its identity and no
+  Manifest is what a publication that stopped short of it left. Where the scan
+  refuses one (its identity and directories alone, or a Journal copy with a torn
+  tail or an unresolved device mutation), it passes it over only when
+  `JobStore::failed_publication_accounts_for` proves a failed publication of this
+  Runtime left it: the identity names a Job this store holds, whose durable
+  record keeps a failed publication of that Session, at `yyyy/mm` of its
+  creation; and the Session holds nothing the publication does not write before
+  it stops (a Journal that is the Job's own as far as it goes, the outcome audit
+  only with the whole Journal, empty locks). Anything else is refused, naming
+  the Session: "retained Session <path> has no Manifest and no failed
+  publication of this Runtime accounts for it; inspect it with read-only
+  `arkdeck runtime storage status`; preserve the original Session and any
+  unresolved outcomes; cutover and device mutation remain blocked until complete
+  state continuity is proved". Moving a Session or confirming a review does not
+  replace the mechanical proof required by `POL-RECOVERY-001`.
+  Swift's scan never refuses such a Session: it looks only at the Session root's
+  direct children, so in the `yyyy/mm/session-*` layout it reads no Session at
+  all. `JobStore::require_retained_sessions` runs the same scan over one
+  Sessions root alone, for a check made before the Runtime serves.
+- **Not served.** A descriptor without `defaultPolicyIssuance` counts as enabled,
+  as Swift's generated catalog reads it. Destructive effects, the
+  `runtimeCapability` policy and workspace subjects are still refused.
+
+`tests/pointer_input_submit.rs` replays the pointer-input oracle's submissions:
+the answers, the capabilities installed, each Job's request and original
+submission, and the refusal after an unknown outcome.
+`tests/debug_hap_submit.rs` does the same for `debug.hap@1`, whose capability is
+also named by the entry package's owner-validated facts. An admitted HAP waits in
+`preflight` for `job.run` (below); `agent.run` admits the HAP it starts at once.
+`deploy.native-library.app-owned@1` is planned and admitted as Swift does
+(`native_library_plan.rs`). Its HDC composition must carry the verified
+code-sign helper the deployment stages (`HdcComposition::code_sign_helper`);
+without one the operation is runtime unavailable. The daemon composes it as
+Swift's `HDCNativeCodeSignHelperArtifact.bundled()` does (`code_sign_helper.rs`):
+`arkdeck-code-sign-enable` from ArkDeckWorkflows' resource bundle beside this
+executable, verified as an arm64 ELF the library validator accepts, carrying no
+mutable input signature, and a static executable (`ET_EXEC`, a loadable segment,
+no interpreter). An isolated development root may name one with
+`ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER`, an absolute path whose bytes are
+verified the same way, so the facts a deployment carries are that file's; the
+standalone and production daemons refuse that variable at startup, as they refuse
+every other development one, and a named helper that does not verify fails
+startup. With no helper anywhere the operation stays unavailable with
+`provider_tool_unavailable`, as before. The Windows daemon composes the
+bundled helper the same way (TASK-XPA-009): the xcopy and RC packages carry the
+checked-in resource beside `arkdeck-agentd.exe` in the same bundle layout, and
+the census names `codeSignHelper` in its macOS position. No Windows HDC tuple
+is registered, so there the helper waits behind that gate (the operation
+answers `provider_not_registered`), and a named development helper is refused
+at startup, since on macOS only a development HDC's admission names one.
+`tests/windows_code_sign_helper_process.rs` measures it. Once the Target's facts hold, the library's lease (a Job Artifact or an
+Import) is resolved and bound to them, its bytes are read, and each step's
+action is named from them (`StepAction::Native`, claimed by the operation before
+any step kind): the provider verifies them as the expected ABI's code-signed ELF,
+still the byte count the lease records. Every provider step is lowered to its
+process sequence with Swift's journal arguments, and the plan also holds the
+rollback a failure past the publish applies. The library's facts name its
+capability. `tests/native_library_plan.rs` and `tests/native_library_submit.rs`
+replay the native-library oracle's plans and submissions; `job.run` runs the
+admitted Job (below), and `agent.run` admits the deployment it starts at once.
+
+On Windows (TASK-XPA-008 and XPA-009) the same four replays run over the
+oracle's layout below the temporary directory, owner-only as the store makes it
+and each published payload sealed by the store. A plan's digest covers its
+sends' arguments, which name the package's, the library's and the helper's host
+paths, so a Windows root digests the same plan document with its own paths.
+`hap_plan_digest` and `native_plan_digest` (the documents split out of
+`materialize_hap` and `materialize_native`) reproduce every Swift plan digest of
+both oracles over the paths Swift named, on every host. The replays read the
+plan digests and whatever they derive (the Runtime capability's ID, a use's
+query and scope fingerprints, its receipt and outcome hashes) as Swift's
+through a one-to-one relabelling (`support::debug_hap::HostLabels`); every other
+byte of the answers, the capability store and ledger, the Job records, the
+admission journals and the index rows must be Swift's, and on macOS nothing is
+relabelled. With no HDC composition (the Windows daemon's unless a registered
+Windows HDC tuple's managed server is composed) an admitted HAP or deployment
+is refused before its first step with zero dispatch and no use consumed, and
+the daemon refuses every recorded `debug.hap@1` plan and submission before
+admission (`windows_job_admission_process.rs`).
+
+The runs replay on Windows host code too (TASK-XPA-009): `debug_hap_run.rs` and
+`native_library_run.rs`, both oracles' full replays (every run, result,
+evidence, Artifact list, capability read and cleanup-debt continuation), the
+compensations and the native rollback, and provider-hdc's `debug_hap.rs` and
+`native_library.rs` argv-for-argv replays. The shared fake's driver is a POSIX
+shell script, so on Windows its debug-hap and deploy-native-library answers are
+ported in process (`arkdeck-provider-hdc/tests/common/oracle_fake.rs`, a
+test-only `HdcDispatch` over the same root, mode file, marker files and call
+log). What a replay leaves is compared with the oracle's as on macOS, with
+three readings: each host path below the replay's root in the oracle's
+spelling (its fixed root; the Sessions root as Foundation spells it, without
+`/private`), the Session manifest's platform (`PLATFORM-WINDOWS@0.2.0`) as the
+oracle's, and the plan digests and every value derived from them (capability
+IDs and fingerprints, receipts, outcome and record hashes, Journal seals,
+manifest digests) through the same one-to-one relabelling; an entry's mode is
+read from its DACL (`700` for a private directory, `600` for an owner-only
+document).
+
+The same two oracles also replay end to end through the daemon. In agentd's
+`tests/spawning/gj23_replay.rs`, the real signed `arkdeck.exe` sends every
+recorded exchange to the signed test daemon. That daemon is the production
+Windows development-root composition, with the fake given through a seam that
+exists in test builds only. The test reads the same things with the same
+relabelling, and both replays match. The production Windows daemon composes an
+HDC only for a registered Windows HDC tuple. Until one is registered, it still
+refuses these Jobs before admission.
+
+## Job run (TASK-XPA-014)
+
+The isolated development composition answers `job.run` for the analyzer Jobs it
+admits as Swift `RuntimeJobEngine.runForTargetControl` does, composed like a
+Swift engine without a Session publication writer. `JobRunner` refuses absent,
+terminal and parked Jobs before any dispatch, with Swift's messages and the
+zero-dispatch proof, and runs only a Job at its admitted `preflight` boundary:
+the `preflight -> running` transition, the source lease resolved again, the exact
+typed action persisted in `job-record.json` before the write-ahead `stepIntent`
+is synchronized, and only then the pinned analyzer, spawned through its retained
+inode in its own process group and handed the source as the `/.vol` alias of a
+descriptor bound to its digest, with a clean environment, `/` as its directory
+and `/dev/null` as stdin. Each output stream keeps its first 8 MiB and drains the
+rest; a timeout terminates the group (TERM, then KILL after 0.25 s). Swift's
+semantic checks judge the receipt, the correlated `stepOutcome` follows, and a
+verified answer is published as `crash-signature.json`: Swift's provenance
+envelope, redacted by Swift's default policy (the home directory and
+secret-looking values, with ICU's matching), under an Artifact quota that refuses
+a new product and never evicts one, the payload sealed `0400` before the index
+names it. Terminal transitions and records are spelled as Swift writes them. A
+timeout, a signal death or an unobservable child leaves the intent outstanding
+and parks the Job in `waitingForRecovery`; nothing is dispatched twice. Recovery
+is ported as the maintainer ruled on 2026-09-19 (design §L.1 item 13): the
+carriers the ADR-0009 decision package names, unchanged. Before it serves, the
+isolated daemon recovers its active Jobs (`job_recovery.rs`, Swift
+`recoverActiveJobs` and `recover(records:)` over `RuntimeRecoveryService.replay`;
+`recover_jobs` recovers named Jobs, a terminal one included, for its other
+callers): each journal is replayed, every unresolved intent or unknown outcome is
+parked (journaled `recovery-t-<n>` when the Job had left no recovery state),
+only decisions the journal already holds are completed, the record gains its
+`recovered: …` marker once and is persisted again (record, then index row), and
+a runtime capability's use outcome is re-asserted; nothing is dispatched or
+published. A record it cannot read is quarantined; an ArkForge execution and a
+complete-overwrite recovery Job are refused untouched. `job.reconcile`
+(`job_reconcile.rs`) reconciles a Job whose outcome is unknown against its
+durable intent and never resends the original. An analyzer Job's source is
+resolved again, and the provider confirms the intent not executed only for the
+source it named. A device-bound Job's Target facts are resolved fresh and
+validated, and its parked action is materialized again from its record
+(`job_reconcile_device.rs`): an action below `deviceMutation` is confirmed not
+executed, a pointer gesture has no dedicated readback and stays unknown, and a
+mutation Swift reads back is read back once, lowered under the reconcile's own
+step identity, and concluded completed, not executed or unknown — a port
+rule's create or remove by `fport ls`, a debug HAP's staging, package and
+ability by the owned path or directory, `bm dump` and `pidof`, a diagnostic
+capture's owned file by `ls -ld`, and a native deployment's steps by its own
+inspection, whose verdict table never calls a publish (`publish state is not
+safe to replay`) or a rollback not executed. Two declared differences fix
+Swift defects (the maintainer's rule of 2026-09-20: a Swift defect is fixed in
+Rust and declared). Swift's materialization does not know the screen
+sequence's capture and cleanup, so there a reconcile of either, once begun,
+fails and the Job can never be concluded; here each is read back as a capture
+file leg is, by `ls -ld` of what it owns (`ParkedScreenSequence`): the capture
+completed when its archive is there, not executed when neither the archive nor
+its frames directory is, and unknown — still parked, never resent — when its
+frames remain without their archive; the cleanup completed when the frames
+directory is gone and not executed when it is not. And a receive or cleanup of
+a JPEG still is rebuilt with the still's own suffix, where Swift rebuilds the
+`.png` the device never wrote and refuses the record. The decision is
+journaled as Swift journals it, the correlated step outcome carrying
+`confirmedNotExecuted` for a non-execution; the Job then fails and is
+published as a Session, its capability use resolved `safeToReflash`; or waits
+at its confirmed safe boundary, its use still `outcomeUnknown` until it
+resumes; or stays parked. A debug HAP's record is durable before its decision,
+and one confirmed not executed stays `finalizing` for its failure
+finalization, which runs at once through the runner (`finalizeDebugHAPFailure`:
+the compensations its succeeded steps declared, under the use it consumed), as
+it does for a debug HAP a restart left `finalizing`, on `job.run` or
+`job.reconcile`. As in Swift, the Session of a device-bound Job
+reconciled before any of its steps confirmed a binding is refused
+(`SessionManifestJournalValidator`: the decision's binding revision is not in
+the Manifest's binding history). A terminal Job's capability outcome that a
+crash lost is repaired from its journal's proof, on reconcile and before the
+next device mutation's submission materializes (`job_lineage_repair.rs`), with
+nothing dispatched; what a failed reconcile journaled stays resident in memory,
+as Swift's engine keeps it. A terminal debug HAP whose lineage a repair would
+write, a debug HAP parked on a declared compensation, on its compensation
+identity proof or on a failure decision its journal already holds, and a Job
+parked on a read-only action Swift's provider has no reconcile source for (a
+presence readback, a crash index or log) are answered only where Swift writes
+nothing, and refused otherwise, with nothing written or dispatched.
+`tests/job_reconcile.rs`,
+`tests/device_reconcile.rs` and `tests/readback_reconcile.rs` replay
+`rust/tests/fixtures/job-reconcile-analyzer/`, `device-reconcile/` and
+`readback-reconcile/` (Swift `testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs`,
+`DeviceReconcileOracleContractTests` and `ReadbackReconcileOracleContractTests`,
+re-recorded with `ARKDECK_RUST_JOB_RECONCILE_RECORD`,
+`ARKDECK_RUST_DEVICE_RECONCILE_RECORD` and
+`ARKDECK_RUST_READBACK_RECONCILE_RECORD=/private/tmp/<new>`): every start,
+reconcile, answer, read and store snapshot byte for byte, the capability store
+and the fake's calls included; `tests/job_recovery.rs` and the other tests of
+`tests/readback_reconcile.rs` cover the branches they do not reach.
+`tests/crash_window.rs` replays `crash-window/` (Swift
+`CrashWindowOracleContractTests`, `ARKDECK_RUST_CRASH_WINDOW_RECORD`) with this
+runner killed at the four quadrants XPA-AC-7 names — before the consume, after
+a read-only intent, after the consume, after the mutation intent — each in a
+child of the test binary that exits where the window falls: the store the dead
+run leaves is Swift's, and so are the two starts over it, the two reconciles,
+the next admission and every read. The one leftover Swift does not share is the
+Session owner's lock and an empty retention catalog, which this Runtime's
+admission creates when its storage-state check reads the Session root and Swift's writes
+only when it first publishes. `job.run` resumes a device-bound Job as Swift's
+`runOwned` does (`job_run.rs`, `device_run.rs`): at the confirmed safe
+boundary a reconcile reached (`resumeAtConfirmedSafeBoundary`), from `running`
+once a restart found nothing outstanding, and a debug HAP's failure
+finalization from `finalizing`. The journal must stand exactly at that
+boundary — no torn tail, no outstanding intent, no unknown outcome, a confirmed
+decision — or nothing is dispatched; every step the journal confirmed
+succeeded is skipped (`resume skipped journal-confirmed step …`), host steps
+run again, and a resumed Job continues under the capability use it already
+holds, which the capability store must still hold unsettled for it
+(`mutation_execution.rs`, stricter than Swift, which reads the record alone),
+consuming no second one; a Job resumed before it consumed one consumes it as
+a first run does. An analyzer Job is still run from `preflight` only. In the
+daemon a `job.run` of a Job whose reconcile is under way waits it out, so a run
+and a reconcile never drive one Job at once.
+`tests/device_mutation_reconcile.rs` replays
+`rust/tests/fixtures/device-mutation-reconcile/` (Swift
+`DeviceMutationReconcileOracleContractTests`,
+`ARKDECK_RUST_DEVICE_MUTATION_RECONCILE_RECORD=/private/tmp/<new>`): five
+scenarios over the shared fake whose HDC calls die on SIGKILL before or after
+the device changed — a port rule, three debug HAPs, two native deployments,
+two screen sequences and three component tree captures, reconciled and
+resumed, a cleanup debt continued — and three whose daemon died mid-run,
+reproduced by a child of the test binary exiting at the same window: a tap
+before and after its consume, resumed from `running`, and a debug HAP whose
+failure finalization a restart left for `job.run` to continue; every answer,
+store snapshot and leftover byte for byte, but the frames of the parked screen
+sequence capture, which the test marks as declared differences (Swift's
+reconcile fails `internalError` and leaves the Job `reconciling`; the Rust one
+reads it back and keeps it `waitingForRecovery`). Rust-only scenarios there
+conclude a screen sequence capture and cleanup the probes do settle, and a
+JPEG still's receive, cleanup and cleanup debt, which Swift refuses. Also landed: `recovery_manifest.rs`, Swift's
+`RecoveryManifestCodec` (the Session manifest's `recovery` member, which the
+Session reader now decodes through it before checking its relations to the
+Session's steps); its unit tests replay `rust/tests/fixtures/recovery-manifest/`
+(Swift `RecoveryManifestOracleContractTests`, re-recorded with
+`ARKDECK_RUST_RECOVERY_MANIFEST_RECORD=/private/tmp/<new>`): every decision and
+canonical byte, and one member more or less written by Rust at each level as the
+document Swift refused. Nothing writes a non-null member, in Swift or here.
+Concurrent runs of one Job join its one run, as Swift's callers do.
+
+A device-bound Job whose exact inputs select a step at or above
+`deviceMutation` runs in its Target's mutation lane (`device_lane.rs`, Swift
+`DeviceMutationLaneCoordinator.withMutationLane`), which the Target owner keeps
+in memory for every composition over it: one such Job per Target at a time, the
+others waiting in arrival order with no deadline; other Targets are not held
+up, and read-only and host-only Jobs take no lane. The lane is keyed by the
+request's Target, a proven post-Flash alias folded into its canonical Target
+(Swift keys by the name alone). A Job enters it before its running transition,
+so nothing is written while it waits, and holds it through its step loop, a
+debug HAP's failure finalization, finalization, its terminal state and the
+settling of its capability use (Swift enters after the transition, lets go
+after the step loop and enters again for the failure finalization). A debug
+HAP finalizing on `job.run` or `job.reconcile` holds it for its compensations
+(a reconcile's read-only readback takes none), and a cleanup debt's
+continuation holds it for its readback and retry (Swift's takes none). A
+request to cancel a waiting Job closes it at its first step boundary with
+nothing dispatched and nothing consumed; the lane's guard lets go of it on
+every exit, a panic included. `tests/device_mutation_lane.rs` runs gestures on
+the shared fake with two adopted Targets (one after another on one Target, at
+once on two, cancelled while waiting, the lane let go of after a failure, a
+park and a panic), and `tests/device_mutation_reconcile.rs` replays its
+scenarios with the Target's lane held around a reconcile, two resumed runs and
+a cleanup debt continuation, every answer and snapshot still Swift's.
+
+`arkdeck job run --job <id>` prints the Job's status and exits as Swift's CLI
+does: 1 for a failed, cancelled or interrupted Job and 75 for an unknown outcome.
+A connect failure stays `runtimeUnavailable`; a reply that cannot prove zero
+dispatch is `outcomeUnknown`.
+
+`debug.hap@1` runs through the HDC composition as Swift's `executeSteps` and
+`dispatchWithWAL` run it. Its packages are resolved from their leases again
+before each step given them (every package for the send, the entry package for
+the install and each approved remote read), each still bound to the Target,
+binding revision and identity the plan bound; a step dispatches its whole plan, a
+process sequence included; an install and a start succeed as dispatches that
+only the required readback after each may believe; and the send, install and
+start intents declare the compensation that undoes each. The Job consumes one
+capability use before its first mutation's intent. Each later mutation, and
+each compensation, continues under that use once the mutation state, the fresh
+plan and the Target facts are proven again; a compensation also proves the use
+is still the Job's own, unsettled and authorized (`validateContinuation`). A run
+continues only a use it consumed itself, and settles only that one. A required
+failure is compensated as Swift's `performDebugHAPFailureFinalization` does: the
+compensations the succeeded steps declared run latest first, a cleanup already
+attempted is never sent again, a failed cleanup is owed in the Artifact root's
+`cleanup-debt.json` with the exact action that failed (an optional one is owed
+and skipped on the normal path), and the Job fails with its original failure; a
+lane that cannot conclude parks the Job. `job.result` and `job.evidence` read
+these Jobs, their step kinds those the journal proves (Swift
+`durableActualStepKinds`). `tests/debug_hap_run.rs` replays the whole
+debug-hap oracle, its debt lists and continuations included: every answer, the
+fake's 108 calls and every file byte for byte. Continuing a parked or
+`finalizing` HAP follows the recovery port (L.1 item 13, ruled 2026-09-19).
+
+`deploy.native-library.app-owned@1` runs as Swift runs it (`device_native.rs`).
+`verify-elf-locally` and `hash-library` verify the leased library on the host
+(`verifyHostInputArtifact`): resolved again, the expected ABI's code-signed ELF,
+still the digest and size its lease records. Each device step resolves the lease
+again and reads the library before its Target facts, and runs only against facts
+that still name the identity and binding the plan was materialized for
+(`validateMaterializedTargetFacts`). The send succeeds as a dispatch that only
+the staging readback after it may believe (the readback pairs are Swift's whole
+table), and the publish and the loader readback publish `publish-report.json`
+and `verification-report.json`. The Job consumes its one use before the send;
+every later mutation continues under it. A required step's confirmed failure is
+compensated inside the step loop (`compensateNativeLibrary`): with the Target's
+facts proven again, `rollback-native-library` restores the backup once the
+publish was attempted, then `cleanup-native-library-compensation` removes what
+the deployment staged. Both are ordinary steps of the Job that consume nothing;
+a failed rollback is the Job's failure, a failed cleanup is owed, and otherwise
+the Job fails with its original failure. An optional cleanup that fails is
+skipped and owed with the exact action that failed (`recordCleanupDebt`: a
+plain append, not deduplicated), the Job's residue is counted again, and the
+Job succeeds. `job.result` and `job.evidence` read these Jobs.
+`tests/native_library_run.rs` replays the whole native-library oracle through
+`tests/support/hdc_oracle.rs`, which the debug HAP replay shares: every answer,
+the debt's list and continuation included, the fake's 225 calls and every file
+byte for byte; three faulted runs cover a failed rollback, a failed
+compensation cleanup and one whose outcome is lost. The daemon composes no
+code-sign helper, so the isolated daemon lists the operation as unavailable
+and plans none.
+`tests/native_library_run.rs` replays the native-library oracle but its debt
+continuation and the list after it through `tests/support/hdc_oracle.rs`, which
+the debug HAP replay shares: every answer, the fake's first 210 calls, the four
+Jobs the continuation leaves alone byte for byte and the continued one and the
+ledger as they stood before it; three faulted runs cover a failed rollback, a
+failed compensation cleanup and one whose outcome is lost.
+
+`cleanupDebt.list` reads the ledger as Swift's daemon lists it
+(`listCleanupDebt`, `encodeCleanupDebt`): every record not settled, ordered by
+Job, remote path and when it was owed, each with its residue's identity and
+whether a retry of it ever started; a ledger that cannot be read or decoded
+fails the whole list with Swift's store error, and nothing is written.
+`cleanupDebt.continue` (`cleanup_debt_continue.rs`) continues one debt as
+`continueCleanupDebt` does. A terminal Job, which Swift's engine no longer
+holds, is loaded through `recover_jobs` (its record marked `recovered: journal
+clean`); a Job whose outcome is unknown is answered without a write. The debt's
+persisted action is materialized again (`HapAction::from_persisted`,
+`NativeAction::from_persisted`; a JPEG still's cleanup with the still's own
+suffix, a declared difference) and must name its residue; a refusal is answered
+`internalError` with Swift's interpolation of the provider error, its detail
+alone. A read-only readback
+judges the residue first: gone settles the debt, inconclusive leaves it owed.
+Only a residue still present is retried, once: the retry is made durable in the
+ledger before it is sent, dispatches under the use the Job consumed (the
+persisted-evidence arm, `continue_held_use`; nothing new is consumed), and
+settles the debt, leaves it owed, or keeps its outcome unknown so that it is
+never resent. A settled debt refreshes the Job's residue count; the Job's
+journal is not written. The daemon answers both methods from its Artifact and
+Job owners. The device oracles' lists and continuations and the committed
+corpus are replayed through them, and `tests/cleanup_debt_continue.rs` covers
+what no oracle records.
+
+On Windows (TASK-XPA-012) the same code builds and the daemon answers both
+methods from its Artifact and Job owners, through the runner `job.run` uses
+there (`windows_runner`). Without an HDC composition a continuation of a debt the
+ledger owes reads the ledger and loads the Job, then is refused (`rejected`,
+`internalFailure("provider hdc is unavailable")`) before any readback or retry,
+and the ledger is not written. The control-layer corpus replay
+(`cleanup_debt_control.rs`) runs on both hosts;
+`arkdeck-agentd/tests/windows_cleanup_debt_process.rs` lists Swift's recorded
+debug HAP ledger exactly as the corpus records it across a restart, proves the
+refusal for both owed debts with the ledger's bytes unchanged, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `recovery cleanup list`, `cleanup-debt
+list` and `recovery cleanup continue` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-cleanup-debt-owner-run.md`.
+
+`rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
+`JobRunAnalyzerOracleContractTests` records with the real descriptor-bound
+dispatcher and an analyzer that answers by the first line of its source: 20
+ordered runs over one store (three published products, eight semantic refusals,
+a timeout, a signal death, a quota refusal, a removed source and five refused
+runs), Swift's reads of each Job and the store they leave. Every Job but the
+timeout case's runs under the daemon's 30 s analyzer budget; the timeout case's
+entries name the 2 s budget of the composition that holds its Job. Its source
+answers `hold`, which ends only once a release file exists under the oracle
+root, and nothing creates one in this oracle, so only that budget ends it.
+`tests/job_run.rs` reproduces every answer, read, index row, Job file, Artifact
+index and payload byte for byte. Re-record from Swift with
+`ARKDECK_RUST_JOB_RUN_RECORD=/private/tmp/<new>`. `scripts/check-job-run.py` runs
+the standalone Swift daemon and the Rust owner in turn over one state root, then
+hands the Rust-run store to a Swift daemon that reads every Job and Artifact.
+
+## Job result and evidence (TASK-XPA-014)
+
+The isolated development composition answers `job.result` and `job.evidence` for
+the analyzer Jobs it runs as Swift `RuntimeJobResourceReader` does. `JobResultReader`
+reads the Job from its durable index — an absent Job is `notFound` without
+details, as Swift answers every Job read — and refuses `job.result` for a Job
+that is not terminal with `resultNotReady` and the status's next action. The
+evidence is derived once for both reads: the catalog descriptor while the Job's
+catalog digest is current, every Artifact index row of the Job checked against
+its owner, every published payload rehashed (all or nothing), and each required
+product the index lacks named in `missingRequiredArtifacts`; the status follows
+Swift's precedence. `job.result` adds the status with its outstanding cleanup
+count, the inventory sorted as Swift sorts it, the Job's outstanding rows of the
+cleanup ledger and the one next action they leave. A read that races a change
+of the Job is refused (`resourceConflict`), and a result over 4 MiB is
+`inputTooLarge`. Rust reads write nothing, where Swift may create a Job's empty
+Artifact directory, reseal a payload or refresh its verification cache while it
+reads. Until their owners join, a Job of another operation or one carrying
+device observations or Trace probes is refused (`rejected`, with the zero-dispatch
+proof). The superseding recovery epochs are read as Swift reads them for every
+snapshot, through `recovery_epoch.rs` (Swift `RuntimeSupersedingRecoveryStore`,
+ported unchanged as design §L.1 item 13 was ruled on 2026-09-19): an unreadable
+document, and an epoch that names the Job as the Job that recovered (a
+`recoveryEpoch` the published schema still pins to null), degrade the evidence to
+`recordUnreadable`; any other store leaves it whole. `tests/recovery_epoch.rs`
+replays `rust/tests/fixtures/recovery-epoch/` (Swift
+`RecoveryEpochOracleContractTests`, re-recorded with
+`ARKDECK_RUST_RECOVERY_EPOCH_RECORD=/private/tmp/<new>`): 32 appends, lists and
+refusals, each root's files byte for byte. Nothing in Rust appends an epoch yet;
+the writers are on the M4 flash path.
+
+`arkdeck job result --job <id> [--timeout <duration>]` checks the whole result
+as Swift's CLI does — the status, the evidence, every inventory and cleanup row
+and the next action they imply — and exits 75 for an unknown outcome, then 2
+while the evidence needs attention, then 1 for a failed, cancelled or interrupted
+Job. A failed analyzer Job never publishes its required product, so its result
+exits 2. `resultNotReady` exits 75 and the request may be retried.
+
+The run oracle also records Swift's `job.result` and `job.evidence` of every Job,
+the six Job reads of an absent Job and the two reads of open options
+(`refused-reads.json`); `tests/job_run.rs` answers each through the Rust readers
+byte for byte. `scripts/check-job-run.py` compares both reads and both CLIs'
+`job result`, and has the Swift daemon read the result of every Rust-run Job.
+
+## Session publication (TASK-XPA-014)
+
+The isolated development composition publishes a Session for every terminal
+Job it runs, as the standalone Swift daemon's `RuntimeSessionPublicationWriter`
+does, through the Session owner it already holds. Once a Job's terminal record
+is durable, `SessionPublisher` reads the storage status (which initializes a
+missing catalog), claims metadata and finalization headroom on the Sessions
+volume, and composes the Manifest from the Job's record and Journal alone: a
+host target, no toolchain, the typed steps with the tuples their outcomes
+prove, and no copied Artifacts. It then writes the proposal beside the Job,
+appends the Journal's `finalized` record, creates the Session once
+(`yyyy/mm/session-<job>`, its identity document created exclusively), copies
+the Journal byte for byte, appends the outcome audit, publishes `manifest.json`
+write-once (`RENAME_EXCL`) under the Session's terminal lock and every Artifact
+publication shard, and registers the catalog entry before it releases the
+claim. The Job record keeps Swift's ownership marker at one more index version:
+the receipt once the catalog holds the entry, `awaitingStorage` when the volume
+has no room, a confirmed failure otherwise; reads report the publication fact
+from it. A parked Job, whose outcome is unknown, publishes nothing. As in
+Swift, a restart never resumes a publication and nothing retries one;
+`job.reconcile` publishes a Job's Session once it confirms the parked intent not
+executed (see Job run).
+
+A publication writes the Session aside and renames it whole. Swift writes it in
+place, where its one-level continuity scan never looks; this Runtime's scan
+reads every retained Session's Journal and takes no storage lock (see Job
+admission), so it must never meet a Session before it is complete. The
+publication stages the Session in the Sessions root's own `.staging/<UUID>` and
+writes the tree, the Journal copy, the outcome audit and the Manifest there;
+both scans pass over exactly `.staging` of a Sessions root. It holds the Session
+owner's storage lock (`.session-storage.lock`) only to read the status, to
+create staging, and to rename the Session to its name (`renameatx_np` with
+`RENAME_EXCL`, never over another entry), remove staging once it is empty and
+register the catalog entry. One sample on a quiet host, publishing a
+10,013-record Journal in 50 s, held it for 0.6, 6.1 and 23.3 ms. A Session name
+something already holds is refused where Swift refuses it, before anything is
+staged. A publication that stops short of its rename moves what it staged to the
+Session's name, as Swift leaves what it wrote in place. A crash leaves the
+staged Session: the daemon's next start removes it once it is proved this
+Runtime's (a staged name, a private directory, and the canonical Session
+identity of a Job this Runtime holds) and publishes nothing again, as Swift
+resumes no publication. Anything else is kept as it is, named on the daemon's
+standard error and in every `doctor` report (`storage.stagedSessionQuarantined`,
+a warning). `tests/pointer_input_run.rs` stops the tap's publication once its
+staged Journal ends at the injection intent: the long press submitted then is
+admitted at once, as Swift admitted it. Stopped with the lock held to rename, a
+scan answers at once and finds no Session at the name, and the long press waits
+for its status read. It also kills a publication once its staged Manifest is
+published and shows the next start removing what it staged.
+`tests/production_composition.rs` starts the daemon over a staged Session and an
+entry nothing proves.
+
+`rust/tests/fixtures/job-publication-analyzer/` is the oracle Swift
+`JobRunAnalyzerOracleContractTests.testSwiftPublishesTheSharedAnalyzerSessions`
+records with the standalone daemon's writer over a Sessions root and storage
+owner of its own: six Jobs (a success and a failure published, a parked Job, a
+full volume, a Session path something else already holds, a source removed
+before its run), each Job record's volume, device, inode and claim generation
+kept as labels. `tests/job_publication.rs` reproduces every answer, read, index
+row, Job file, Artifact, Session file and catalog, and every entry's mode, byte
+for byte. Re-record from Swift with
+`ARKDECK_RUST_JOB_PUBLICATION_RECORD=/private/tmp/<new>`. `scripts/check-job-run.py`
+compares both owners' publications and has a Swift daemon list and show every
+Rust-published Session.
+
+## Job cancellation (TASK-XPA-014)
+
+The isolated development composition answers `job.cancel` for the analyzer Jobs
+it admits as Swift `RuntimeJobEngine.requestCancel` does behind the daemon's
+handler. `JobCanceller` requires a string `jobId` (`invalidParams` "jobId is
+required"), answers an absent Job `notFound` "unknown job <id>", and otherwise
+answers `{"cancelRequested": true}` once the request is carried out or needs
+nothing; like Swift it attaches no details to a refusal. A Job at its admitted
+`preflight` boundary closes with zero dispatch at once: the three journaled
+transitions `preflight -> cancelRequested -> cancellingAtSafeBoundary ->
+cancelled` with Swift's reasons, the cancelled failure (`notAutomatic`, `none`),
+its finish time and record, and then the publication every terminal Job gets, a
+cancelled Session without steps. A Job that ended or is finalizing is left as it
+is, and so is one that waits for recovery or already carries the request; Swift
+also remembers such a request in memory for the Job's recovery, which is not
+ported (L.1 item 13).
+
+A Job this owner is running is cancelled by its run, which alone writes the
+Job's Journal: the request waits in the run's `RunCancellation` until the run
+has written and persisted Swift's `running -> cancelRequested` ("durable client
+cancellation intent"). At its last boundary before the analyzer intent the run
+then closes the Job with zero dispatch. While the child runs, the run
+terminates the child's process group as Swift's executor does (TERM, then KILL
+after 0.25 s, then a second for the group to disappear) and, once no member is
+left, records the step's confirmed `failed` outcome with semantic code
+`cancelled` and closes the Job through `cancellingAtSafeBoundary` to
+`cancelled`, which is published as a Session. A group that cannot be drained,
+or a child that finished before the request reached the run, parks the Job in
+`waitingForRecovery` without replay; once the child has finished, a request
+changes nothing. Swift answers as soon as the intent is durable; the Rust
+canceller answers once the run has acted, which for a running child is after
+the drain. A Job left active without a run here is refused as Swift refuses a
+Job it holds no runtime for (`rejected`, `internalFailure("job <id> is <state>
+but is not resident, …")`). A run of a Job no run holds waits a cancellation
+out and then meets the cancelled Job (`resourceConflict` with the zero-dispatch
+proof), and concurrent cancellations of one Job join.
+
+`arkdeck job cancel --job <id>` and `arkdeck job reconcile --job <id>` send the
+opaque identity as Swift's CLI does, print the answer and exit 0. A reconcile's
+answer is the Job's status, and an outcome it leaves unknown is that answer, not
+a failed request. Swift classifies both methods as mutation-capable, so without
+the zero-dispatch proof `notFound` is `resourceNotFound`, `invalidParams` is
+`invalidInput`, `rejected` and `internalError` are `outcomeUnknown` (75), and so is
+a reply lost after the request went out, which is never resent; a connect failure
+stays `runtimeUnavailable`.
+
+`rust/tests/fixtures/job-cancel-analyzer/` is the oracle Swift
+`JobRunAnalyzerOracleContractTests.testSwiftCancelsTheSharedAnalyzerJobs` records
+in the publication oracle's composition: four Jobs and twelve ordered requests (a
+Job cancelled before it runs, cancelled again and then run; Jobs cancelled once
+they succeeded, failed or parked; an absent Job; parameters without a string Job
+identity), Swift's four reads of each Job and everything the requests leave.
+`tests/job_cancel.rs` reproduces every answer, read, index row, Job file,
+Artifact and Session file and every entry's mode byte for byte. Re-record from
+Swift with `ARKDECK_RUST_JOB_CANCEL_RECORD=/private/tmp/<new>`.
+`rust/tests/fixtures/job-cancel-running-analyzer/` is the oracle
+`testSwiftCancelsRunningAnalyzerJobs` records with the engine's two
+cancellation hooks: a Job cancelled once its intent is durable and its `hold`
+child runs, one cancelled at the last boundary before the intent, and one
+cancelled after its success commit. The oracle and `tests/job_cancel_running.rs`
+create the child's release file only once its run has answered, so no stall
+between the intent and the cancellation lets the child finish first.
+`tests/job_cancel_running.rs` reproduces every answer, read and file byte for
+byte; re-record it with `ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD=/private/tmp/<new>`.
+`scripts/check-job-run.py` compares both owners' cancellations, one of a Job
+whose `hold` child is running included (the harness holds the oracles' lock and
+never releases that child), and both CLIs' `job cancel`, and has a Swift daemon
+answer a cancellation and a run of the Rust-cancelled Job.
+
+## Capability reads (TASK-XPA-014)
+
+The isolated development composition answers `capability.list` and
+`capability.inspect` from a capability store beside its Job state,
+`<root>/jobs-state/capabilities`, as the Swift daemon answers them from
+`<state>/capabilities`. `CapabilityStore` (`arkdeck-hoststore`) reads Swift's
+`RuntimeCapabilityStore` format under the store's blocking exclusive lock: the
+checkpoint `runtime-capabilities.json` and every event appended to
+`runtime-capabilities.ledger` since it, a torn final append dropped. It refuses
+what Swift refuses, in Swift's words: a checkpoint or ledger that is a symbolic
+link, a ledger without its checkpoint, duplicate or malformed JSON (a port of
+Swift's `StrictJSONDuplicateValidator`, `strict_json.rs`), a document outside
+the current shape or a capability breaking its model invariants (with Swift's
+`DecodingError` descriptions), an event that cannot be replayed, and
+inconsistent use accounting, lineage order or receipt and outcome digests.
+Every refusal is `internalError` with Swift's rendering of the store error, the
+store's directory included. A list row carries the capability's identity,
+effect ceiling, uses and lineage blocker (a use without a settled outcome, else
+an exhausted budget); an inspection carries the whole capability and its
+lineage, `invalidParams` without a string `capabilityId` and `notFound` for an
+unknown one. A read writes nothing but the lock file.
+
+`CapabilityStore` also writes the store as Swift's does, for the M2 admission
+the Rust owner has yet to serve; nothing in the daemon calls these writes yet.
+`install` appends a capability with its whole budget and writes the checkpoint
+atomically in Swift's `canonicalPretty` spelling, then empties an existing
+ledger, only once the checkpoint holding its events is durable. `consume`
+reserves one use after `validateNewExecution`: a device or workspace subject, a
+materialized plan digest, no earlier use left unsettled, the scope of the
+lineage's first use, then `authorizes`'s denials in Swift's order.
+`recordOutcome` settles a pending use. Each receipt and outcome is digested
+into one hash-linked lineage per capability and appended to the ledger as one
+event, fully synchronized; the event after 128 is folded into a new checkpoint
+instead. Retrying a reservation answers its receipt and writes nothing. A
+drifted retry, a second pending use and a change to a recorded outcome are
+refused, except the one change Swift permits (`resolvesUnknown`, ported as
+design §L.1 item 13 was ruled on 2026-09-19): an `outcomeUnknown` use settled
+`confirmed` or `safeToReflash` by a later readback, appended after it.
+`tests/capability_write.rs` replays the stores the M2 oracles leave
+(`pointer-input`, `port-forward`, `debug-hap`, `deploy-native-library`,
+`screen-sequence`) and Swift's `capability-resolve` store (two uses left
+unknown, then resolved) through these writes, checkpoint and ledger byte for
+byte, and checks the refusals over synthetic capabilities and the resolved
+store.
+
+`arkdeck capability list` and `arkdeck capability inspect --capability <id>`
+send what Swift's CLI sends and print the answer.
+
+`rust/tests/fixtures/capability-read/` is the oracle Swift
+`CapabilityReadOracleContractTests` records: synthetic capability stores the
+Swift store writes through its public API in temporary directories (every use
+outcome, a revocation, a device, workspace and destructive Runtime-issued
+capability, more appended events than the periodic checkpoint allows) and such
+stores with one defect each, with every answer the daemon's control plane gives
+over them and the kind and mode of every entry before and after the reads.
+`tests/capability_read.rs` reproduces every answer and leaves every store as
+Swift's reads left it. Re-record from Swift with
+`ARKDECK_RUST_CAPABILITY_READ_RECORD=/private/tmp/<new>`.
+`scripts/check-capability-read.py` places every oracle store where each daemon
+keeps its own and compares the standalone Swift daemon and the Rust owner, and
+both CLIs, over the oracle's reads.
+
+## Device observation (TASK-XPA-014, SPK-7)
+
+The isolated development composition plans, admits, runs and reads
+`observe.device@1` as the Swift engine does, when it is given a development
+HDC: `ARKDECK_DEVELOPMENT_HDC_PATH` names a fixture executable, pinned by its
+digest at startup, and is accepted only beside
+`ARKDECK_DEVELOPMENT_STATE_ROOT`. A registered HDC executable is refused there,
+because it would address a real server and device, unless the owner also
+starts it as its managed server (`ARKDECK_DEVELOPMENT_HDC_SERVER=managed`,
+below). Facts come from the Target
+owner's adopted record (`<root>/targets-state/targets.json`): the connect key,
+the identity it names, the revision and the tool version. `job.plan` binds that
+identity and revision into the plan digest; `job.run` dispatches each step
+through `arkdeck-provider-hdc`'s `ProcessDispatch`, the `HdcDispatch` every HDC
+plan takes on the verified tool runner, with its typed action persisted and its
+write-ahead intent durable first, proves the evidence preflight
+(target, model, firmware), publishes `tool-facts.json`, `device-facts.json` and
+`binding-snapshot.json`, and publishes a device Session; `job.result` and
+`job.evidence` carry the evidence observation. A step whose outcome cannot be
+observed parks the Job with its intent outstanding.
+
+`rust/tests/fixtures/observe-device/` is the oracle Swift
+`ObserveDeviceOracleContractTests` records over the fake HDC every HDC oracle
+shares (`HDCOracleFake`: one driver at `/private/tmp/arkdeck-hdc-oracle/hdc`,
+answering from the oracle's `hdc-answers.sh` in the mode `hdc-mode` names).
+`tests/observe_device.rs` replays it in-process on the oracle's clock and
+compares every answer and every file the Jobs leave. Re-record from Swift with
+`ARKDECK_RUST_OBSERVE_DEVICE_RECORD=/private/tmp/<new>`.
+
+`scripts/check-corpus-replay.py` replays any oracle in this format against the
+real daemon: it installs the fake under its lock, seeds a fresh isolated root
+from the oracle, replays every exchange the daemon serves over its socket at T1
+(times and Swift's wording as labels), checks the fake's calls, restarts the
+daemon and reads every Job again, and reads through the Rust CLI:
+
+```bash
+cargo build -p arkdeck-agentd -p arkdeck-cli
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics-read-legs
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-execution
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-lifecycle
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/trace-probe
+```
+
+## Diagnostic capture (TASK-XPA-014, M1)
+
+`capture.diagnostics@1` runs through the same composition, for the legs Swift's
+default selects. The host storage preflight asks the Artifact store for the
+room the capture may take (the request's `totalArtifactByteBudget`, else the
+operation's 512 MiB), then come the evidence preflight, the device's free space
+(`shell df -k /data/local/tmp` against the job byte budget, 128 MiB unless the
+request sets one), the HiLog drain (`shell hilog -x`; the window bounds only
+its timeout, the budget is 16 MiB) and the window inventory (`shell hidumper -s
+WindowManagerService -a -a`), each with Swift's typed action and verdict; their
+raw bytes become `hilog.txt` and `ui-dump.json`, within the job byte budget. An
+optional step the request did not select, or whose upstream did not run, is
+recorded as skipped, and every product it owned as missing, with the reason; an
+optional step that fails is skipped with its failure and the Job goes on; an
+empty HiLog drain is an unknown outcome and parks the Job, optional or not.
+Finalization publishes `capture.log` (the timeline), `markers.json`,
+`artifact-index.json` and `capture-summary.json`, which states every declared
+product's status, so a partial capture never reads as a whole one.
+`job.result` and `job.evidence` accept as missing only the products the request
+left out.
+
+Every other leg runs too, with the provider's `FileAction` (below): the
+component detail dump, the Faultlogger index and one entry of it, and the
+application liveness readback, whose facts become `application-liveness.json`;
+the component tree and the screenshot, each written to an owned path, read back,
+received under the composition's host receive root and removed, a refused
+removal owing a cleanup debt; and the Trace legs, blocking or as an armed ring
+whose held coverage anchor the record keeps (`ringCoverage`) and `markers.json`
+reports. A Trace capture's steps are bracketed by two snapshots of the trace
+tool and its parameters (`device_trace.rs` over `trace_probe`): the first must
+name the Target, a capture-eligible `hitrace` offering every requested tag and
+the whole parameter catalog before any step runs, the second is taken whatever
+the steps ended with, and the index and summary report what both read. A
+composition without a receive root plans every leg but a receive.
+
+`rust/tests/fixtures/capture-diagnostics/` is Swift
+`CaptureDiagnosticsOracleContractTests`' oracle over the shared fake: a capture
+that succeeds, one the device's free space refuses, one on another device and
+one whose HiLog drain comes back empty. `capture-diagnostics-read-legs/`,
+`capture-diagnostics-file-legs/` and `capture-diagnostics-trace/` are the
+`CaptureDiagnostics{ReadLegs,FileLegs,Trace}OracleContractTests` oracles of the
+other legs, with their failures, unknown outcomes and refusals.
+`tests/capture_diagnostics.rs` replays all four in-process and compares every
+answer and every file the Jobs leave; the harness above replays the default and
+read-leg oracles against the real daemon (a file leg needs the development
+mutation authority and names the daemon's own receive root).
+
+## Agent executions and Artifact lists (TASK-XPA-014, M1)
+
+The isolated development composition answers `agent.run`, `agent.status`,
+`agent.list` and `agent.abandon` as the Swift daemon's
+`RuntimeAgentExecutionCoordinator` does for an explicit target, and
+`artifact.list` for a Job owner. `AgentExecutionStore`
+(`agent_execution.rs`) keeps each execution as Swift's record,
+`<root>/agent-executions/execution-<sha256(executionId)>.json` (owner-only,
+canonical JSON, one more generation per durable step), beside the
+`snapshots/` directory where its pager keeps the list's pages. A run parses the closed intent with
+Swift's messages and fingerprint, validates a new execution's inputs against
+the Catalog and creates it with its orchestration deadline; the same identity
+under another intent is `idempotencyConflict`. The execution then resolves its
+target (a target never adopted is `resourceNotFound` and a stale revision
+`bindingRevisionStale`, both leaving the execution orchestrating), prepares the
+exact typed Job request (`agent-request-<seed>` and `agent-execution-<seed>`,
+the seed being `sha256(executionId)`), submits it through the Job admitter and
+answers once it owns the Job. The Job runs in the background as Swift's
+`startJob` runs it, registered with the daemon's runs before the answer, and
+the execution records the Job's end when the run returns (Swift `finishJob`).
+A status read, like a run of an execution that already owns its Job, answers
+from the record and the Job without a write; once the Job is terminal the
+answer carries its evidence and verified Artifacts. Refusals before a Job carry
+the zero-dispatch proof.
+
+`agent.list` pages every execution's stored projection without its physical
+action (`createdAtDescExecutionIdAsc`, 1 to 1,000 per page, 100 by default),
+filtered by state, operation or resolved target, through Swift's
+`RuntimeSnapshotPager`: a first page stores the whole listing under a random
+revision in `agent-executions/snapshots/`, and a cursor names one of its pages,
+never a new scan. The owner serializes every request, so, as in Swift, the pager
+keeps no lock file there. `agent.abandon` takes the execution and the
+generation its caller read. An execution that owns a Job, or whose accepted
+submission the Job owner holds, is `resourceConflict` with its `jobId`, since
+abandonment never cancels a Job, and so is a changed generation; an execution
+still orchestrating becomes `abandoned` in one more generation, and a terminal
+one is answered as it is, without a write.
+
+An execution that waits for a person, as the runbook's §2.1 path leaves one, is
+read, listed, run again and abandoned as Swift's owner does. Its record keeps
+Swift's physical-assistance actions (`connectDevice`, `trustDevice` or
+`selectDevice`, each `waiting`, `resolvedByFreshProbe` or `expired`), checked as
+Swift's `validate` checks them: at most one waits, the last, exactly while the
+execution does, and only a device selection offers choices. Its answer carries
+the waiting action (`arkdeck.human-action/1`) and a `nextAction` naming it with
+its resume reference; a list item leaves the action out. Running it again only
+reads its budget, and an abandonment, like a budget that runs out, expires the
+action in the same write.
+
+`artifact.list` pages a Job's Artifacts as Swift's `RuntimeSnapshotPager` does
+(`createdAtDescArtifactIdAsc`, cursors `<revision>.<token>`, 1 to 1,000 per
+page, 100 by default). Its snapshots live where Swift's `artifactInventory`
+keeps them, `.imports-v1/artifact-snapshots` below the Artifact root, made on
+the first list: the Artifact quota and usage census skip the Import namespace,
+and the Job owner's `cli-job-snapshots` keeps the Job list's alone, so neither
+pager reclaims the other's snapshots. A Runtime of before kept them in
+`cli-job-snapshots`; they are not moved. Their cursors are answered as
+reclaimed (`invalidCursor`), and the Job owner's pager reclaims them as its
+oldest.
+
+An execution that names no target, for an operation that binds a device, takes
+one observation through the Target observation owner and, when a person must
+act, raises Swift's action: `connectDevice` for no device, `selectDevice` for
+several, and `trustDevice` or `connectDevice` naming the one observed device
+that is not authorized and connected. A connected device whose physical identity
+is unproved is refused with `admissionDenied`; one whose identity is proved is
+adopted through the observation owner before the Job is made.
+`human-action.list` and `human-action.show` are the combined human-action
+owner's (`human_action.rs`, paged in `human-action-snapshots`), over the
+executions' actions and the control actions' impact approvals. `agent.resume`
+and `human-action.resume` continue an execution's action through fresh
+observations and guarded adoption; a control action's approval is looked up
+first and answered as Swift's daemon answers a request outside a foreground
+console (the control-action section below). A restart leaves an owned Job as it
+is: nothing resumes a run (L.1 item 13).
+
+`rust/tests/fixtures/agent-execution/` is the oracle Swift
+`AgentExecutionOracleContractTests` records over the shared fake HDC with the
+daemon's coordinator: Golden Journey 1's two runs, their reads and Artifact
+pages, and the refusals. `tests/agent_execution.rs` replays it in-process and
+compares every answer and every file the executions and Jobs leave; re-record
+from Swift with `ARKDECK_RUST_AGENT_EXECUTION_RECORD=/private/tmp/<new>`. The harness above
+replays it against the real daemon: it holds and releases the owned Job's first
+call as the oracle does, compares a listing's pages without the order of their
+items, which follows the daemon's clock, and reads every execution again after
+the restart.
+
+`rust/tests/fixtures/agent-lifecycle/` is Swift
+`AgentLifecycleOracleContractTests`' oracle for the list and abandonment: three
+executions as `agent run` leaves them, their list page by page and by filter,
+the refused list requests, the abandonments and their refusals, and the
+abandoned execution read, run again and listed. `tests/agent_lifecycle.rs`
+replays it in-process and compares every answer and every file, the list's
+snapshots by their existence and mode; the harness replays it against the real
+daemon.
+
+`rust/tests/fixtures/agent-human-action/` is Swift
+`AgentHumanActionOracleContractTests`' oracle for the §2.1 path: executions
+that name no target, the actions they raise, their resumes and the human-action
+routes. `tests/agent_human_action_records.rs` seeds its execution records, the
+identities the oracle labelled (`<har-1>`) read as valid ones of their kind, and
+answers them as the oracle recorded: the waiting execution read, listed, run
+again and abandoned, and the abandoned one run again.
+`tests/agent_human_action_raise.rs` replays, in recorded order over the shared
+fake, the 19 exchanges that need no adoption, resume or Job: the raises, the
+reads, and the list and show refusals. Replaying the rest waits for the resume
+path.
+
+`rust/tests/fixtures/agent-execution-evidence/` is Swift
+`AgentExecutionEvidenceOracleContractTests`' oracle for completed executions
+whose evidence the published results had not sampled: the three pointer
+gestures, whose Runtime capability names no Artifact (`artifactDigest` null); a
+workspace copy, whose target is its project; and a tap and an analysis that
+wait for a person to connect the device, are resumed, and are resumed again
+once complete, by `agent.resume` and `human-action.resume`. Its frames widened
+those four results. `crates/arkdeck-agentd/tests/agent_run_cli_process.rs`
+runs the real CLI against the real daemon for the copy, the gestures and the
+assisted tap, the oracle's device answering behind the managed fake HDC
+(`fake-hdc.c`'s `DRIVER`).
+
+The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
+<reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
+<path>] [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]`
+(or `--request-file <path>`) builds the execution intent and checks it before
+anything is sent, sends `agent.run`, and reads `agent.status` at 100 ms doubling
+to 2 s until the execution settles; `--timeout` bounds only its own wait. A
+completed run prints its execution and exits 0, 1 for a failed, cancelled or
+interrupted Job, 2 for evidence that could not be verified and 75 for an unknown
+outcome; a run that stops before its Job exits with the execution's failure
+code. `arkdeck agent status --execution-id <id>` reads one execution; `arkdeck
+agent list [--state <state>] [--operation <reference>] [--target <id>]
+[--page-size <n>] [--cursor <cursor>]` pages the executions; `arkdeck agent
+abandon --execution-id <id> --expected-generation <n>` abandons one that owns no
+Job; and `arkdeck artifact list --job <id> [--page-size <n>] [--cursor
+<cursor>]` pages a Job's Artifacts. An execution identity is checked before
+anything is sent. Every execution answered and every Artifact page is checked
+as the Swift CLI checks it, and an execution page is passed on as the Runtime
+answers it. A page is a bounded read; an abandonment is a mutation, so a refusal
+without the zero-dispatch proof, or a lost reply, is an unknown outcome (75).
+
+`arkdeck runtime hdc status` reads `runtime.hdc.status` as the Swift CLI does:
+no parameters and no options of its own, a bounded read emitted as the Runtime
+answered it, exiting 0 whatever availability the status reports.
+`crates/arkdeck-cli/tests/runtime_hdc_status.rs` replays Swift's argv fixture and
+serves every answer of Swift's frame corpus to the actual CLI through the fake
+Runtime in `tests/support`, which the later HDC control-action CLI tests share.
+
+`arkdeck runtime hdc impact-preview --action restart --server-endpoint-ref <ref>
+--expected-server-generation <n> --action-request-id <id>` and `arkdeck runtime
+hdc restart --control-action <id> --preview-id <id> --preview-digest <sha256>`
+follow Swift's registry grammar, then its handler's checks before any
+connection (an exact restart intent, or one exact preview tuple, else
+`invalidInput`), and emit the Runtime's answer as it gave it. Both are
+mutations: a refusal without the zero-dispatch proof, or a lost reply, is an
+unknown outcome (75), and both methods' published details admit no proof. A
+restart answers `awaitingImpactApproval`; the approval is `human-action
+resume`'s at Swift's interactive console, which this CLI answers
+`humanActionRequired`. `crates/arkdeck-cli/tests/hdc_control_actions.rs`
+replays Swift's argv fixtures and serves the recorded preview, restart and
+refusals to the actual CLI.
+
+`arkdeck control-action list [--kind hdcLifecycle] [--state <state>]
+[--page-size <n>] [--cursor <cursor>]`, `arkdeck control-action show
+--control-action <id>` and `arkdeck control-action reconcile --control-action
+<id>` read and reconcile the control action a restart creates, as the Swift CLI
+does: Swift's registry grammar, an exact identity checked before any
+connection, and the answer emitted as the Runtime gave it. Swift classes all
+three as mutation-capable, so a refusal without the zero-dispatch proof, or a
+lost reply, is an unknown outcome (75). `crates/arkdeck-cli/tests/control_actions.rs`
+replays Swift's argv fixtures and serves the recorded show, list, reconciliation
+and refusals to the actual CLI.
+
+## Target presentation owner (TASK-XPA-012)
+
+The explicitly isolated development composition owns `targets-state/` and serves
+`target list`, `target show`, `target display-name set|clear`, and
+`device display-name set|clear`. Target bindings and alias history are validated
+and read. Only an adoption of a new Target (below) writes `targets.json`. Local
+names use the current Swift `target-display-names.json` format, private
+descriptor-anchored locks and atomic publication. Every transaction waits for
+both locks, as Swift's blocking `flock` does, so a concurrent one (another
+thread, owner or process) delays it rather than refusing it. Target names
+survive restart; candidate names require the current Runtime observation
+reference and expire on refresh or restart. A lost or invalid name-write reply
+is `outcomeUnknown`; the CLI never replays it.
+
+With the development HDC, the daemon answers `device.observations` (following a
+reference too) and `target.adopt` through the owner below. Beside the registered
+HDC the isolated owner starts as its managed server, its USB relations are the
+Runtime's own (`UsbRegistryRelations`, "Trusted USB relations" below); beside a
+fixture it reads none, so a fixture's candidates are proved and adopted only
+when the isolated development owner names a development source:
+`ARKDECK_DEVELOPMENT_USB_RELATIONS`, an absolute path beside the development
+HDC's fixture (beside a registered one, in place of the Runtime's own and only
+as the HDC runtime status section below says), read on every call
+(`{"relations": [...]}`, with `"after": {"reads": n, "relations": [...]}` for a
+replug the oracle times by its reads). A host composed with relations
+(`Host::with_usb_relations`) proves and adopts as Swift does. Candidate display
+names stay on the provider snapshot's path until Swift's coordinator is recorded
+for them, so with the development HDC they find no current snapshot
+(`resourceConflict`). Without the development HDC, observations keep the
+read-only provider's path. The daemon writes no alias history, but routes a
+Target with a proven post-Flash alias as Swift's `hdcExecutionRoute` does
+(`TargetDocument::hdc_route`, `TargetStore::hdc_route`, TASK-XPA-013): every
+completed reading is kept for five seconds as the live candidate list; while it
+is fresh the Target's HDC commands, and the identity an HAP or native-library
+Import binds, use the sole Connected key of the Target's own and its alias's,
+refusing none or both, and otherwise the alias's key.
+`target.show` leaves the absent Bootstrap warm presentation and confirmed
+Job-observation sources as `null`. Existing adopted names can be projected onto
+actually observed provider addresses.
+
+`TargetObservations` (`target_observation.rs`, TASK-XPA-014) is Swift's
+`TargetObservationCoordinator`. Every device list is bracketed by two reads of
+independently observed USB relations: lane B's `Reading`, over an `HdcDispatch`
+and a `UsbRelations` port. An observation keeps its identity only while an
+unchanged proved relation carries it. The fact generation advances only when the
+facts change, and that expires the candidate names. A reference is followed only
+while it still belongs to the snapshot. `adopt` adopts the device of one exact
+current observation whose relation still holds through the tool version, the
+identity readback and a final relation read. Its refusals carry Swift's codes:
+`targetTrustPending`, `admissionDenied`, `factsDrifted`, `resourceConflict` and
+`operationUnavailable`.
+
+`TargetStore::adopt_observed_candidate` writes the adoption in one transaction:
+1. It materializes the Target: an alias's canonical Target, the Target with the
+   same identity, or `TGT-` and twelve digits at revision 1.
+2. It stages the candidate's name onto the Target.
+3. For a new Target only, it writes `targets.json` in Swift's encoding.
+4. It finishes the candidate names.
+
+The snapshot, the generations and the receipts live in memory, as in Swift.
+`tests/target_adoption.rs` replays Swift's `TargetAdoptionOracleContractTests`
+(`rust/tests/fixtures/target-adoption`) byte for byte: its answers, the fake's
+calls, `targets.json` and the display names. `target_observation_control.rs`, in
+agentd's `tests/spawning`, replays the same fixture through `Control` with the
+daemon's own host, on the host's clock, so every time there reads as `<time>`.
+
+`rust/scripts/check-target-resources.py --swift-target-store <fixture-directory>`
+checks actual Rust endpoint/CLI behavior from bytes exported by the Swift contract
+producer; `--cli-path` selects a current Swift consumer. The fixture is explicitly
+simulated host-test data. Run it after current Swift producer recording and schema
+generation; it checks typed refusals as well as CAS, restart and binding-byte
+preservation. No hardware acceptance is claimed by this harness.
+
+The Rust CLI's `target adopt --candidate <key> --observation <id>
+--observation-generation <n>` and `target availability --target <id>` are
+Swift's leaves (TASK-XPA-014). An adoption is a mutation: its answer must be
+exactly the receipt of that observation (`adopted`, a Target, a positive binding
+revision, and the request's observation and generation), or it is
+`outcomeUnknown` (75) and never replayed. A Runtime refusal keeps its code
+(`resourceConflict`, `targetTrustPending`, `admissionDenied`, `factsDrifted`,
+`operationUnavailable`) only with the pre-admission zero-dispatch proof. The
+generation follows Swift's positive-integer grammar, so a leading zero is a usage
+error that is never sent. Availability is one bounded read of the Runtime's
+aggregate, emitted as it answered. `crates/arkdeck-cli/tests/target_adoption.rs`
+replays Swift's argv fixtures and serves every answer of the Target adoption
+oracle to the actual CLI.
+
+## macOS HDC server identity (TASK-XPA-016, SPK-6)
+
+`LoopbackServerLease::acquire(tool, 127.0.0.1:<port>)` proves that an HDC server
+already exists on macOS the way Swift's `HDCExact320FSystemIdentityObserver`
+does: it reads libproc, never connects to the endpoint and never launches a
+client (not even `checkserver`, which may bootstrap a server). The one process
+running the verified executable that owns exactly one TCP listener on the exact
+registered loopback spelling — `127.0.0.1` or its IPv4-mapped IPv6 form as the
+kernel labels it, never a wildcard — is named by its birth identity; two scans
+must agree, and `revalidate()` fails once that process exits or a PID is
+recycled. `NotFound` is Swift's `unavailable`, `PermissionDenied` its `unknown`.
+The owner must also be the calling user, as on Windows. `HdcReadOnlyProvider`
+acquires this lease before its only argv and revalidates it after the process,
+so `device.observations` can now reach a spawn on macOS when a published HDC
+identity is registered and its server is up. A candidate process that exits
+between being listed and having its sockets read owns nothing and is skipped
+(a server restarting under a scan is caught by the two scans having to agree);
+a process the kernel will not describe stays `unknown`, since it may own the
+endpoint. `tests/loopback_server_lease.rs` drives it with listener processes
+of the test binary itself (re-executed with `listener_process` selected) and
+with `/usr/bin/nc` in place as another executable; no real HDC is launched by
+the tests.
+## Verified tool runner (TASK-XPA-016, SPK-6)
+
+`VerifiedTool::run_tool(&ToolRequest { arguments, environment, working_directory,
+limits }, cancelled)` runs any pinned executable the way Swift's
+`FoundationProcessExecutor` runs a descriptor-bound provider dispatch: spawned
+through its retained inode in a new process group; a caller-named environment
+overlaid on the clean base (`PATH`, `LANG`, `LC_ALL`; the daemon's own
+environment is never inherited, and `PATH`, `LC_ALL` and dynamic-loader
+variables cannot be overlaid); a child-only working directory that must be an
+absolute, canonical, existing directory; `/dev/null` as stdin; each stream kept
+to its first `capture_bytes` while the rest drains; a timeout that terminates
+the process group (TERM, then KILL after 0.25 s); and a cancellation probe asked
+before the spawn (no child) and while the child runs (the group drained). The
+result carries both streams, whether either was truncated, the termination
+(`Exited`, `Signalled`, `TimedOut`, `Cancelled { drained }`) and the monotonic
+duration Swift's receipt reports; `Refused` errors ran no tool code,
+`Unobservable` ones cannot say what the child did. `run_analyzer` is this runner
+with the source Artifact retained. `tests/tool_process.rs` drives it with shell
+scripts; the HDC provider's `run_read_only_*` path is unchanged until lane A's
+dispatch seam moves onto it.
+
+## Persistent device shell channel (TASK-XPA-016, SPK-6)
+
+`DeviceShellChannel::open(tool, ["-t", <key>, "shell"], env, settle)` keeps one
+`hdc shell` open on a pseudo-terminal, as Swift's `PersistentDeviceShellChannel`
+does for pointer injection: echo and newline translation off, the client in its
+own process group on the retained inode, opening proved by a framed `true`.
+`run(tokens, timeout, budget)` carries bare tokens only and brackets each
+command with a fresh nonce, so the device shell reports the command's own exit
+status and a late answer can never be read as the next command's. An answer
+past the budget is trimmed and marked; one past the budget plus 4 MiB, the
+timeout or the client's death closes the channel as an unknown outcome, never
+a failure. `tests/shell_channel.rs` drives it with `/bin/sh -i`; no HDC is
+launched by the tests.
+
+## PTY prompt/secret exchange (TASK-XPA-016, SPK-6)
+
+`VerifiedTool::run_pty_exchange(&PtyRequest { arguments, environment,
+working_directory, timeout }, interactions, output_byte_budget, cancelled)`
+runs a signer on a pseudo-terminal as Swift's `IdentityBoundPTYExecutor` does:
+echo disabled by the parent before the child runs, each exact prompt answered
+in order with its secret, the secret never in argv, environment or result, a
+secret seen in the output or a prompt out of protocol ending the exchange, the
+budget, the deadline and a cancellation terminating the child's group. What
+comes back is the termination, how many prompts were answered, how many bytes
+were seen and Swift's closed failure category classified from the diagnostic
+after the last prompt; the transcript is wiped. `tests/pty_exchange.rs` drives
+it with shell scripts that print the signer's prompts; no signer is launched.
+
+## Windows PTY prompt/secret exchange (TASK-XPA-011, G19)
+
+`VerifiedTool::run_pty_exchange` and its `Pty*` types build on Windows with
+the macOS signature and errors (`src/windows/pty.rs`). The verified tool is
+attached to a pseudo console (`CreatePseudoConsole`,
+`PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`) through the tool runner's spawn:
+argv array, no shell, suspended, image proved before resume, kill-on-close
+Job, clean environment, no inherited handle. Each exact prompt is matched in
+the rendered console output and answered with its secret and CR in one write
+from a wiped buffer; a rendered secret, a repeated or out-of-order prompt, an
+early exit, the budget, the deadline and a cancellation end the exchange, and
+every path ends the Job and closes the console. Windows differences: echo is
+the child's choice and is detected (`SecretEchoDetected`) rather than cleared
+by the parent, a secret must be UTF-8 without control characters, and a
+prompt's trailing space is not matchable (the console renders it as a cursor
+move). `tests/windows_pty_exchange.rs` is a `harness = false` target whose
+fake signer is the test binary on the pseudo console; no signer is launched.
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
+
+## Windows persistent device shell channel (TASK-XPA-016, G19)
+
+`DeviceShellChannel` and its answer and error types build on Windows with the
+macOS signature. The framing, the bare-token rule, the budgets and the
+outcomes stay in `src/shell_channel.rs`, shared; only the client under them
+is per platform: the macOS pseudo-terminal client keeps its code, and
+`src/windows/shell.rs` attaches `hdc` to a pseudo console through the G19
+spawn (argv array, suspended, image proved before resume, kill-on-close Job,
+clean environment with a validated overlay), because `hdc shell` refuses a
+plain pipe. Windows differences: a framed line ends with CR; the console's
+rendering is read as text (its VT control sequences are removed before the
+frame is looked for, a cursor-forward over blanks reads back as the blanks,
+lines end in CRLF), so the answer bytes are T1; the shell "comes up" only on
+rendered text; a flood is bounded by the console and ends at the timeout,
+still an unknown outcome; closing ends the client's Job, its descendants
+included. `tests/windows_shell_channel.rs` is a `harness = false` target
+whose fake `hdc -t <key> shell` is the test binary on the pseudo console; no
+HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-016/windows-shell-channel-run.md`.
+
+## HDC process dispatch (TASK-XPA-016, SPK-6)
+
+`arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
+`VerifiedTool::run_tool` as Swift's `DescriptorBoundProcessDispatcher.hdc(resolver:)`
+dispatches: a plan's arguments and budget, no working directory, the runner's
+clean base plus `OHOS_HDC_SERVER_PORT` only when the daemon inherited a valid
+port. An exited child is a receipt with its real exit status, both streams and
+whether either went past the capture; a timeout or a signal death leaves the
+outcome unobservable (Swift's wording); a refused budget, environment or
+identity means nothing ran. It never gates a dispatch on the server lease.
+`tests/process_dispatch.rs` drives it with shell scripts and the shared fake HDC
+driver. The isolated development owner dispatches its fixture HDC through it
+(TASK-XPA-014), and so do the `observe.device@1` and agent execution replays.
+
+## Managed HDC server (TASK-XPA-016, SPK-6)
+
+`arkdeck_platform::ManagedServer` launches a verified tool through its retained
+inode in its own group with no budget, records its launch from the kernel
+while the child is still suspended (PID, birth, canonical path, digest, argv —
+read before the child can run, so a server that ends at once is reported as
+its exit, never as a launch that could not be recorded), captures both
+streams up to a limit, says how it ended and stops it. `arkdeck_provider_hdc::ManagedHdcServer`
+owns an HDC server with it as Swift's `HeadlessHDCServerHost` does: `hdc -s
+<endpoint> -m` with the server port named, the loopback listener reachable
+first (never `checkserver` first), `checkserver` exit 0 with agreeing versions,
+then the listener's owner proved to be the launched process by
+`LoopbackServerLease` and the same birth; a reachable listener of another
+process, however exact, is `Unbound`. `tests/managed_server.rs` in both crates
+drive it with shell scripts and a fake `hdc` compiled from C at test time; no
+real HDC is launched.
+
+## Windows tool dispatch and managed HDC server (TASK-XPA-005)
+
+Gate-inventory group 5 is ported to Windows in `arkdeck-platform`: the tool
+types (`ToolRequest`, `ToolLimits`, `ToolExecution`, `ToolTermination`,
+`ToolRunError`) and the server records (`ServerIdentityReceipt`,
+`ServerLaunch`, `ServerExit`, `ServerStop`) are one set shared with macOS, and
+`VerifiedTool::run_tool`, `ManagedServer::launch` and the commandless
+`LoopbackServerLease` receipt have Windows implementations (`CreateProcessW`
+argv array in a kill-on-close Job object; `GetExtendedTcpTable` owner, image
+file identity and creation time). Windows has no TERM, so a deadline, a
+cancellation or a stop terminates the Job at once, and Windows reads no argv of
+another process, so `ManagedServer::verifies(receipt)` proves the receipt names
+that server's own child (launch record, creation time, image file, Job
+membership, declared endpoint, listener) where macOS reads argv
+(`verifies_managed_process`). `arkdeck_provider_hdc::ProcessDispatch` and
+`ManagedHdcServer` now build on Windows; `mutation_identity_current()` stays
+`false` there (no Windows launch identity is published), and only a registered
+Windows HDC tuple composes them (below): DevEco Studio 26.0.0.43's `hdc.exe`
+(CHG-2026-078, `3.2.0g`, `127.0.0.1:8710`) only.
+`tests/windows_tool_dispatch.rs` (platform) and `tests/windows_managed_hdc.rs`
+(provider) are `harness = false` targets whose fake tool and fake `hdc` are the
+test binary itself; no real HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
+
+The managed server's start and stop follow #2131's semantics on Windows as
+well.
+- A start refuses an endpoint something already listens on before launching
+  anything, and names the holder.
+- The stop's `end_proved_process` (the macOS one's Windows counterpart) ends
+  only the process a proof names: a replacement server a confirmed restart
+  left outside the Runtime's Job. It opens the PID once, which pins it, and
+  checks the receipt's birth and this user on that handle before
+  `TerminateProcess`. Another birth, or a PID of 4 or less, ends nothing.
+  Windows has no TERM, so the grace is not waited.
+- `windows_tool_dispatch.rs` proves the end, and that no other birth is ever
+  ended. `windows_managed_hdc.rs` runs restart, then stop, then start: the
+  replacement blocks the start, and once the proved replacement is ended,
+  the next start owns the endpoint.
+- The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
+  lifecycle) builds on Windows and is composed behind the HDC tuple gate
+  (`windows_hdc_gate.rs`, CHG-2026-078). A development root whose
+  `ARKDECK_DEVELOPMENT_HDC_PATH` (with `ARKDECK_DEVELOPMENT_HDC_SERVER=managed`)
+  hashes to a registered tuple starts it as its managed server on the
+  tuple's endpoint, after its stores and before the ArkForge lane; its
+  dispatch registers the HDC, `runtime.hdc.status` and `target.availability`
+  answer from it, and the daemon stops it after the drain and before
+  releasing the root (exit 70 when the owner must be recomposed). The
+  status verifies the process by provenance (`ManagedHdcServer::verifies`).
+  `WINDOWS_HDC_TUPLES` holds only DevEco's `hdc.exe`, so every other input is refused before
+  the root is opened and a root without one answers `runtime.hdc.status` as
+  unconfigured (`windows_lifecycle_process.rs`); the composed path is
+  exercised with an injected tuple and a stand-in compiled at test time
+  (`windows_lifecycle::tests`).
+- The account daemon's HDC (TASK-XPA-012), as macOS production composes it:
+  only when `ARKDECK_HDC_PATH` (an explicit absolute path) is set, and then
+  the account's Bootstrap registry's selection
+  (`%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`): while the registry holds none,
+  the configured `hdc.exe` is registered and adopted as the first selection,
+  admitted only when a registered Windows tuple names its digest (the
+  store's published identities are `WINDOWS_HDC_TUPLES`'); once a
+  selection exists the configured file is never what runs. The selection's
+  retained `hdc.exe` is admitted again by the tuple table, its endpoint must
+  be the tuple's (`OHOS_HDC_SERVER_PORT`), a pending selection that never
+  entered its launch window is settled failed, and Swift's startup
+  transaction (`tool_selection_startup`, now built on Windows) starts it as
+  the managed server and publishes or restores the selection.
+  `ARKDECK_HDC_SHA256` is refused, as on macOS. Beside it the union
+  control-action owner holds the HDC control-action owner and the
+  tool-selection owner (`tool-selection-control-actions`, over the same
+  registry), so `runtime tool select` is answered on Windows; its restart
+  runs through the managed server's lifecycle (`ToolSelectionDriver`). The
+  account daemon proves device-mutation continuity against its own Job
+  state, so its Jobs run over this HDC; no development root gains a
+  mutation authority. Exercised with an injected tuple and the compiled
+  stand-in (`windows_lifecycle::tests`); `arkdeck-bootstrap`'s
+  `tests/windows_tool_registration.rs` holds the Windows selection ledger.
+- The registration itself (CHG-2026-078 TASK-WHR-002): the c2 tuple in
+  `WINDOWS_HDC_TUPLES`, the registered `deviceObservationSnapshot` grammar
+  `parse_registered_windows_presence` (six columns; only `USB` rows are
+  devices; the sampled `COM<n>`/`UART`/`Ready` rows are excluded; `[Empty]`,
+  zero bytes and every other form `unknown`). CHG-2026-078 r3 adds one form:
+  the server-startup listing `[Empty]` CR TAB `hdc` CR LF
+  (`WINDOWS_SERVER_STARTUP_LISTING`, exit 0, empty stderr) is
+  `ObservationFailure::NotYetObservable` (`unknown`, retryable), never no
+  device. On Windows `ManagedHdcServer::start` settles past it
+  (`settle_startup_listing`, at most `WINDOWS_STARTUP_SETTLE` = 3 s) and
+  records `StartupListing::Settled` or `Unsettled`; an unsettled server's
+  observations stay `unknown`. `healthyCheckserver` is no
+  registered Windows probe (`checkserver` starts a server when none runs);
+  Windows server health is the commandless `runtime.hdc.status` observation.
+  `observe.device`'s `probeHDCServer` lowers to that commandless
+  observation on a registered Windows tuple (TASK-XPA-005, below). `tests/windows_hdc_registration.rs`
+  closes the table and grammar on `openspec/integrations/openharmony/
+  windows-probes.yaml`, `rust/tests/fixtures/hdc-windows/` and the lock. No
+  consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
+  until then a Windows device listing read by the macOS grammars is
+  `unknown`.
+  (`windows_lifecycle::tests`). Swift's union control-action owner is
+  composed on every Windows root (`control-action-snapshots`), over the HDC
+  control-action owner (`hdc-control-actions`) only beside that managed
+  server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
+  `operationUnavailable` without one, as on macOS. The tool-selection owner
+  is composed beside the account daemon's selected HDC (above).
+- Its consumers (TASK-XPA-005): a dispatch names the registered Windows
+  tuple its executable is pinned to (`HdcDispatch::registered_windows_tuple`;
+  `ProcessDispatch` by its digest, on Windows only), and the candidate list,
+  the identity readback and `observe.device`'s confirmation read that tuple's
+  listing with `parse_windows_target_list`, its `-v` with
+  `parse_host_client_version` and the managed start's readiness with
+  `parse_host_server_check` (the CR LF forms the Swift-parity splitter cannot
+  read); every other dispatch keeps the macOS grammars. The managed server is
+  named `TEMP`/`TMP` on Windows (without them `3.2.0g` cannot create its
+  mutex file and exits 0), and a server receipt's `\\?\` image path is
+  compared in the plain spelling. `windows_hdc_live_process.rs` runs the
+  real daemon and CLI over the registered `hdc.exe`
+  (`ARKDECK_LIVE_WINDOWS_HDC`).
+- `probeHDCServer` on a registered Windows tuple (TASK-XPA-005, WHR-002's open
+  point): the step is the commandless server observation
+  (`serverIdentityGeneration`, `HdcDispatch::observe_server`), never
+  `checkserver`. `ProcessDispatch` observes its pinned executable's own
+  listener at the tuple's endpoint (`CommandlessIdentity`), and
+  `DevelopmentHdc` does so only while its launched server is current. The plan
+  names the step `"processKind": "commandless"` with no argv, the run launches
+  nothing, and the step verifies the tuple's version as the client's and the
+  server's once that server is observed, or is unknown otherwise. A dispatch
+  pinned to no Windows tuple keeps Swift's `checkserver`
+  (`hoststore/tests/windows_observe_device_commandless.rs`,
+  `provider-hdc/tests/windows_hdc_adoption.rs`).
+A device command names its target in one place:
+`arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
+`-t <connectKey>` before the command's own arguments. Every plan the provider
+lowers goes through it: observation, capture, Debug HAP and reads, native
+library, port forward, pointer input, trace probe, live mode, and the Rockchip
+reads and Loader entry. `operation::tests::every_target_flag_is_added_here`
+fails if any other non-test code writes `-t` before a connect key. On Windows,
+`windows_managed_hdc.rs` runs a lowered device plan through `ProcessDispatch`:
+the fake process face receives exactly `-t <key> shell param get
+const.product.name`. A plan with no connect key runs nothing.
+
+## Windows xcopy package (TASK-XPA-022)
+
+The daemon and the CLI also ship as an xcopy package for CI and headless use
+(CHG-2026-074 r12 decision 10; Windows 11 x64 only, r13). The App is not in
+this package; the whole-product release candidate (the App, the daemon and the
+CLI, xcopy and MSIX) is `windows/scripts/package-rc.ps1`, which builds this
+package first (`windows/README.md`, "Release candidate package").
+[`scripts/windows-package-xcopy.ps1`](scripts/windows-package-xcopy.ps1)
+(PowerShell 7.2+) builds it from one recorded checkout:
+
+```powershell
+pwsh -File rust/scripts/windows-package-xcopy.ps1 -OutputDirectory D:\out\xcopy -SigningMode development -Smoke
+```
+
+It refuses an existing output directory, and a build that fails removes the
+output directory it created. It also refuses a checkout with any
+change or untracked file unless `-AllowDirty`, which the manifest records with
+the entries it found; a production package is never built from a dirty
+checkout. It runs `cargo build --release --locked -p arkdeck-agentd -p
+arkdeck-cli --target x86_64-pc-windows-msvc` and stages `arkdeck.exe` and
+`arkdeck-agentd.exe` side by side, because the CLI's default daemon is its
+sibling. Beside them it stages the OpenHarmony code-sign helper a native
+deployment sends to the device (TASK-XPA-009): the checked-in
+`arkdeck-code-sign-enable` at the recorded revision, at
+`ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/` where the
+daemon looks beside itself. It is an arm64 ELF, data on the host, so it is
+never Authenticode-signed; the manifest pins its bytes as it pins the
+executables'. It then signs both executables (`-SigningMode`):
+
+| Mode | Signer |
+| --- | --- |
+| `none` | Nothing is signed. The CLI refuses this daemon, since there is no signer to pin. |
+| `development` | `windows-dev-identity.ps1 sign` with the host-trusted development certificate (`-Thumbprint`, else `ARKDECK_DEV_SIGNER_THUMBPRINT` from the process or the user environment). This is not an installation identity. |
+| `production` | An external command the maintainer supplies (`-ProductionSignCommand`, else `ARKDECK_PRODUCTION_SIGN_COMMAND`), called once per file with the file's path as its only argument. For example, a wrapper around `signtool sign /fd SHA256 /tr <timestamp URL> /td SHA256 /dlib <Artifact Signing dlib> /dmdf <metadata.json>`. The script holds no credential. If no command is configured, it fails before building. |
+
+Each signed file must pass `Get-AuthenticodeSignature` with status `Valid`. In
+development mode both files must carry the same signer, and the pin is the
+SHA-256 of the signer certificate's DER; `-ExpectedSignerSha256` optionally pins
+the expected certificate. A production signature must also carry a timestamp,
+and is pinned by publisher identity instead (maintainer ruling 17): each file's
+chain must end at Microsoft Identity Verification Root Certificate Authority 2020
+(the root the CLI pins), and both leaves must carry the same single subject `O=`
+and the same Artifact Signing identity EKU (`1.3.6.1.4.1.311.97.<profile>`); the
+leaves themselves may differ across a daily renewal, and `-ExpectedSignerSha256`
+is refused. The manifest's `signing.publisher` and `daemonConfiguration` then
+name `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` and `ARKDECK_DAEMON_PUBLISHER_EKU`
+in place of a pin, the script prints those, and the smoke checks the unpacked
+daemon's publisher and configures them. The script writes
+`manifest.json` (`arkdeck.windows-xcopy-package/1`) inside the package. It
+records the revision, the dirty flag and entries, `rustc -V`, `cargo -V`, the
+target, the cargo arguments, each file's size and SHA-256, the signing mode and
+the signer pin. The script then zips the package directory
+(`arkdeck-<version>-windows-x64-<revision>.zip`) and writes the same manifest
+beside the zip with the zip's SHA-256 added. Last, it prints the pin to
+configure. To use the package, unpack it anywhere and set
+`ARKDECK_DAEMON_SIGNER_SHA256` to that pin; `ARKDECK_DAEMON_PATH` stays unset,
+so the CLI uses its sibling daemon. Nothing is installed or registered, and
+uninstalling is deleting the directory. The daemon's state (`%LOCALAPPDATA%\ArkDeck\Agentd`,
+or a development root) is separate from the package and stays after that.
+
+`-Smoke` (after a build), or `-SmokeZip <zip>` alone (for example on a clean
+host), unpacks the zip into a new directory under `-SmokeParent` (default: the
+temporary directory). It checks each file against the manifest and the
+daemon's signer against the pin. Then, with the pin and a private development
+state root inside that directory, it runs `arkdeck --output json doctor`, which
+must answer `ok: true`. If the CLI starts its daemon (decision 11), that daemon
+must be the unpacked one. Otherwise the smoke starts the unpacked daemon itself,
+waits for its `listening on` line, and runs doctor on the root's pipe. It runs
+`runtime service verify`, which is recorded as unavailable when the CLI does not
+serve it on Windows. It stops the daemon through the root's stop event (what
+`InstanceScope::request_stop` sets), waits for it to exit (`arkdeck-agentd
+stopped`), and removes the directory. It synchronises on output, exit and the
+instance document, never on sleeps. The smoke writes its record to
+`smoke.json` beside the zip, or to `-SmokeRecord`.
+
+The development-signed package passes `Get-AuthenticodeSignature` only on a host
+that trusts the development certificate. A clean host needs the production
+signature. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/xcopy-package-run.md`.
+## Windows Artifact read and export (TASK-XPA-006)
+
+The Artifact read, inspect, list and export owner (`ArtifactReadStore`,
+`ArtifactReadRequest`, `ArtifactInspectRequest`, `ArtifactExportRequest`) is
+built on Windows over the host store's NTFS export, file-export and
+payload-cache primitives (`crates/arkdeck-platform/README.md`), with the same
+Job index documents, payloads and snapshot pages as macOS; its quota answer
+stays macOS-only (the usage owner is on Windows, H3b; the Import owner below). An export destination on Windows is a
+local drive's absolute path (`C:\…`), `.` and `..` resolved and the drive
+letter upper-case, which must be the directory's own spelling (no junction,
+link, short name or other case); the receipt's `exportedPath` joins the file
+with `\`. The CLI spells a destination the same way. A name containing `\` or
+another NTFS-reserved character is refused rather than rewritten.
+
+The Windows daemon composes the owner over its root's `artifacts` (the
+development root and the account's `%LOCALAPPDATA%\ArkDeck\Agentd` alike),
+created owner-only when absent and never re-permissioned: an existing
+`artifacts` that is not owner-only refuses the start. Every Artifact belongs to
+a Job, which the daemon's Job store (`jobs-state`, "Job store owner on
+Windows" above) proves before anything is read, listed or exported; a Job it
+does not hold is refused `resourceNotFound` ("Artifact Job owner does not
+exist") and nothing is touched. `tests/windows_artifact_owners.rs`
+(hoststore) reads and exports the
+macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
+recorded bytes and digests and reproduces the Swift daemon's recorded
+`artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
+(agentd) records the Job into the daemon's Job store, answers `artifact list`,
+`inspect`, `read` and `export` over the real daemon's pipe before and after a
+restart and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
+development-signed copy. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
+
+## Windows Import owner (TASK-XPA-008)
+
+`arkdeck-hoststore` builds the Import owner (`ImportUploadStore`: begin,
+append, abort, commit, inspect, list, release, an Import's Artifacts, and a
+Job's Import inputs) on Windows, over the host store's NTFS import upload
+(#2357) and the Artifact publication and read owners. The code is the macOS
+code, and `TargetStore::resolve_import_binding` with it. A `flash-bundle`
+Import is judged at publication by the Flash archive reader, which reads the
+archive on Windows with the platform's own raw DEFLATE decoder (#2410). Its
+upload is measured end to end through the CLI (#2435). The Windows
+daemon composes the owner over its Artifact root's private `.imports-v1`,
+right after the Artifact owner (census `…, artifacts, imports, storage, …`),
+and hands it to the Job planner and runner. The CLI's `artifact import
+<kind>` uploads on Windows through the host store's `HostImportSource`,
+which holds the source open without write sharing, so it cannot change
+while it is sent; other hosts keep refusing the upload.
+
+Tests on Windows: `tests/import_upload.rs` (31 of its tests; the analyzer
+and child-kill ones stay macOS-only), `tests/import_target.rs` and the
+Swift Import refusal oracle (`import_refusal_oracle_tests.rs`), with
+fixtures made owner-only by `tests/fixture_fs`; the CLI's upload tests;
+and `arkdeck-agentd/tests/windows_import_owner_process.rs`: over the real
+daemon a HAP is uploaded, committed with its exact bytes, read through the
+Import owner, listed, inspected and released across a restart, a flash
+bundle is refused with nothing published, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, the real CLI imports, inspects, lists and
+releases. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
+
+## Windows Debug reads (TASK-XPA-008)
+
+The Windows daemon answers `debug.probe` and `debug.template.run` as Swift's
+daemon composes its Debug probe. Each reads through the Host's HDC composition
+(`HdcComposition::debug_read`, now built on Windows). That composition is the
+registered tuple's managed server, or a Windows test build's fake.
+
+The tests replay the Swift oracles on Windows:
+
+- `arkdeck-agentd --test spawning debug_probe_replay` replays every exchange
+  of the Debug probe oracle (23, every mode) through the production Host and
+  Control. It checks the fake's calls too.
+- `debug_leaves_cli` runs `debug probe` through the real CLI against the signed
+  test daemon, for the 7 probes the leaf can send.
+- `arkdeck-hoststore`'s `tests/debug_invocation.rs` replays the 68 exchanges of
+  the Flash recovery broker oracle. It now runs on Windows too.
+
+The shared fake's Debug probe answers are ported in process (`oracle_fake.rs`,
+`Answers::DebugProbe`). `debug.probe` is in `WINDOWS_MEASURED_LEAVES`.
+
+`debug template run` stays `partial`. It runs the `debug.template@1` Job, whose
+admission observes the Target, and no Swift oracle records that Job's HDC
+answers. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-debug-reads-run.md`.
+
+## Windows History filter owner (TASK-XPA-012)
+
+`arkdeck-hoststore` builds the History filter owner (`HistoryStore`) on
+Windows: the macOS code over the host store's NTFS directory, the same
+`history-filter.json` (the store's frozen encoding) under
+`.history-filter.lock`. Both macOS compositions keep them in the state
+directory itself; the host store cannot open a Windows root itself (any
+directory of this user for a development root, one that grants SYSTEM for
+the account's), so the Windows daemon composes the owner over the root's
+private `history-filter`, as it keeps the Job store in `jobs-state`. The
+census names it at its macOS position (`…, storage, history,
+workspaceProjects, …`), and `history.filter.list|save|delete` answer from
+it. Its unit tests run on both hosts and replay the committed control-frame
+corpus at the recorded time, the document bytes pinned;
+`arkdeck-agentd/tests/windows_history_filter_process.rs` replays the corpus
+over the real daemon across restarts, reads a document Swift wrote as Swift
+answered it and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `history filter
+list|save|delete` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-history-filter-owner-run.md`.
+## Windows Flash lane (TASK-XPA-010)
+
+The software part of GJ-4 on Windows. `ManagedServer::launch_paired` starts
+the bundle's `bin/arkforged.exe` in its own kill-on-close Job and hands it
+the pairing secret on stdin. Its stop is the end of input, half a second,
+then `TerminateJobObject`. `arkdeck-provider-arkforge`'s `Lane` composes
+over ArkForge's named pipes (#2403). The Flash archive reader reads a
+bundle through the platform's raw DEFLATE decoder (#2410).
+
+`arkdeck-hoststore` builds the Runtime's Flash owners on Windows:
+
+- the planner, the admitter, the run, the recovery and the reconcile
+  (`flash_plan`, `flash_admission`, `flash_run`, `flash_recovery`,
+  `flash_reconcile`), including the delegated Flash's lane receipt;
+- the Rockchip host's dispatcher, durable records, executor and startup
+  reconcile;
+- the Flash facts, the post-flash alias, and the flash-bundle Import
+  validator.
+
+The records keep the platform's owner-only boundary: private directories
+and files, owner-only single-link reads, and no directory `fsync` on NTFS.
+The Swift `flash-plan` oracle, plan digests included, and the `flash-run`
+oracle's eight stories replay on Windows. What a Windows Session names of
+its platform is read back as Swift's wrote it before it is compared. The
+owners that compose beside a managed HDC build on Windows too:
+`control_performer`, `rockchip_reactivation` and `loader_binding`. The
+Loader binding oracle replays 33/33 through the Windows Host, and the
+post-flash alias and start-up oracles replay there too. The daemon composes
+the Loader binding coordinator. It installs the executable lane
+(`arkforge_execution::install`) only with a descriptor-bound HDC, and none
+exists on Windows until the managed HDC is composed.
+
+The Windows daemon composes the lane beside its Job state
+(`Authority::compose_arkforge`): the account root, or a development root's
+`jobs-state`, with the lane's runtime directory `arkforge` in it. It
+composes, as the macOS compositions do:
+
+- the lane from `ARKDECK_ARKFORGE_BUNDLE_PATH`, with Swift's absences;
+- the Flash planning over it;
+- the Flash facts over the Windows USB census (open since the DAYU200 sample
+  confirmed its mapping);
+- the device access observer.
+
+The lane's authority binds the managed-control HDC's digest, and no HDC is
+composed on Windows. So a verified bundle is refused before its
+`arkforged.exe` is launched, with Swift's words. A Flash `job.plan` or
+`job.submit` is refused before admission with that reason and zero
+dispatch (`windows_flash_lane_process.rs`).
+
+Over a composed HDC (TASK-XPA-005's Job composition) a Flash runs end to end
+on Windows against fakes: the Swift Flash run oracle's fake lane and
+Rockchip host (`arkdeck-hoststore/tests/support/flash_lane.rs`) and an
+in-process fake HDC given through the test seam (`Host::with_test_hdc`).
+`tests/spawning/flash_execution_control.rs` plans, admits, runs and
+reconciles `flash.full-restore@1` through the Host and Control; an unknown
+outcome stays unknown and is never replayed. `flash_socket_control.rs` drives
+the same Flash with the real CLI (`flash run`, `agent run`, `job plan|submit|
+run`, and `flash bootloader-status|prerequisites` over the same
+composition) against a copy of the test binary signed with the development
+signer, serving on a private pipe, which the CLI verifies as it verifies an
+installed daemon. An agent execution admits its Flash through the Flash
+admission on Windows too, as on macOS (`Host::agent_execution`).
+`flash_plan_control.rs` answers a Flash `job.plan` and `job.submit` in each
+composition as Swift's daemon does, on Windows as on macOS. No board is
+flashed and no `arkforged` runs.
+
+The Windows daemon composes Swift's Flash invocation owner beside the Job
+state it plans in, and the post-flash alias reconciler over its Application
+Support root and the Windows USB census, as the macOS compositions do; the
+census names `flashAliasReconciler` and `flashInvocations` at their macOS
+positions. `flash_host_reads_control.rs` replays the Swift flash-host-reads
+oracle (`flash.reconcile-alias`, `debug.status`,
+`recovery.flash-invocation.list`, 61 exchanges) through the Windows Host,
+`tests/spawning/flash_broker_control.rs` executes the recovery broker's
+pinned full restore through it, and `flash_socket_control.rs` drives
+`recovery flash-invocation start|evaluate|status|list` (and the `debug`
+spellings) and `flash reconcile-alias` through the real CLI against the
+signed test daemon.
+`device_access_control.rs` replays Swift's `flash.device-access` control
+frames on Windows against a stand-in serving ArkForge's public named pipe for
+the lane directory (`arkforge_platform`'s transport), and
+`flash_socket_control.rs` drives `flash device-access` and `flash
+lane-preview` through the CLI against the signed test daemon, over that
+stand-in and a stand-in plan previewer in the test binary; the daemon binary
+has no seam for either.
+
+`flash install-binding [--rebind]` runs on Windows as on macOS: the CLI
+installs the DAYU200 cross-mode binding in its own process from one census of
+the Windows USB registry into the Rockchip binding store of
+`%LOCALAPPDATA%\ArkDeck`, the Application Support root the Windows daemon
+composes; the Swift install oracle (`rockchip-binding-install`, 35 steps)
+replays on Windows in `arkdeck-rockchip-binding`. `flash bind-loader` is
+driven through the CLI against the signed test daemon over the Swift Loader
+binding oracle's state, answering exchanges 15 and 16 as Swift did.
+
+## Windows credential store and console secret entry (TASK-XPA-011)
+
+Gate-inventory group G13's platform layer has Windows implementations in
+`arkdeck-platform` with the macOS names and answers. `KeychainItems` keeps one
+generic credential per item in this user's Credential Manager (`CredWriteW`/
+`CredReadW`/`CredDeleteW`, DPAPI-protected, `CRED_PERSIST_LOCAL_MACHINE`: per
+user, surviving logoff, never roaming) under the target name
+`ArkDeck/<access group>/<service>/<account>`, the macOS item identity; the
+account is also the user name every read checks. An absent credential is
+`Status(CREDENTIAL_NOT_FOUND)` / `Absent` / `Ok(false)` as macOS answers
+`errSecItemNotFound`; values are bounded by Credential Manager's 2560 bytes;
+`presence` has to read the blob (no attribute-only query exists) and wipes it
+in place. Credential Manager loses concurrent updates of one user's
+credentials: writes vanish and deletions come back. So every call takes this
+user's Credential Manager turn, the owner-only named mutex
+`Local\ArkDeck.CredentialManager.<user SID>`, and `set` keeps it through its
+read-back (TASK-XPA-005, `windows-credential-manager-turn-run.md`).
+`read_terminal_secret` requires a console on stdin, clears echo and
+line input, reads UTF-16 with `ReadConsoleW` into a wiped buffer, and restores
+the mode on every return and, through a console control handler, on Ctrl-C.
+`tests/windows_credential_store.rs` works in a per-run fixture namespace and
+deletes every credential it may have created; `tests/windows_console_secret.rs`
+(`harness = false`) drives the reader in a child on a pseudo console and checks
+that nothing typed is rendered. The signing owners built on it are the next
+section. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
+## Windows signing owners (TASK-XPA-011)
+
+`arkdeck-provider-workspace` builds `signer`, `sdk_release`, `credential_owner`,
+`signing_install`, `signing_rekey` and `signing_removal` on Windows as well as
+macOS, with one Runtime semantics. Host paths are this host's spelling
+(`X:\a\b`, joined with `\`): the attempt directory, the managed SDK material
+and its `…\toolchains\lib\hap-sign-tool.jar` rule, and the preset root
+`<LocalAppData>\ArkDeck\Signing\OpenHarmony` (`SigningPresetStore::default_root`).
+`arkdeck_platform::VerifiedSource` has a Windows form: the file is held without
+write or delete sharing and every ancestor without delete sharing, so its
+canonical path names the verified bytes while held, and that path takes the
+place of the macOS `/.vol` inode alias in the signer's argv.
+`create_private_directory`/`create_private_file` give new entries the store's
+owner-only descriptor where macOS uses `0700`/`0600`.
+`tests/windows_signing_flow.rs` (`harness = false`) runs the test binary as a
+fake `java.exe` on the signer's pseudo console: install, sign, verify and
+record, re-key through Credential Manager, a rejected password, a drifted JAR,
+the managed SDK release profile, removal;
+`arkdeck-platform/tests/windows_verified_source.rs` covers the held source and
+the private entries. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-owners-run.md`.
+
+A Windows receipt is bound to the installed daemon as on macOS:
+`arkdeck_platform::trusted_daemon_fingerprint` is
+`SHA-256(domain ‖ SHA-256(signer leaf) ‖ SHA-256(image))` of a canonical,
+trusted-write-only `.exe` that `WinVerifyTrust` accepts, and
+`KeychainSigningSecrets::installed`/`for_maintenance` read Credential Manager
+bound to it. The CLI serves `runtime signing status|install|install-sdk-release|
+remove` (and the `signing …` spellings) on Windows; the daemon it binds is the
+one it would start (`ARKDECK_DAEMON_PATH` or `arkdeck-agentd.exe` beside it),
+and the maintenance leaves first require that image to satisfy a configured
+signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
+Credential Manager is opened.
+
+`install --build-profile` and `migrate-deveco` read DevEco's encrypted
+passwords on Windows too, at macOS parity, so the maintainer never handles a
+plaintext password:
+
+- **Build profile.** It is read through one handle that follows no reparse
+  point, in its spelling on disk, and must be trusted-write-only. Its single
+  `storeFile` is the JSON string DevEco writes (a `\\`-escaped drive path).
+- **Password material.** It sits beside the keystore
+  (`material\fd\<slot>\<file>` ×3, `material\ac`, `material\ce`), the
+  layout DevEco writes on macOS too. Each directory must be trusted-write-only
+  and in its spelling on disk. Each file is read as the file it measured, and
+  must have a single link.
+- **`migrate-deveco --daemon`.** It must name the installed, pinned daemon.
+
+`arkdeck-provider-workspace`'s `deveco_password` test replays the Swift vectors
+on Windows. The CLI's `windows_signing_leaves` test installs and migrates from
+a Windows-spelled build profile and decodes it with the Swift vectors. With
+`ARKDECK_LIVE_DEVECO_BUILD_PROFILE`, it decodes one of the host's DevEco build
+profiles through the host's own material, checking only the shape and printing
+nothing.
+
+The installed Windows daemon composes the workspace presets'
+credential pinning over the account's preset root, bound to its own image, and
+Windows attempts go under `SigningPresetStore::attempts_root`
+(`<preset root>\Attempts`).
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-leaves-run.md`.
+
+`workspace.sign-openharmony-hap@1` runs end to end on Windows through the
+planner, admitter, runner, reconciler and result reader. `cargo test -p
+arkdeck-hoststore --test windows_workspace_sign_oracle` (`harness = false`)
+replays the Swift sign oracle (`tests/fixtures/workspace-sign-oracle`, 19
+frames), with the same root layout under the temporary directory. The test
+binary plays `hap-signer.sh` as `tools\java.exe` on a pseudo console.
+
+Every answer must be Swift's, and so must the two parked records, the
+credential owner's ledger and the signed HAPs and reports. Before comparing,
+the test relabels what differs only because of the host (rulings 48 and 61):
+
+- the stand-in Java's SHA-256 and byte count;
+- the 9 digests derived from them: the credential reference, three plan
+  digests, two signing reports and their Artifact IDs;
+- the root's spelling;
+- the console's `observedOutputBytes`.
+
+No material, input or signed-HAP digest is relabelled. The test also covers the
+macOS replay's checks: a parked Job is never signed again, a drifted
+certificate refuses before the signer runs, attempt directories are removed,
+neither password reaches any file, and results read back after the owners
+close.
+
+The same test also ports the macOS registered-preset replay over the
+Windows profile, in both project orders. It registers the project, pins the
+credential, composes after a restart, signs and releases the pin.
+`arkdeck-cli/tests/windows_signed_runtime.rs` shows that a development root
+reports signing unavailable and refuses `workspace preset register --kind
+signing` and `workspace sign` with nothing dispatched. Only an installed daemon
+signs, so `workspace.sign` stays Windows `partial` in the coverage.
+
+Signing has no presence gate on either platform. Runtime reads are never
+interactive: `interactionNotAllowed` on macOS, and `CredReadW` never prompts
+on Windows.
+
+## Windows DevEco toolchain registration (TASK-XPA-011)
+
+`arkdeck-hoststore`'s DevEco registry (`DevEcoRegistryStore`: `register`, `inspect`, `list`) is
+built on Windows. node and hvigor register there as the child roles of one content-addressed
+toolchain (`toolchain:sha256:<digest>`); a build uses them through that reference, never
+through PATH.
+- **Source.** The DevEco Studio directory, as a standard `X:\…` path, read by D2's no-follow
+  reader.
+- **Roles.** Four: the product and SDK manifests, `tools\node\node.exe` and
+  `tools\hvigor\bin\hvigorw.js`. There is no signed resource envelope.
+- **Trust.** node's own Authenticode signature must verify
+  (`arkdeck_platform::inspect_native_code_signature` on Windows: `verified` with the signer's
+  name and leaf SHA-256, or `unsigned`, or refused). The launcher `bin\devecostudio64.exe` must
+  be signed by `Huawei Technologies Co., Ltd.` (`inspect_deveco_publisher_signature`).
+- **Pinning.** Children are pinned by the host store's file identity and SHA-256, and every
+  inspect re-measures them.
+- **Index.** The same `arkdeck.bootstrap-deveco-toolchains/1` document. Each host accepts only
+  its own record form (Windows: an `X:\…` root, four roles, `"platform":"windows"`, which is
+  also in the content digest).
+- **Retirement** is built on Windows too (see the next section), metadata only; the index is
+  encoded as its registration encodes it, since an NTFS file id may exceed the exact range
+  canonical JSON admits.
+
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-deveco-registration-run.md`.
+
+## Windows Bootstrap registry owners (TASK-XPA-012)
+
+The Windows daemon composes the Bootstrap readers (`bootstrap_readers.rs`) as the macOS daemons
+do, over the registry of a development root's private `bootstrap`, or the account's
+`%LOCALAPPDATA%\ArkDeck\Bootstrap\v1` (the macOS `ArkDeck/Bootstrap/v1` below the product
+directory), created owner-only at the start. The census names `bootstrap` after
+`workspaceProjects`, the macOS order.
+- **Served.** `runtime.bundle.register|list|inspect|remove` and `runtime.tool.list|inspect|remove` over
+  `arkdeck-bootstrap`'s store, index, retirement, reference and selection-ledger owners, which
+  build on Windows on the NTFS host store; `runtime.tool.register --kind deveco` and a DevEco
+  toolchain's inspection, listing and retirement over the DevEco registry. The control layer and
+  the CLI take a registration path as the host spells an absolute one (`X:\…` on Windows), and the
+  CLI expects the host's `platform` in a returned record.
+- **The Windows daemon Bundle** is a release-candidate package tree (`package-rc.ps1`'s xcopy
+  form): it holds exactly the files its `rc-manifest.json` names with their sizes and SHA-256s,
+  and its `arkdeck-agentd.exe` is signed as the running Runtime is (the same development leaf,
+  or the same production publisher, ruling 17). `arkdeck-platform`'s `windows::bootstrap_tree`
+  reads the tree handle-relative on NTFS (no reparse point; nothing another principal may
+  change) and captures it through a private staging directory as `bundle-<digest>.rc`. The
+  record adds `"platform":"windows"` and the signer, and the projection names
+  `arkdeck.windows-daemon-package/1` with the signer as `teamIdentifier`; the content digest is
+  host-tagged. `runtime service update` stays macOS-only (the open question is in
+  `evidence/runs/TASK-XPA-012/windows-daemon-bundle-run.md`).
+- **An HDC on Windows** is `hdc.exe` and, exactly when it imports it, the sibling
+  `libusb_shared.dll`: bounded x64 PE images (`arkdeck-bootstrap`'s `tool_pe`, in place of
+  `tool_macho`), captured by `windows::bootstrap_tree`'s `BootstrapToolCapture` as
+  `tool-<digest>.hdc`, with their Authenticode signatures recorded as integrity and a host-tagged
+  content digest and record (`"platform":"windows"`). Registration admits only an executable a
+  registered Windows HDC tuple names: the daemon composes `arkdeck-provider-hdc`'s
+  `WINDOWS_HDC_TUPLES` into the store's identities, checked on the source before the store is
+  locked and again on the captured bytes before anything is published. **The table holds
+  DevEco Studio 26.0.0.43's `hdc.exe` only (CHG-2026-078, c2, `3.2.0g`), so every other
+  `hdc.exe` is refused** (`admissionDenied`) and nothing is written; with no HDC to select,
+  `runtime.tool.select` answers Swift's no-owner refusal.
+- **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
+  team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
+  `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
+
+Tests on Windows: `arkdeck-hoststore`'s `windows_registration_tests` (a fixture toolchain retires
+once; the installed DevEco Studio's record conforms to the published schemas, ignored unless
+`ARKDECK_LIVE_DEVECO_ROOT` names it), `arkdeck-bootstrap/tests/windows_tool_registration.rs`
+(an `hdc.exe` refused with no identity, writing nothing; refused again from its captured bytes,
+retaining nothing; admitted only under an injected fixture identity, then registered, inspected,
+listed and retired), and `arkdeck-agentd/tests/windows_bootstrap_owners_process.rs`
+(Swift's recorded empty-registry answers byte for byte and the Windows refusals over the pipe
+across a restart; with `ARKDECK_DEV_SIGNER_THUMBPRINT`, the leaves through the signed CLI, and
+with `ARKDECK_LIVE_DEVECO_ROOT` the DevEco registration, inspection, listing and retirement
+across restarts).
+
+## HDC lifecycle executor (TASK-XPA-016, SPK-6)
+
+`arkdeck_provider_hdc::{LifecycleAction, LifecycleCommand, PreparedLifecycle}`
+is the process part of Swift's `HDCProcessLifecycleExecutor`: the exact
+`hdc -s <endpoint> kill -r` / `kill` argv as the actual command an audit
+records before anything is prepared, `VerifiedTool::launch_identity()`
+(`/.vol/<dev>/<ino>`, device, inode, size, mode, digest) as the launch-window
+entry it records before the launch, one launch per preparation through the
+verified tool runner (15 s), and the post-dispatch re-observation through
+`LoopbackServerLease` (12 s, every 100 ms) that alone decides the outcome — a
+restart is `Succeeded` only with a strictly newer server generation, a stop is
+`Stopped` only with nothing at the endpoint, and a nonzero exit, a registered
+failure, stderr or an unprovable state is `OutcomeUnknown` with Swift's
+reason. `tests/lifecycle.rs` drives it with a fake `hdc` compiled from C whose
+`kill -r` client starts a new server of the same executable.
+
+## HDC runtime status (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::HdcStatusObserver` is Swift's
+`HeadlessHDCStatusObserver`, the object `runtime.hdc.status` answers with
+(`arkdeck.runtime-hdc-status/1`, twenty-three members, `unconfigured_status`
+for a daemon without a tool): the configured facts — the tool's path and
+digest, the selected endpoint with its source and `serverEndpointRef`
+(`hdc-endpoint:` + SHA-256 of the endpoint), the startup versions kept as
+history — then what one commandless observation proves. The tool is pinned
+(`VerifiedTool`, now with a public `revalidate`), its signature read, the
+identity observed once, and the tool re-proved on both sides of every step;
+an observed receipt must be the selected tool at the selected endpoint with
+the observed generation, else `hdc.identityMismatch` claims nothing. Managed
+ownership needs the daemon's own launch record read three times unchanged,
+matching the receipt by PID, birth, path and digest, and the live process
+verified — or the supervisor's unchanged, healthy, managed record of this
+generation; else `hdc.ownershipUnproven`. The five non-observed
+classifications map to their reason codes; any failure of the tool itself
+withdraws every tool fact (`hdc.toolIdentityOrSignatureInvalid`).
+`serverHealth` is always `unknown`, `serverVersion` null and
+`newDispatchCount` 0: the status launches nothing. The production pieces
+beside it: `CommandlessIdentity` (Swift `HDCCommandlessServerIdentity
+.observe`: the 3.2.0f family only at `127.0.0.1:8710`, the 3.2.0d family at
+the selected loopback endpoint, `LoopbackServerLease::acquire` raced against
+the 1000 ms deadline, the receipt checked against the selected tool),
+`NativeSignature` (the signing facts plus `platformTrust: unverified` and
+`executionAssessment: notPerformed`) and `SystemManagedProcess`
+(`arkdeck_platform::verifies_managed_process`: the observed birth on both
+sides of Swift's inspector — the process alive, running the receipt's
+executable, its complete argv after argv[0] equal to the launch's through
+`process_arguments` (`KERN_PROCARGS2`), declaring `-s <endpoint>`, and owning
+a TCP listener on the port bound to the loopback or a wildcard). Beyond
+Swift: a server another user owns is `hdc.identityUnknown` rather than an
+observed identity, and the deadline abandons the scan rather than
+cancelling it. `tests/hdc_status.rs` replays the Swift oracle
+(`rust/tests/fixtures/hdc-status`, twenty-two cases at a fixed root under
+the oracle's lock) byte for byte.
+
+The published schema admits these live values. It was re-derived (TASK-XPA-014)
+from the frames Swift's daemon answers through its handler for these cases and
+for a registered tool. `arkdeck-control` serves `runtime.hdc.status` through
+`HostServices::runtime_hdc_status`. A request that names any parameter is
+refused with `invalidParams` ("live HDC status does not accept caller facts or
+paths") before the host is asked. The macOS host of `arkdeck-agentd` answers
+`unconfigured_status(None)` without a managed HDC server, as Swift's daemon does
+without its HDC host. On other platforms the method keeps the foundation's
+refusal. `hdc_status_control.rs` in agentd sends every oracle case through
+`Control`, behind a host that composes the observer per request, and each
+answer is the oracle's snapshot byte for byte.
+
+With `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` (TASK-XPA-016) the isolated owner
+starts its development HDC as Swift's `HeadlessHDCServerHost` does before it
+serves: `hdc -s <endpoint> -m` on the inherited `OHOS_HDC_SERVER_PORT` or
+`127.0.0.1:8710` (a set port outside 1...65535 fails startup), ready once the
+listener answers and `checkserver` agrees, and bound to its own launch by the
+commandless identity proof (`ManagedHdcServer`); a registered HDC is then
+accepted, and development USB relations beside it only with
+`ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC=acknowledged` (the
+maintainer's option A of 2026-09-19: what the owner proves about the real device
+is development-root evidence, never `REAL_DEVICE_PASS`), which startup refuses in
+any other composition and outside an isolated root. Without such a file the owner
+reads the Runtime's own USB relations beside that server ("Trusted USB
+relations"), so `target adopt` needs no relation file there; what it proves is
+development-root evidence all the same.
+Beside that server, `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY=acknowledged` lets
+the isolated owner prove a device mutation's state continuity against its own
+Job state instead of the installed Runtime's root, which it can never be, so
+M2's real-device acceptance can run there (the maintainer's decision of
+2026-09-20, handled as that option A: development-root evidence again, and the
+dashboard's Golden Journey count does not move). Startup refuses the
+acknowledgment without the managed server, outside an isolated root, and in the
+standalone and production daemons. Nothing else about the proof changes: recorded
+authorization usage beside the root, a Job history that is not read-only, and an
+unsafe or foreign Session root still refuse it, and a mutation still needs its
+capability and its device hold.
+`runtime.hdc.status` answers the observer over that launch, and
+`target.availability`'s tool leg is `ready` with the startup facts. Swift exits
+70 when the server ends unexpectedly, for launchd to restart it (design §L.1
+item 13); here no HDC plan is dispatched once the server is not the one
+launched. SIGTERM and SIGINT stop the Rust-serving daemon as Swift's
+`drainAndStop` does: the socket is closed and its name removed, the frames being
+answered finish, every connection is ended within 20 s, the managed server is
+stopped, `arkdeck-agentd stopped` is printed and the daemon exits 0; its locks
+go only with the process. `tests/managed_hdc_process.rs` drives this with a fake
+HDC compiled from `tests/fixtures/managed-hdc/fake-hdc.c`.
+
+`runtime.hdc.impact-preview`, `runtime.hdc.restart`, `runtime.tool.select` and
+`control-action.list`, `.show` and `.reconcile` reach `HostServices::control_action`
+unread, since Swift's `hdcControlActionRequest` reads its own parameters; a host
+without it keeps the foundation's refusal. Without a managed HDC server the macOS
+host answers them as Swift's daemon does (`arkdeck_hoststore::ControlActionResources`):
+the lifecycle methods are `operationUnavailable` before any parameter is read.
+A tool selection is `operationUnavailable` before any parameter is read in every
+composition, with or without a managed server (TASK-XPA-012): Swift composes its
+tool-selection owner only beside a started HDC server host, the HDC impact
+source and the registry adapter, no Rust composition has one yet, and no
+selection writes anything.
+`arkdeck_hoststore::ToolSelectionRecords` is Swift's
+`RuntimeToolSelectionControlActionStore` over its records (`ToolSelectionRecord`):
+one `action-<sha256(requestId)>.json` per request identity as canonical JSON,
+changed under a non-blocking `.lock` transaction and replaced only by the exact
+next generation on Swift's conditions (the transition table, an immutable intent,
+lifetime, epoch, catalog and published preview, an approval that only changes its
+status, a receipt bound to the challenge it answers, an audit that grows one row at
+a time). Every record transition of Swift's owner is here, taking its instant and
+the identities Swift draws from the caller: the preview, the impact approval
+(`ImpactApproval`), its console challenge (`InteractionChallenge`) and receipt
+(`InteractionReceipt`), the prepared dispatch, lifecycle audit rows, the settled or
+failed selection and invalidation. The store's mechanics are shared with the HDC
+control-action owner's records (`control_action_store.rs`), and the approval values
+are ready for the HDC restart. `tool_selection_tests.rs` reads the 17 records Swift's
+production store wrote (`rust/tests/fixtures/tool-selection-store`, recorded by
+`ToolSelectionStoreOracleContractTests`) as their own canonical bytes and Swift's
+projections, and plays 16 of their timelines again to Swift's bytes; the records it
+writes itself (`rust/tests/fixtures/tool-selection-store-rust`) are read back and
+carried further by Swift (`ToolSelectionStoreRustReadbackContractTests`). No owner
+composes the store yet: observing the impact and the restart it approves wait for
+the HDC lifecycle restart and a maintainer ruling on the isolated daemon's selection.
+`arkdeck_hoststore::ToolRegistryStore` keeps Swift `BootstrapToolRegistry`'s HDC
+selection ledger in `tools.json` (TASK-XPA-012): `initialize_service_selection`,
+`adopt_installed_hdc`, `selection_candidate`, `prepare_selection`,
+`startup_selection`, `publish_pending_selection`, `fail_pending_selection`,
+`selection_outcome` and `acknowledge_selection_outcome`, each under the bootstrap
+owner's non-blocking `.lock` over the strictly read bundle and tool indexes (either
+created empty only beside nothing it would describe), measuring the tools it names
+against their retained content, and publishing the index only where Swift does, as
+Swift's bytes. The published HDC identities a store's rows and admissions match are
+Swift's `knownIdentity`: the daemon's two unless `with_published_identities` gives
+others. `tool_selection_ledger_tests.rs` plays the seven timelines of Swift's oracle
+(`rust/tests/fixtures/tool-selection-registry`, recorded by
+`ToolSelectionRegistryOracleContractTests` over synthetic unsigned executables, the
+same bytes on every host) and leaves Swift's index, answer or refusal and
+publication after each of its 111 steps. No daemon composes the ledger yet.
+The isolated owner composes Swift's union control-action owner over no
+tool-selection owner, paging in `control-action-snapshots`. Without a managed
+server it holds no HDC owner and never makes `hdc-control-actions`: an exact
+identity is `resourceNotFound`, and a listing is one empty snapshot page kept as
+Swift's pager keeps it. With `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` it also
+composes the HDC control-action owner (`arkdeck_hoststore::HdcControlActions`)
+in `hdc-control-actions/{records,snapshots}`: `runtime.hdc.impact-preview`
+checks the exact restart intent, returns an existing action of the request
+identity, refuses another endpoint, then writes one owner-only
+`action-<sha256(requestId)>.json` under a per-transaction `.lock` and observes it
+once through the managed server's impact source (`ManagedServerImpact`: the
+pinned executable and its signature, the server identity — `checkserver`
+between two observations for the registered 3.2.0d executable — the Job
+owner's current Jobs, the durable Targets and a Target observation through the
+development HDC). The preview is `previewReady` or `blocked` in Swift's blocker
+order, or the action `previewDrifted` when the impact is unavailable. Show,
+list and reconcile read the actions, invalidating an expired one, one of an
+earlier daemon start or of another catalog when they read it, and the
+approval an invalidated action awaited with it. `runtime.hdc.restart` checks
+the exact preview tuple, then, as Swift's `requestRestart`: the action and
+its age, its exact preview (`reviewedPlanMismatch`), an action already
+awaiting its approval answered as it is, any other but a ready one
+`admissionDenied`, a fresh impact reading that must be the reviewed one
+(otherwise `factsDrifted`, the invalidated action in the details), then the
+impact approval by CAS (`awaitingImpactApproval`, a waiting `har-` action
+with its `resume-` reference, bound to the preview and the new generation,
+closing with the action). Restart dispatches nothing. The approval is
+listed and shown by the combined human-action owner (`human-action.list`,
+`.show`); `human-action.resume` of it answers the approval unchanged and
+`agent.resume` refuses it, as Swift's daemon answers any request outside a
+foreground console. The console challenge, the receipt of a person's answer,
+the lifecycle it starts (`kill -r`), the Job interlock and the recovery of an
+interrupted lifecycle are not here, and a record holding any of them is
+unreadable. Over the fake server, whose digest proves no server as the
+fixture HDC's proves none to Swift, a preview is blocked and its restart
+`admissionDenied`; a ready preview needs the registered 3.2.0d server's
+health proof. A daemon outside an isolated root keeps no state
+and answers as Swift's handler with no owner at all, except that show and
+reconcile of an exact identity keep the foundation's refusal, since their
+schemas do not publish Swift's `operationUnavailable`. In agentd
+`control_action_control.rs` replays every no-host exchange of the corpora
+through `Control`, `control_action_host_control.rs` every exchange of a daemon
+with an HDC server host but the console's challenge and the lifecycle after
+it, and `tests/control_action_host_process.rs` drives the managed fake server
+(compiled to record its invocations, and to list no target).
+
+## Capture file legs (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::FileAction` is Swift's HDC provider for the legs of
+`capture.diagnostics@1` beyond its default request: the file products — a
+trace (`hitrace -t … -o`, or an armed ring: `--trace_begin`, the coverage
+anchor echoed into `trace_marker` and read back with `grep -c`, `sleep`,
+`--trace_dump`, `--trace_finish_nodump`), the component tree (`uitest
+dumpLayout -p`), a screenshot (`snapshot_display -t <type> -f`) and a screen
+sequence (`mkdir -p`, one `snapshot_display` per frame, `tar -c -f`) — each
+written to a provider-owned path (`OwnedRemotePath`: the job/step/nonce
+tuple under `/data/local/tmp` with the producer's suffix) and judged by its
+`ls -l` readback, never by the client's exit status (`remote_regular_file_
+byte_count`, the size column of one listing line); their receive (`file
+recv <remote> <host>`, the host file named by the remote basename, judged
+by the bytes that landed — `HostLanding::inspect`: no file, a symlink or a
+changed file is unknown, empty and over-budget fail without a digest, a
+pinned hash and a pinned magic are checked) and their cleanup (`rm -f` by
+name; for a sequence the frames, the archive, `rmdir`, proved by `ls -ld`'s
+not-found grammar — `path_presence`); and the stdout legs the default
+request leaves unselected — the crash ledger (`hidumper -s 1201 -a "-p
+Faultlogger -l"` / `-f <name>`), the component detail dump and the
+application liveness readback (`pidof`, always a verified fact naming
+running, stopped, unreadable or ambiguous). `FileAction::for_step` is
+Swift's step-to-action mapping from the request's inputs, minting one path
+for a product's capture, receive and cleanup; `lower` the exact argv,
+timeouts and continue-after-non-zero of each invocation; `run` Swift's
+sequence rule over any `HdcDispatch` (stop at the first non-zero exit an
+invocation does not continue past; a landing prepared before the transfer
+and inspected after it whatever the exit); `verify` Swift's verdicts and
+summaries; `persisted` the journal forms. The default legs, the storage
+preflight and the observe steps stay with `Action`; the Job's products,
+index and summary with the store owner. `tests/capture_files.rs` drives
+every leg through the real process dispatch over the shared fake HDC
+driver with its own answers fragment, reading the argv back from the
+driver's log and the received bytes back from the host.
+
+## Target observation port (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::target_observation` is the physical side of a target
+observation as Swift's `TargetObservationCoordinator` proves it. `UsbRelation`
+is Swift's `TargetUSBRelation` (the serial that is the connect key, the
+decimal location, one IOKit attachment identity, the vendor and product) with
+its `is_usable` rule and the JSON shape the oracles record; `UsbRelations` is
+the port that reads them, implemented by any closure for tests, by
+`NoUsbRelations` — no relations, so no candidate is proved and no adoption can
+pass, while the device list stays readable — and by the Runtime's own
+`UsbRegistryRelations` (next section). `Reading::take` is Swift's
+bracketed read over any `HdcDispatch`: the relations, `list targets -v`
+(parsed with the highest registered version, as Swift's bootstrap port
+parses it), the relations again; `Reading::rows` is the stamp's rule — a
+candidate carries a proved relation only when exactly one usable relation
+names its serial in both reads, unchanged, and no other row shares its
+connect key — and `validate` its bounds. `observe_tool_version` (`-v`) and
+`observe_device_identity` (the exact-row confirmation, answering the serial)
+are Swift's `ProviderBootstrapObservation`; `adoption_holds` is the
+adoption's final check over the live relations and the readback;
+`stable_identity_sha256_for_serial` Swift's normalized serial digest. Minting
+observation identities and generations over a reading, following a
+reference, and the adoption itself are the Target owner's.
+`tests/target_observation.rs` reads the observe fixture's shared fake with
+injected relations and checks the argv the driver logged.
+
+## Trusted USB relations (TASK-XPA-016, M1)
+
+The Runtime reads the USB relations that prove a target observation from the
+host's I/O Registry itself, as Swift's daemon does (the maintainer's decision
+Q1=B of 2026-09-24; r11's design table had the ArkForge lane's `arkforged
+discoverDevices` serve them, which is re-evaluated after M4). The census is
+`arkdeck_platform::usb_host_devices`, Swift's
+`RockchipProductUSBProbe.systemIdentities()`: every `IOUSBHostDevice` entry with
+a numeric `idVendor`, `idProduct` and `locationID` and a string
+`USB Serial Number` (else `kUSBSerialNumberString`), read as `NSNumber` reads
+them (the low sixteen bits; the location's bits in decimal), with its optional
+`USB Product Name` and its registry entry ID (none when the registry answers
+none or zero), in registry order and never deduplicated. It only matches and
+reads properties: it opens no device or interface and sends no USB request,
+releases every object it obtains, and drains its own autorelease pool. With no
+entry of the class the kernel answers no iterator, an empty census; a census it
+cannot take, or whose iterator did not stay valid (a check Swift never makes),
+is unavailable (`RegistryUnavailable`). `registry_census` is the same read for
+any class.
+
+`arkdeck_provider_hdc::UsbRegistryRelations` is Swift's
+`TargetUSBRelation.registeredDAYU200()` over that census on every read: the
+HDC-normal DAYU200 (`is_dayu200_hdc_normal`: vendor `0x2207`, product `0x5000`,
+a product name that is `HDC Device` once quotes and spaces are trimmed) with an
+attachment, as relations (`registered_dayu200_relations`); whether one is usable,
+unique and unchanged stays the reading's rule. A census that cannot be taken
+fails the read with Swift's `admissionRejected("USB registry unavailable")`,
+which fails the observation (`internalError`) and breaks its continuity; it is
+never read as no devices. The isolated owner composes it only beside the
+registered HDC it starts as its managed server and without a relation file
+(`development_usb::relation_source`); beside a fixture it reads none, so the
+host's devices never prove a fixture's candidates. The production composition
+composes it by the same rule beside the registered HDC it starts as its
+managed server, and reads no relation file ("macOS production composition"
+below). A host with it names `usbRegistryRelations` in its owner census.
+
+Tests: `usb_registry` unit tests (the per-entry rule over synthetic entries);
+`tests/usb_registry.rs` (the host's census answers with or without a board, the
+census reads strings, numbers and booleans from the host's USB controllers, and
+batches of censuses keep no heap block or port name); the provider's reader
+units and `tests/target_observation.rs` (the shared fake bracketed by the reader
+over a census, and this host's registry through `system()`, which skips without
+a board); in agentd, the Target adoption oracle replayed through `Control` with
+the reader over a census listing each relation's board among entries it must
+pass over, and an uncertain census failing closed. None of it is device
+evidence.
+
+## Windows USB device census (TASK-XPA-004, provisional)
+
+On Windows `arkdeck_platform::usb_host_devices` is the Runtime's own read of the
+Plug and Play device tree, the counterpart of the I/O Registry census above and
+producing the same `UsbHostDevice`. It asks SetupAPI for the present nodes of the
+`USB` enumerator (`SetupDiGetClassDevsW`, `DIGCF_PRESENT | DIGCF_ALLCLASSES`),
+reads each node's instance ID (`CM_Get_Device_IDW`) and four device properties
+(`SetupDiGetDevicePropertyW`), and destroys the set on every path. It opens no
+device or interface, sends no USB request, installs or changes no driver, needs
+no elevation and writes nothing. A set that cannot be created, or an
+enumeration that stops before its end, is unavailable (`RegistryUnavailable::
+DeviceSet` / `Enumeration`), never a shorter list.
+
+`UsbHostDevice::from_device_node` is the per-node rule, failing closed as the
+macOS per-entry rule does. The property choice lives there and in
+`NodeProperty` only. It is CHG-2026-078 design §4 (the Windows profile's USB
+census row, TASK-WHR-003), confirmed by the maintainer's DAYU200 sample of
+2026-10-04 (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`)
+and maintainer ruling 2026-10-04, items 4 and 5; every `CENSUS_MAPPING` row is
+`Confirmed`, so `usb_host_devices()` is open (a row set back to `Tbd` closes it
+with `RegistryUnavailable::MappingUnconfirmed`):
+
+- entry: a present device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`
+  (`DEVPKEY_Device_IsPresent` true, besides `DIGCF_PRESENT`); phantom nodes,
+  which keep their last attachment's properties, interface nodes (`&MI_xx`),
+  hubs without numbers and other enumerators are passed over;
+- vendor and product: the first `USB\VID_…&PID_…` entry of
+  `DEVPKEY_Device_HardwareIds`, which must name the instance ID's numbers;
+- serial: the instance ID's suffix, ASCII-lowercase folded (the instance ID
+  spells the board's serial in upper case, the HDC connect key is lower case);
+  a suffix holding `&` is a Windows-generated, port-derived ID, so the node has
+  no serial and no identity and is passed over. The long-term device identity
+  is the folded serial;
+- topology: the first `DEVPKEY_Device_LocationPaths` entry, spelled as the
+  decimal of the first eight bytes (big-endian) of its SHA-256 (the relation
+  rule accepts only a canonical decimal location; never equal to a macOS
+  `locationID`). It is valid only within one attachment: the sample's board
+  moved from `USB(10)` (USB 2) to `USB(26)` (USB 3) on a replug into the same
+  connector, which is the same identity in a new attachment;
+- product name: `DEVPKEY_Device_BusReportedDeviceDesc` (optional; without it
+  the board is not the registered HDC-normal DAYU200 and proves nothing);
+- attachment: `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`; none when absent
+  or zero, and then no relation is formed). One attachment is the pair
+  (instance ID, arrival), which a relation carries as its numbers and serial
+  with its attachment ID.
+
+`UsbRegistryRelations::system()` reads this census on Windows. The Windows
+daemon composes the Target observation owner it feeds (see
+[Windows Target owners](#windows-target-owners-task-xpa-004)) and reads it by the
+macOS rule: only beside a registered HDC the composition started as its managed
+server. That is the registered `c2` `hdc.exe` on a development root
+(CHG-2026-078). The account daemon composes no HDC yet, so it reads no relation.
+
+Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
+sets: the upper-case suffix folded, a phantom passed over, a new arrival a new
+attachment of the same identity; and this host's census answering with
+well-formed entries, shape only); the provider's `tests/windows_usb_census.rs`
+(a synthetic node with an upper-case suffix proving a scripted HDC's
+lower-case candidate and holding the adoption's final check; a phantom board, a
+port-derived suffix, a topology moving within one attachment, a replug between
+the brackets or a missing name, arrival or serial proving nothing; a USB 2 to
+USB 3 replug proving the same identity in a new attachment; and on Windows this
+host's tree through `system()`). None of it is device evidence.
+
+## Windows Target owners (TASK-XPA-004)
+
+A Windows daemon that owns a state root composes the Target owners over it
+(`windows_lifecycle::Authority::compose`), in the macOS layout: `targets` below
+`%LOCALAPPDATA%\ArkDeck\Agentd` (Swift's production layout) or `targets-state`
+below a development root (the isolated owner's). The directory is created
+relative to the held root handle with the host store's owner-only descriptor
+(owner and sole grantee the user SID, protected) when absent
+(`StateRoot::private_child`), so it is private although the account root also
+grants SYSTEM; an existing one is never re-permissioned, and one that is not
+owner-only refuses the start (exit 69, `the Target store … is unusable`).
+
+- The Target store (`arkdeck_hoststore::TargetStore`, now compiled on macOS and
+  Windows): `targets.json` and `target-display-names.json` under `.targets.lock`
+  and `.target-display-names.lock`, on the NTFS host store, the same bytes as
+  macOS. `target.list`, `target.show`, `target.availability`,
+  `target.display-name.set|clear` answer from it, `doctor` counts its Targets,
+  and a restart reads back what it holds. A torn document or a lock name that
+  is not a lock file fails closed without a write; two writers have one CAS
+  winner and a writer waits out another owner's locks, as on macOS.
+- The Target observation owner (`TargetObservations`) with the USB relations
+  the macOS rule names (`development_usb::relation_source`): the Windows census
+  only beside a registered HDC the composition started as its managed server.
+  On a development root with the registered `c2` `hdc.exe`, `device
+  candidates` and `target adopt` run against the board (measured live on
+  2026-10-04, `windows_hdc_live_process.rs`). Without an HDC (the account
+  daemon, until the Windows tool-selection owner is composed), nothing is
+  observed or dispatched:
+  `device.observations` answers `rejected` (`hdc.notConfigured`),
+  `device.display-name.*` finds no snapshot (`resourceConflict`, phase
+  `candidateDisplayNameOwner`, `newDispatchCount: 0`), and `target.adopt`
+  refuses before admission as Swift's owner refuses a snapshot it cannot take:
+  `operationUnavailable`, details `{"phase": "preAdmission",
+  "newDispatchCount": 0}` (a malformed reference is `invalidInput` first). The
+  CLI therefore reports a refusal (exit 69), not an unknown outcome. macOS
+  answers the same whenever its Target owner has no HDC (a production
+  composition without `ARKDECK_HDC_PATH`); a composition without a Target owner
+  (the read-only foundation) keeps its `rejected`.
+- The stable identity is `stable_identity_sha256_for_serial` (the SHA-256 of
+  the trimmed, lowercased serial) on both platforms; a node without a serial,
+  or a serial two nodes carry, proves no relation and nothing is adopted.
+
+Still macOS-only beside these owners: the Rockchip binding lineage and
+post-flash alias (GJ-4), the Import binding the Target store resolves, the Job,
+Artifact, Session and bootstrap-registry owners, and every HDC composition.
+Tests: the store's unit tests (now on NTFS too);
+`arkdeck-hoststore/tests/windows_target_owners.rs` (the Swift adoption oracle's
+board through a scripted HDC and the Windows census rule: the same Target and
+`targets.json` bytes, an idempotent re-adoption, the trust stop, no serial or
+two boards proving nothing, torn and replaced-lock documents failing closed);
+`arkdeck-agentd/tests/windows_target_owners_process.rs` (the real daemon over a
+development root through its pipe, a restart reading the names back, the
+zero-dispatch refusals, a non-private Target directory refusing the start, and
+the same hops through the real CLI against a copy of the daemon signed with the
+host-trusted development signer, skipped with a message when
+`ARKDECK_DEV_SIGNER_THUMBPRINT` is not set).
+
+## Trace Runtime probe (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::trace_probe` is Swift's `FoundationTraceRuntimeProbe`
+on an adopted route, and `evaluate_help`/`evaluate_tag_list` its
+`TraceProbeAdapter`: only the registered `OPENHARMONY-TRACE-PROBES@1.0.0`
+help and tag-list bytes (their SHA-256 after the leading capture time) select
+`hitrace` for capture, `bytrace` stays probe-only, and a tool's name, exit
+status or a familiar marker never selects anything. The help reads and the
+nine catalog `param get` reads run together (15 s each, 64 KiB or 4 KiB kept);
+the tag list follows only a registered hitrace help, and failing it fails the
+probe. A help read that cannot complete is `probeFailed`, a parameter read
+`unreadable` with Swift's reason — never a value or an answer. The Host serves
+it as `trace.probe` beside the Debug reads, and the standalone App ingress
+admits it with `targetId` alone. `tests/trace_probe.rs` covers the adapter on
+the registered resources and the reads over scripted dispatch;
+`arkdeck-agentd`'s `tests/spawning/trace_probe_control.rs` replays the Swift oracle
+(`tests/fixtures/trace-probe`, recorded by `TraceProbeOracleContractTests`,
+re-recorded with `ARKDECK_RUST_TRACE_PROBE_RECORD=/private/tmp/<new>`) through
+the production Host, answer by answer and call by call.
+
+## Debug HAP provider (TASK-XPA-016, M2)
+
+`arkdeck_provider_hdc::HapAction` is Swift's HDC provider for `debug.hap@1`
+(`debugHAPAction`): a package staged to a provider-owned path (`file send
+<host> <staged>`) or a set of packages to a provider-owned directory
+(`mkdir -p`, one `file send` per package), installed (`shell bm install -p
+<staged|dir> -r`) and believed only through its readback (`shell bm dump -n
+<bundle>`: the bundle on its own boundaries, the deployed Artifact's digest,
+the native-library facts the device reports), the ability started (`shell
+aa start -b <bundle> -a <ability>`) and believed only through its process
+readback (`shell pidof`), stopped (`shell aa force-stop` + `pidof`) and
+uninstalled (`uninstall` + `bm dump`), each judged by its paired readback
+rather than by the mutation's own exit, and the staging cleaned by name
+(`rm -f`; for a set the packages, `rmdir` and the `ls -ld` that proves it).
+An install's failures are named as Swift names them (`installFailed`,
+`installOutputTruncated`, `deviceUDIDUnauthorized` on `bm` code 9568423,
+`installRejected`, each with the bounded hex diagnostic of both streams).
+`for_step` is Swift's step-to-action mapping from the request's inputs, the
+staged set appearing only with additional leases; `lower` sends nothing
+unless the Artifacts it stages are the resolved ones (`ResolvedArtifact`,
+handed in by the Job owner — identity through the lease's suffix, bytes
+through the pinned hash); `verify` Swift's verdicts; `persisted` the journal
+forms; `readback`/`desired_presence`/`presence` the recovery table that
+concludes a mutation whose outcome was never observed through its
+read-only probe (`readPackagePresence`, `readProcessPresence`,
+`readOwnedPathPresence`, `readOwnedDirectoryPresence`) without resending
+it. `tests/debug_hap.rs` replays the Swift oracle
+(`rust/tests/fixtures/debug-hap`: eight Jobs and two cleanup-debt
+continuations over the shared fake HDC driver with the oracle's own answers
+and modes) step by step through the real process dispatch, checking every
+verdict and comparing the argv the driver logged with the oracle's recorded
+log line for line. The Job's planner and runner, the lease resolution and
+the products (`install-readback.json`, `process-readback.json`,
+`debug-hilog.txt`) are the store owner's.
+
+## Native library provider (TASK-XPA-016, M2)
+
+`arkdeck_provider_hdc::NativeAction` is Swift's HDC provider for
+`deploy.native-library.app-owned@1` (`nativeLibraryAction`): a leased native
+library staged into the target application's own data directory with the
+bundled code-sign helper (`mkdir -p`, two `file send`, `chmod 700`,
+`sha256sum`), the current library backed up by a hard link (`ls -ld`, `ls
+-l`, `sha256sum`, `rm -f`, `ln`, `sha256sum`, `ls -l`, `ls -la`), the
+replacement published atomically by the helper (`ls -ln`, `<helper> verify
+<backup>`, `<helper> publish <staging> <target> <rollback>`, `sha256sum`,
+`<helper> verify <target>`, `ls -ln` — the published library must be at
+least as attested as the one it replaced, read off the helper's
+`ARKDECK_CODE_SIGN_*` lines), the target stopped and started (`aa
+force-stop`/`aa start … EntryAbility` with `sleep 2` and `pidof`), the
+loaded library proved through `grep -F <loader path> /proc/*/maps`, the
+staging cleaned by name and proved absent by `ls -ld`, and the rollback (13
+steps) that restores the backup. `Deployment` derives the whole
+provider-owned namespace from the bundle, the ABI and the Job
+(`/data/app/el1/bundle/public/<bundle>/libs/<arm|x86_64>/…`, the job-owned
+staging directory under the application's `el2` data, the loader-visible
+path under `/data/storage/el1/bundle/libs`), accepting persisted paths only
+when they are exactly what it would have produced; `Deployment::from_inputs`
+is Swift's admission over the request's inputs, the engine-resolved
+Artifact, the library's bytes and the helper. `native_elf::validate_elf` is
+the host-side verifier (Swift `NativeLibraryArtifactValidator`): the closed
+ELF fields, the ABI by class and machine, the GNU build id from the note
+sections, and the OpenHarmony V1 code-sign block appended to the file;
+`is_static_executable` the shape the bundled helper must have. `lower`,
+`verify`, `persisted`, `readback` (each mutation's read-only inspection —
+`Inspection`, eight of them) and `reconcile` (a failed readback is "not
+executed" for the idempotent mutations, never for a publish or a rollback)
+follow Swift line for line, with its codes (`nativeSendFailed`,
+`nativeAppOwnedDirectoryMissing`, `nativeBackupMismatch`,
+`nativePublishMismatch`, `nativeTargetStillRunning`,
+`nativeTargetNotRunning`, `cleanupDebt`, `nativeRollbackVerificationFailed`,
+`nativeStagingMismatch`, `nativeTargetHashMismatch`, `nativeLibraryNotLoaded`,
+`nativeCleanupIncomplete`) and summaries (`loaderVerified` stated as
+`notObserved` under a profile that never read the maps).
+`tests/native_library.rs` replays the Swift oracle
+(`rust/tests/fixtures/deploy-native-library`: five Jobs and the debt
+continuation over the shared fake HDC driver with the oracle's own answers
+and modes) step by step through the real process dispatch, comparing the
+argv the driver logged with the oracle's 225 recorded lines. The Job's
+planner, the rollback/compensation sequencing, the lease resolution, the
+bundled helper's discovery and the published reports are the store
+owner's.
+
+## Pointer input and port rules (TASK-XPA-016, M2)
+
+`arkdeck_provider_hdc::pointer_input` and `port_forward` are Swift's device actions for the
+interactive operations of Golden Journey 2 — `input.tap@1`, `input.long-press@1`,
+`input.swipe@1`, `port-forward.create@1` and `port-forward.remove@1` — as
+`HDCObservationProviderAdapter` handles them, with T1 argv parity proved by replaying the
+Swift oracles `rust/tests/fixtures/pointer-input` and `rust/tests/fixtures/port-forward` over
+the shared fake HDC driver (`tests/pointer_input.rs`, `tests/port_forward.rs`).
+
+- `PointerInput` is `HDCPointerInputSpec`: one gesture (`Gesture::{Tap, LongPress, Swipe}`)
+  at exact device coordinates with the frame it was mapped against, `new` holding Swift's
+  closed bounds in Swift's order of refusal (coordinates `0...32767`, a swipe's end point and
+  `80...2000` ms duration, a display `0...64`, a positive frame, every point strictly inside
+  it), `from_inputs` Swift's `pointerInputSpec` over the request's inputs (the operation names
+  the gesture), `frame_age_ms`/`refuse_if_stale` the freshness gate at dispatch (`inputExpired`
+  beyond 1000 ms, no claim without an epoch), `lowered_hold_ms` the hold the device command
+  is given, `persisted`/`from_persisted` the `hdc.injectPointerInput` intent.
+- `PointerAction::for_step` is the `injectPointerInput` step's action at dispatch time;
+  `lower` the positional `uinput -T` argv (`-D <display>` before `-T`; `-c x y`,
+  `-d x y -i hold -u x y`, `-m x y toX toY ms`) on one 30 s process; `verify` Swift's verdict
+  from the injector's own acknowledgement — `parameter error` fails as `pointerInputRejected`,
+  the gesture's lines verify, anything else is unknown, the exit status never consulted;
+  `readback` is none and `reconcile` stays unknown: an injected gesture leaves nothing to
+  read back.
+- `PortRule` is `HDCPortForwardSpec` (`Direction::{Forward, Reverse}`, both ports
+  `1024...65535`), `from_inputs` Swift's `portForwardSpec` with its one refusal,
+  `endpoints` the full-task tuple whose order flips with the direction, `presence` Swift's
+  reading of `fport ls` (trusted only clean, untruncated and UTF-8; a row with the direction's
+  tag and the exact tuple in order).
+- `PortAction::{Create, Remove, ReadPresence}` with `for_step` for `createPortForward`,
+  `removePortForward` and the two operations' `verifyRemoteState`; `lower` `fport`/`rport
+  <tuple>`, `fport rm <tuple>` and `fport ls` on one 30 s process; `verify` the mutation by
+  exit status alone (`portForwardFailed` with the host port) and the readback as `present`;
+  `readback`, `desired_presence`, `conclude` and `reconcile_without_readback` Swift's
+  reconciliation table; `persisted` the three `hdc.*PortForward*` intents.
+- Both reuse the native-library provider's `Reconcile` (Swift's `ProviderReconcileOutcome`)
+  for what a readback concludes.
+
+The engine half — the typed plan's preflight at `job.plan`/`job.submit`, the port-rule
+readback gate (`portForwardReadbackMismatch`) and `compensate-port-rule`, the lineage block
+after an unknown outcome, the persistent shell channel routing of pointer injection — stays
+with the Job owner.
+
+## Rockchip live-mode probe (TASK-XPA-016, M4)
+
+`arkdeck_provider_hdc::LiveModeProbe` is Swift's `FoundationRockchipLiveModeProbe`,
+the read-only observation of a bound Rockchip target's current mode and build
+that stands behind the flash facts: `hdc list targets -v` through an
+`HdcDispatch` (15 s, 64 KiB) names the mode `hdc` only for exactly one
+`Connected` row with the bound connect key; then the allowlisted
+`param get const.ohos.fullname` is the build (a failed readback is a known
+mode with an unknown build, never a guess) and the exact HDC-normal identity's
+current port comes from the `UsbProbe` port. Anything else is decided by the
+`LoaderObserver` port — ArkForge's dual-source Loader observation for the
+exact bound identity — as `loader` with the observed topology, or the target
+is not observable with Swift's reason. A target list the registered parser
+cannot read is never downgraded to absence. Both ports are the ArkForge
+lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
+USB enumeration), as is the facts port that encodes "not observable" as
+`deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
+fake HDC driver as real subprocesses and asserts the argv from the fake's log.
+A dispatch pinned to a registered Windows HDC tuple (CHG-2026-078) reads the
+list by that tuple's own family (`parse_host_target_list` at its version: the
+six-column `USB` rows, UART rows excluded), where a zero-byte list is not
+observable rather than absence; every other dispatch keeps Swift's `3.2.0f`
+family. The module's Windows unit tests replay the c2 captures.
+## Post-flash HDC alias store (TASK-XPA-016, M4)
+
+Swift's post-flash HDC alias store (`RockchipPostFlashHDCBindingStore`, the
+owner-only document under `~/Library/Application Support/ArkDeck` that keeps
+an adopted Target usable after a flash rotates its HDC serial) needs three
+host-store rules the crate did not have; they are now `arkdeck_platform`
+primitives, with no store logic behind them (its waited-for lock is the
+existing `HostDirectory::wait_lock`): `HostDirectory::open_or_create_private`
+(Swift `prepareRoot`: create every missing level owner-only, make the root
+owner-only whether or not it existed, open it by its canonical path),
+`HostDirectory::create_exclusive_or_match` (Swift `archiveSuperseded`: a
+document created exactly once at its name, synced in place, and when the
+name is taken compared byte for byte — `Created` / `Matched` / `Different` —
+never replaced or removed), and `HostDirectory::read_owner_only` (Swift
+`load` + `validateFile`: `None` for absence, otherwise the owner's
+single-link regular file of exactly mode 0600 and 1..=maximum bytes).
+`arkdeck_platform::{application_support_directory, arkdeck_application_support_root}`
+derive Swift's Application Support root from `runtime_home()`
+(`CFFIXED_USER_HOME`, never `HOME`). The store itself — the record, its
+canonical bytes, the three-way publication and the reissue reconciliation —
+is the store below, over these.
+
+`arkdeck_hoststore::PostFlashAliasStore` is Swift's
+`RockchipPostFlashHDCBindingStore`: the owner-only document
+`rockchip-post-flash-hdc-binding.json` under the product's Application
+Support root that keeps an adopted Target usable after a flash rotates its
+HDC serial. `PostFlashBinding` is the record (twelve fields, the canonical
+sorted compact bytes plus one trailing newline; decoded as Foundation
+decodes, validated as Swift validates with one message); `publish` admits
+the candidate and its expected previous alias before anything is touched,
+then under the waited-for lock reads the stored record and resolves three
+ways — the same proof returned unchanged and unwritten, a revision advance
+archiving the superseded epoch as `post-flash-superseded-<alphanumerics of
+its time>.json` (a taken name compared byte for byte, never replaced) before
+the commit, or the chain rule (same target, revision and Loader identity,
+the stored alias being the one expected) letting a same-revision rotation
+commit; `reconcile_reissued_lineage` republishes a stored alias ahead of the
+live Target at the live revision when it agrees with the Target and the
+observed device on every identity fact, else declines without a write. The
+decisions are pure functions (`admit_post_flash_alias`,
+`resolve_post_flash_alias`, `reissue_post_flash_alias`); the I/O is the
+`arkdeck_platform` primitives (`open_or_create_private`, `wait_lock`,
+`read_owner_only`, `publish_document`, `create_exclusive_or_match`).
+`tests/post_flash_alias.rs` replays the Swift oracle
+(`rust/tests/fixtures/post-flash-alias`) step by step, comparing every
+outcome and every file the root holds — names, modes, sizes, bytes.
+
+## Rockchip post-flash HDC observation (TASK-XPA-016, M4)
+
+`arkdeck_provider_hdc::RockchipHdcObserver` is the HDC side of Swift's
+Rockchip flash executor (`FoundationRockchipRuntimeActionExecutor`): the
+waits for the bound target to leave and re-join HDC (`wait_for_hdc`, 15 s /
+120 s, a `list targets -v` every second, an empty list and a malformed read
+tolerated until the deadline, which names the last malformed read), the
+bound reconnect after a complete overwrite (`wait_for_bound_hdc`, 600 s: the
+exact HDC-normal device at the recorded topology, or the previous alias at
+its new port, self-consistent and with exactly one `Connected` row — a
+board that drifted on both axes is a rebind, not a reconnect), the fresh
+re-proof of a cached route (`revalidate_bound_hdc`), and `verify_bound_build`
+up to the alias publication: prove the device, read
+`param get const.ohos.fullname; param get const.product.model` once
+(`parse_build_properties`: exactly two ordered values, at most 400
+characters each), require the model and then the build to equal the
+published profile exactly, and return the proof for the alias-store owner
+to publish. Every read is judged as Swift's `requireSemanticSuccess` judges
+it (`output_excerpt` is its last-output line). The `UsbProbe` port gains
+`single_hdc_normal_at(usb_topology)`; the receipt summaries are the
+functions beside the observer. The durable alias store, the Target lineage
+advance and the executor's observation-reuse cache are other owners'.
+`tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
+answers fragment and asserts the argv from the driver's log. Its waits read a
+registered Windows HDC tuple's list by that tuple's own family, as the live
+probe does; an empty or unregistered read never proves a reconnect or a
+disconnect.
+## Rockchip Loader transition (TASK-XPA-016, M4)
+
+`arkdeck_provider_hdc::RockchipLoaderTransition` is the Loader side of
+Swift's Rockchip flash executor: `enter_loader` sends the one mutating HDC
+command of the flash flow (`hdc -t <key> shell reboot loader`, 20 s, 64 KiB)
+unless the exact bound Loader is already there (confirmed by ArkForge, no
+command sent), and believes the command only when the exact bound Loader
+appears within the readback budget (45 s, one readback a second) — even exit
+0 is not the semantic boundary of a command whose success disconnects its
+own transport. When it does not: the exact HDC-normal readback proves the
+transition did not complete (`ConfirmedNotExecuted` with one of Swift's two
+closed diagnostics), else a command that did not return cleanly stays as it
+was, else the mutation is unknown; both failure exits carry the command's
+evidence clause (`transition_evidence_summary`: exit status, a bounded
+single-line stderr, the runner failure — which names a terminating signal
+through `signal_death`, readable back with `signal_number`). `wait_for_loader`
+and `rebind_loader` are the same readback for the Loader and rebind arms.
+The `UsbProbe` port gains `single_loader`; `LoaderObserver` gains
+`confirm_loader` (defaulting to a fresh observation). The observation-reuse
+cache keyed by the managed-control step id stays with the executor.
+`tests/rockchip_loader.rs` drives the shared fake HDC driver and asserts the
+command's argv and the refusal it prints.
+
+## Workspace provider (TASK-XPA-015)
+
+`arkdeck-provider-workspace` is the Rust side of Swift's `WorkspaceProvider`.
+Its first layer, from SPK-10, signs a HAP without Swift. `signing_preset` reads
+`preset-v1.json` (`arkdeck-openharmony-signing/v1`) with Swift's exact keys and
+refuses one more. It re-measures the pinned Java launcher, hap-sign-tool JAR,
+keystore, certificate and profile the way Swift's `measure` does, including
+Foundation's `/private` spelling. It also checks the installed daemon's code
+identity. `secret_envelope` reads the Keychain value Swift writes.
+`deveco_password` opens DevEco Studio's password ciphertext with PBKDF2 and
+AES-128-GCM. `signer::sign_hap` runs `sign-app` and `verify-app` through the
+registered identities. The JAR and the staged input are bound by inode, and
+both passwords go only through `run_pty_exchange`. The run ends in Swift's
+`signing-result.json`, with Swift's refused-before-spawn and outcome-unknown
+failure classes.
+
+The registration owner is `arkdeck_hoststore::WorkspaceProjectStore`. It
+serves `workspace.project.*` and `workspace.preset.*` over Swift's
+`projects.json`, with the key sets frozen and a record with one key more
+refused. A project or preset update or removal first asks the durable Job
+census, `JobStore::require_no_active_workspace_project_reference` or
+`require_no_active_workspace_preset_reference`, whether an active or uncertain
+workspace Job names it. A preset that pins a DevEco toolchain or a signing
+credential goes through Swift's crash-recovered dependency transaction: the
+intent is written first, completed by the next access if the process dies, and
+abandoned if a pin is refused. The pins go through the
+`WorkspaceToolchainPinning` and `WorkspaceCredentialPinning` owners the
+composition root passes to `with_dependency_pinning`. Both compositions pass
+the toolchain owner: `DevEcoRegistryStore::acquire/release`
+(`tool_retirement::pins`) hold a preset's pin in its own bootstrap registry,
+as Swift's `BootstrapDevEcoToolchainRegistry` holds it, and retirement refuses
+a pinned toolchain. The production composition also passes the credential
+owner (`arkdeck_hoststore::keychain_credential_pinning` over
+`arkdeck_provider_workspace::credential_owner`, Swift's
+`OpenHarmonySigningCredentialOwner` and its `credential-owner-v1.json`
+ledger): the credential's project binding is checked without secrets before
+the store writes its intent, and again at the pin. The isolated daemon passes
+none, so a signing preset is refused there as Swift refuses it without one.
+`AgentDaemonContractTests.testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals`
+is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
+frames in order.
+
+On Windows the daemon composes the same owner over `workspace-projects`
+in its state root, created owner-only (`windows_lifecycle::Authority::compose`),
+and reads its document at start as the macOS start does: one it cannot read
+ends the start. A root is a drive path in the spelling on disk (`X:\a\b`,
+`\`-separated, no `.`/`..`, verbatim, stream or device syntax); no component
+may be a link or junction (the ancestry walk macOS makes, where the standard
+library reports a junction as a link); it is opened without following its last
+component (`arkdeck_platform::InspectedDirectory`), must be named by the system
+with exactly that spelling (so another case or a short name is refused), and is
+pinned by the volume serial and the 64-bit NTFS file reference as its device
+and inode (a ReFS 128-bit id is refused). `projects.json` keeps the macOS keys
+and digests. No DevEco toolchain or credential owner or workspace composition
+is composed there yet: a project stays `runtimeRestartRequired`, a
+symbol preset registers, a preset that pins a toolchain is refused as without
+its owner, and every project or preset update or removal is refused
+(`recordUnreadable`, no new dispatch) because the composition does not yet ask
+the Job owner whether a Job names it. `tests/windows_workspace_project.rs` (hoststore) and
+`tests/windows_workspace_projects_process.rs` (agentd, the real daemon and CLI)
+measure it.
+
+`arkdeck_platform::KeychainItems` is the `SecItem*` store under it. Production
+reads use the Data Protection Keychain in the helpers' access group, with
+Swift's non-interactive `LAContext` created through the Objective-C runtime. A
+file-based keychain at an exact path is the test scope.
+`trusted_daemon_fingerprint` reproduces the receipt's
+`trustedDaemonApplicationSHA256`.
+
+`tests/fake_hap_signer.rs` compiles `ArkDeckFakeHapSignerFixture` with
+`swiftc` from its byte-identical copy in `tests/fixtures/fake-hap-signer/`. It
+keeps the envelope in a keychain made by `security create-keychain`. It reads
+the running signer's argv and environment from the kernel to show no password
+reaches them. `tests/deveco_password.rs` replays vectors Swift produced. The
+`spk10_probe` and hoststore `spk10_hvigor` examples are the by-hand probes of
+the real signer, the real DevEco material and Hvigor through a registered
+DevEco toolchain.
+
+Five of the 13 `workspace.*` operations run as Jobs on the Rust daemon
+(`workspace_run.rs`): `prepare-isolated-copy`, `apply-patch`, `revert-patch`,
+`build-openharmony` and `sign-openharmony-hap`; the other eight are M3 work. A
+build (`workspace_build.rs`) runs a registered Hvigor preset, composed at
+start-up through its exact DevEco pin (`DevEcoRegistryStore::resolve`), with
+every pinned file held open by digest while the child runs, and lands a
+Runtime-owned copy's unsigned HAP. Signing (`workspace_signing.rs`,
+`workspace_composition.rs`) signs with a registered signing preset through
+`signer::sign_hap`, reconciles a parked Job from its own attempt directory and
+never signs it again; the production composition reads the account's preset
+store and the Data Protection Keychain and releases, at start-up, the
+credential pins no preset record carries, while the isolated daemon signs
+nothing. `tests/workspace_build_oracle.rs` and `tests/workspace_sign_oracle.rs`
+replay the Swift oracles (`WorkspaceBuildOracleContractTests`,
+`WorkspaceSignOracleContractTests`).
+
+## Crash-ledger analyzer mode (TASK-XPA-015)
+
+`arkdeck-agentd --analyze-crash-ledger <absolute path>` is Swift's one-shot
+analyzer mode (`ArkDeckAgentDaemonMain`): the executable a service's plist names
+as `ARKDECK_ANALYZER_PATH`, which the Runtime runs as the analyzer child of
+`analyzer.extract-crash-signature@1` (no environment, the source Artifact's
+`/.vol` alias). It is answered before anything else the daemon does, under any
+executable name: no environment is read and no store, socket or device is
+touched. It reads the one file it is named and prints the canonical
+`HarnessCrashLedgerAnalysis` (`arkdeck_hoststore::analyze_crash_ledger`): the
+Faultlogger listing's entries, or `unreadable` with Swift's reason
+(`invalidEncoding`, `ledgerHeaderAbsent`, `ledgerFenceAbsent`,
+`entryNameUnparseable`), never an empty ledger for bytes that are no listing.
+Other arguments get Swift's line and exit 64 before anything is read; a file that
+cannot be read, or an answer that cannot be written, is exit 1 and one line
+naming the error, never the path or the bytes.
+
+The listing is read over Swift Characters: grapheme clusters as the pinned Swift
+runtime draws them, each judged by its first scalar, with Swift's `Numeric_Type`
+and `Alphabetic` where they hold scalars the standard library's tables do not.
+`rust/tests/fixtures/crash-ledger-analyzer/oracle.json` is what the Swift daemon
+answered to 78 cases and the four Character properties the parser reads, for
+every scalar (recorded by `CrashLedgerAnalyzerOracleContractTests`).
+`cargo test -p arkdeck-hoststore --lib crash_ledger` compares the analysis and
+the properties; `cargo test -p arkdeck-agentd --test crash_ledger_analyzer`
+replays every case through the built daemon, byte for byte, and runs the daemon
+as its own analyzer through an isolated Runtime
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/rust-crash-ledger-analyzer-run.md)).
+
+## HiLog summary analyzer (TASK-XPA-015)
+
+`arkdeck-agentd --summarize-hilog <absolute path>` is Swift's other one-shot
+analyzer mode: the Runtime runs the daemon as the analyzer child of
+`analyzer.summarize-hilog@1` when `ARKDECK_ANALYZER_PATH` names the daemon's
+own bytes (`hilog_summary_analyzer::composed`, Swift
+`HilogSummaryDerivedAnalyzer.profile`); an analyzer executable that is not this
+daemon leaves the operation unavailable as
+`analyzer.hilogRequiresCurrentDaemon`. Like the crash-ledger mode it is
+answered before anything a daemon does. It reads the one file it is named as
+Swift's bounded reader reads it (`arkdeck_platform::read_profile_file`: a
+regular file through its physical path or its `/.vol` alias, no link followed,
+unchanged while read, at most 512 MiB) and prints the canonical
+`HilogSummaryAnalysis` (`arkdeck_hoststore::analyze_hilog`): line, blank and
+unrecognized counts and a count per severity of OpenHarmony's default header,
+matched as ICU matches Swift's pattern. A usage refusal is
+`analyzer.hilogInvalidArguments` and exit 64; any failure is
+`analyzer.hilogReadFailed` and exit 1.
+
+`rust/tests/fixtures/hilog-summary-analyzer/oracle.json` is what the Swift
+daemon answered to 62 cases (`HilogSummaryAnalyzerOracleContractTests`), and
+`rust/tests/fixtures/job-run-hilog/` Swift's plans, admissions, runs, reads and
+store for eleven Jobs of the operation
+(`JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedHilogSummaryJobs`).
+`cargo test -p arkdeck-agentd --test hilog_summary_analyzer` replays every
+case through the built daemon and runs the daemon as its own analyzer through
+an isolated Runtime, by `job.run` and by `agent.run`;
+`cargo test -p arkdeck-hoststore --test job_run_hilog` replays the Jobs byte
+for byte
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
+
+## Windows workspace provider (TASK-XPA-011)
+
+The Windows daemon composes the workspace provider over the registered
+projects at its start, as the macOS compositions do
+(`Host::with_workspace_operations`). It uses the root's `evolution-workspaces`
+for the Runtime-owned copies. The source inspection uses the inspector named
+by `ARKDECK_WORKSPACE_INSPECTOR`, pinned at the start; an inspector that is not
+an executable ends the start. The symbolizer is the one `ARKDECK_ANALYZER_PATH`
+names. Signing is composed for the installed daemon only: it uses the
+account's preset store, Credential Manager bound to the daemon's own image,
+and the root's `workspace-signing-attempts`. A development root composes no
+signing, as the macOS isolated owner composes none. A preset's DevEco
+toolchain is pinned in the Bootstrap registry, as both macOS compositions pin
+it.
+
+The hoststore workspace modules (composition, profile, reads, patch attempts,
+isolation, build, checkpoint, sweep, tests and symbolization), the planner's
+`workspace_plan`, the runner's `workspace_run`, the admitter's
+`preauthorize_workspace` and the reconciler's workspace arms all build on
+Windows. Two things change there:
+
+- **Paths.** An absolute path is spelled as the host spells a standard local
+  one (`X:\a\b`), which is what the project registration pins and what the
+  platform's verified handles require. A path relative to a project root keeps
+  Swift's `/` (`workspace_support::{join, relative_to, is_within}`). A colon
+  is never part of a relative path.
+- **Files.** Files are opened without following a reparse point and created
+  with the private descriptor. An executable is a PE image the caller may
+  execute, measured through `measure_host_file`. A copy refuses a link or
+  junction inside the tree instead of recreating it.
+
+Swift's profiles pin code-owned system tools (`/usr/bin/grep`, `sed`,
+`patch`, `bsdtar`, `git`). The maintainer ruled on 2026-10-04 how Windows
+trusts them, and the table is `CodeOwnedTools` in `workspace_profile.rs`:
+
+- **grep, sed and patch** are reimplemented in Rust (`workspace_text_tools.rs`)
+  for exactly the argv the provider builds. The daemon runs its own image as
+  each one (`arkdeck-agentd --workspace-tool grep|sed|patch …`), pinned by
+  digest, so no external binary is trusted for them.
+- **tar** (`System32\tar.exe`) and **git** (Git for Windows) are trusted by
+  their Authenticode publisher at their registered absolute path, never by a
+  PATH lookup.
+
+With these tools a registered OpenHarmony project resolves to its profile.
+`external_tools` fills the archive slot with `trusted_system(Tar)` and, inside a
+git working copy, the source-control slot with `trusted_system(Git)`. Git runs
+with `GIT_CONFIG_NOSYSTEM=1`: a verified launch does not name the image Git
+derives its system configuration from, and the Runtime's git reads no host-wide
+configuration. A tool that does not verify resolves the project to no profile.
+
+The profile-served reads (`read-source-range`, `inspect-git-status`,
+`inspect-diff`), the isolated copy and the sweep run end to end on Windows. Three
+changes in the hoststore make this work:
+
+- A relative path below a Windows root is joined with `support::join`, so the
+  patch validation no longer refuses every path as escaping the root.
+- A spawn's working directory is its verbatim spelling.
+- A staged file is closed before it is renamed.
+
+The workspace mutations (`apply-patch`, `revert-patch`, `create-checkpoint`)
+need the device-mutation authority, which a development root does not hold.
+The installed (account) daemon's admission holds that authority (#2499), so an
+apply, a checkpoint (through the trusted `tar.exe`) and
+a revert run on a Runtime-owned copy under the Runtime's own capability.
+`windows_workspace_mutation_process` measures them over a fake account, through
+the pipe and through the signed CLI
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-mutations-run.md)).
+`windows_workspace_provider_process` and
+`windows_signed_runtime::workspace_profile_leaves_run_end_to_end_through_the_pipe`
+measure the rest, and `workspace read|status|diff|isolate|sweep` are in
+`WINDOWS_MEASURED_LEAVES`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-lanes-run.md)).
+A registered project resolves to its profile through the code-owned tools:
+the daemon's own `grep`, `sed` and `patch`, and the trusted `tar` and `git`
+below. A tool that does not verify on the host leaves the project with no
+profile. Every profile-served operation is then unavailable with
+`workspace.toolchainUnavailable` and its reason, and a plan of one is refused
+before admission with zero dispatch. `workspace.inspect-source@1` needs no
+profile, so it runs either way.
+
+`cargo test -p arkdeck-hoststore --test workspace_text_tools_oracle` checks the
+reimplementation against the macOS tools in two ways:
+
+- **On every host**, it replays the recorded Swift oracles.
+  `workspace-read-oracle`'s `/usr/bin/grep` and `/usr/bin/sed` artifacts must
+  match byte for byte. `workspace-patch-oracle`'s tree after `/usr/bin/patch`
+  must match digest for digest, including the failed hunk's
+  `@@ -1,1 +1,1 @@` reject and its `.orig` backup.
+- **On macOS**, the host's own `/usr/bin/grep`, `sed` and `patch` must answer a
+  corpus of the provider's argv shapes exactly as the reimplementation does:
+  exit status, stdout, stderr and the tree.
+
+`windows_workspace_provider_process` runs the daemon image as each tool and
+compares its answer with the reimplementation's.
+
+Maintainer ruling 69 decides the rule. `grep`, `sed` and `patch` are
+reimplemented in process. `tar` and `git` are trusted by a registered absolute
+path and an Authenticode publisher, never through PATH.
+`arkdeck_platform::trusted_system_tool` measures each one:
+
+- **`tar`** is `<system directory>\tar.exe`, Microsoft-signed. Either its
+  embedded third-party component signature (root Microsoft Root CA 2011) or
+  the system catalog's Windows production signature (root 2010) is accepted.
+  The catalog is found by the Authenticode hash of the held handle.
+- **`git`** is `<Program Files>\Git\mingw64\bin\git.exe`, signed by Git for
+  Windows' signer (`O=`/`CN=` Johannes Schindelin). It is the real git, not
+  the `cmd\git.exe` launcher.
+
+The root, every directory below it and the file must have the exact spelling
+on disk. No reparse point is allowed, and only `SYSTEM`, `Administrators` or
+`TrustedInstaller` may own or change them. The SHA-256 comes from the same
+held handle that `WinVerifyTrust` verified.
+`WorkspaceCommandPreset::trusted_system` pins a preset by that digest, and its
+dispatch (`VerifiedTool::open`) runs only that image. The workspace profile's
+code-owned tool table uses them for the archive and source-control slots
+(#2500). The tests run against the host's real `tar.exe` and Git for Windows.
+They also cover a copy outside the registered path, an altered or unsigned
+image, the other tool's publisher, another spelling, a junctioned root, a
+launch by another digest and a shadowing PATH.
+
+`cargo test -p arkdeck-agentd --test windows_workspace_provider_process`
+(`harness = false`) registers a project and restarts the daemon with this
+test binary as the inspector; the binary answers as `grep -r -n` does. The
+inspection is planned under the default read-only policy and runs. It
+publishes exactly what the inspector prints when run directly, and it reads
+back and deduplicates after a restart. The test also checks that the
+profile-served operations carry the system tools reason, that a plan of
+one is refused with zero dispatch, and that an inspector that is not an
+executable refuses the start.
+
+With `ARKDECK_DEV_SIGNER_THUMBPRINT`, `arkdeck-cli/tests/windows_signed_runtime.rs`
+runs `arkdeck workspace inspect` against a dev-signed daemon, before and after
+a restart. `workspace.inspect` is in `WINDOWS_MEASURED_LEAVES`, so
+`workspace.inspect-source@1` is Windows `implemented` in
+`cli-feature-coverage.json`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-provider-run.md)).
+
+### Hvigor build, tests and crash symbolization on Windows
+
+A Hvigor build or test preset runs on a Runtime-owned copy on Windows. The build product lands
+below the copy's `X:\` root. Node and Hvigor inherit the account's profile and temporary
+directories (`USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `TEMP`, `TMP`) where macOS gives `HOME`
+and `TMPDIR`, plus the composition's `DEVECO_SDK_HOME`.
+
+`arkdeck-hoststore/tests/windows_workspace_hvigor.rs` builds and tests a copy through a
+stand-in Node and a pinned `hvigorw.js`. It also checks that the person's own tree is never
+built, and that a changed script never runs.
+
+A registered DevEco toolchain resolves to the installation's own `tools\node\node.exe`,
+`tools\hvigor\bin\hvigorw.js` and `sdk`, spelled `X:\…`. A tool child's working directory is
+handed to it in its standard `X:\…` spelling whenever that names exactly the canonical
+`\\?\` one; Hvigor cannot resolve module paths below a `\\?\` directory.
+
+`arkdeck-agentd/tests/windows_workspace_hvigor_live_process.rs` runs only when
+`ARKDECK_LIVE_DEVECO_ROOT` and `ARKDECK_DEV_SIGNER_THUMBPRINT` are set. It registers the host's
+DevEco, the repository's WaterFlow demo and a build preset through the real CLI, then runs
+`workspace isolate` and `workspace build` on an installed-mode daemon over a fake account. On
+the reference host the build lands `entry-default-unsigned.hap` as the Job's verified Artifact,
+so `workspace build` is Windows `implemented`.
+
+Hvigor's packaging runs `java` by name, and Windows has no system `java`. A Windows DevEco
+record therefore pins a fifth child, `jbr\bin\java.exe`. It is Authenticode-verified and
+SHA-256-pinned like `node.exe`, under the same ownership rules, and registration refuses an
+unsigned one. Only the Hvigor build or test child of a registered preset gets that one
+directory ahead of the system directory on its search path
+(`VerifiedTool::with_search_directory`). The dispatch holds `java.exe` open by its pinned
+identity while the child runs. Every other child keeps the system directory alone, and a caller
+still cannot overlay `PATH`. A record registered before this pin stays readable but resolves no
+preset; register the toolchain again. The tool runner also names its child by the standard
+`X:\…` spelling of the verified image when that names the same file. Hvigor's first-run
+wrapper bootstrap hands Node's image path to `cmd.exe`, which cannot run a `\\?\` one. Managed
+servers and consoles keep `\\?\`.
+
+Node and `cmd.exe` look up a bare command name (`java`, `cmd.exe`, `wmic`) in the working
+directory before `PATH`, and a Hvigor child's working directory is the copy of the person's
+project. So a registered toolchain's Node children also get
+`NoDefaultCurrentDirectoryInExePath=1`, and a command planted in the project never runs ahead of
+the pinned JDK or the system's tools. The live test plants images and scripts under those names
+and builds anyway. Hvigor still runs the project's own `hvigorfile.ts` and declared plugins, by
+design, as on macOS
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-cwd-run.md)).
+
+The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
+(`crash_symbolizer_mode`). The symbolize leaf stays `partial`, since a symbolization needs a
+device-captured crash.
+
+`ohpm` links a project's packages as directory junctions inside the project. A Windows copy
+recreates such a junction, as macOS keeps an in-tree link, when its fully resolved target is a
+directory inside the source root. The new junction names the copy's corresponding directory at
+the copy's published path. Symbolic links, junctions that leave the tree, and dangling ones are
+still refused. The copy also writes paths past `MAX_PATH` (`\\?\` for long drive-letter paths).
+The live test installs the demo's `ohpm` dependencies and runs `workspace test` on the copy
+after the build, so `workspace test` is Windows `implemented`
+([junction layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-copy-junctions-run.md);
+earlier [run records](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md),
+[JDK layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-jdk-run.md)).
+
+## Windows analyzer provider (TASK-XPA-011)
+
+The Windows daemon composes the analyzers `ARKDECK_ANALYZER_PATH` names, as
+the macOS composition does (`hilog_summary_analyzer::composed`): the
+crash-ledger analyzer, and the HiLog summary when that path is the daemon's
+own bytes. A named path that is not an executable ends the start. The two
+ArkTrace analyzers are unavailable as `analyzer.arktraceNotFound`, because no
+ArkTrace distribution is reviewed for Windows (TASK-XPA-021), and
+`ARKDECK_ARKTRACE_DESCRIPTOR` still refuses the start. The Windows parts:
+
+- An analyzer profile's executable is an explicit local absolute path, resolved
+  to its on-disk spelling. It is measured through one handle that follows no
+  reparse point, must be a PE image the caller may execute, and is measured
+  again at every plan (`measure_host_file`).
+- The planner materializes the analyzer plan as on macOS, so the plan digest
+  and the Job identity are Swift's.
+- The runner spawns the child through `VerifiedTool::run_analyzer`, with no
+  environment and the source Artifact's canonical path, where macOS passes its
+  `/.vol` alias.
+- The daemon's `--analyze-crash-ledger` and `--summarize-hilog` modes run on
+  Windows too. They read the one file through `read_host_file`: a local
+  absolute path, no reparse point, unchanged while it is read, and at most
+  512 MiB.
+
+`cargo test -p arkdeck-agentd --test windows_analyzer_process` replays
+recorded Swift oracle cases through the built daemon, byte for byte: 67 of the
+crash-ledger oracle's 78 cases and 40 of the HiLog oracle's 62. These are
+every case whose one argument is the input file, plus the usage refusals.
+The cases left out need a `/.vol` alias, a POSIX spelling, a link, a FIFO or a
+mode, and stay with the macOS replay. The same test runs the real daemon as
+its own analyzer over a recorded Swift source Job, and each derived Artifact
+is Swift's analysis beside its identity. The crash-signature Job reads back
+after a restart and deduplicates on resubmission. A path that is not an
+executable refuses the start.
+
+With `ARKDECK_DEV_SIGNER_THUMBPRINT`, `arkdeck-cli/tests/windows_signed_runtime.rs`
+runs `arkdeck analyze crash-signature` and `arkdeck analyze hilog-summary`
+against a dev-signed daemon, both before and after a restart. They are
+`WINDOWS_MEASURED_LEAVES`, so both catalog entries are Windows `implemented` in
+`cli-feature-coverage.json`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-analyzer-provider-run.md)).
+
+## ArkTrace analyzers and distribution loader (TASK-XPA-015)
+
+`analyzer.summarize-trace@1` and `analyzer.analyze-trace@1` run the reviewed
+ArkTrace CLI a host names with `ARKDECK_ARKTRACE_DESCRIPTOR`. Without one, the
+daemon's composition (`hilog_summary_analyzer::composed`) names both analyzers
+unavailable as Swift's does, `analyzer.arktraceNotFound`, and `job.plan` and
+`job.submit` refuse them by that reason before admission. With one, the
+daemon (development and production alike) loads it at its start as Swift's
+does — the production trust checker, the doctor's private home
+`<state>/arktrace-availability-home`, snapshot generations under
+`<state>/arktrace-profile-snapshots`, the setting read as Swift's
+`URL(filePath:)` reads it — and composes both profiles, or names both
+unavailable for the loader's reason. `analyzer.summarize-trace@1` is then
+planned, admitted, run, published, read and reconciled like the other
+analyzers: the CLI is launched at its canonical snapshot path with the bundle,
+its pinned files and trees and the source held, its answer is judged by the
+port of Swift's `ArkTraceSummaryEnvelopeValidator` (`arktrace_summary.rs`),
+and the exact bytes it printed are published with their derivation before
+the step's outcome (`ArtifactPublisher::publish_machine_bytes`).
+`analyzer.analyze-trace@1` runs the same way with the request its Job's inputs
+make (`arktrace_analysis.rs`: Swift's `ArkTraceAnalysisRequest`, its closed
+cross-field contract refused at plan, submission and agent intent alike, its
+arguments, deadline and recovery digest), judged by the port of Swift's
+`ArkTraceAnalysisEnvelopeValidator` and published with the request's
+derivation.
+
+The loader is ported: `arkdeck_hoststore::ArkTraceProfileLoader` reads the
+descriptor and the distribution manifest as Swift's bounded physical reader
+and JSON readers read them, checks every executable, parser file and receipt
+against the manifest, copies the distribution into a private generation named
+by its tree digest (`arkdeck_platform::tree_snapshot`, `copy_tree_snapshot`:
+Swift's `ArkTraceDistributionTreeHasher`), and returns the two profiles with
+their pinned files and trees, after a trust checker and a doctor probe
+(`DistributionTrust`, `DoctorProbe`). `runtime_availability` measures every
+profile's pins again at each read (`analyzer.profileIdentityDrift`).
+
+`rust/tests/fixtures/arktrace-profile-loader/` is Swift's loader over 46
+distributions (`ArkTraceProfileLoaderOracleContractTests`) and
+`rust/tests/fixtures/arktrace-absent/` Swift's answers without a descriptor
+(`ArkTraceAbsentOracleContractTests`). `cargo test -p arkdeck-hoststore --test
+arktrace_profile_loader --test arktrace_absent` replays both byte for byte
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
+
+The production seams are `arkdeck_hoststore::ProductionDistributionTrust`
+(`arkdeck_platform::static_code_holds`: the Security framework's Developer ID
+and notarization checks of the App and its helper) and
+`ProductionDoctorProbe`, which runs the CLI's `doctor --self-test` through
+`VerifiedTool::run_tool_at_canonical_path` (the child spawned suspended at its
+canonical path and continued only once its first executable mapping is the
+verified inode, its `VerifiedResource`s and `VerifiedNamespace` held).
+`cargo test -p arkdeck-hoststore --test arktrace_doctor` replays Swift's probe
+over a stand-in compiled from `rust/tests/fixtures/arktrace-doctor/fake-arktrace.c`;
+`--test arktrace_reviewed` loads a reviewed distribution a host names with
+`ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR` (and compares it with Swift's load when
+`ARKDECK_REVIEWED_ARKTRACE_SWIFT` names one), and summarizes
+`Packages/ArkDeckKit/Fixtures/traces/zlib.htrace` with it as Swift's engine did
+when `ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT` names Swift's recording
+(`ArkTraceReviewedDistributionOracleContractTests`), and analyzes it (a
+context window and a long-slice analysis) when
+`ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT` names that recording; `cargo test
+-p arkdeck-agentd --test trace_summary_analyzer` does the same through the
+built daemon.
+
+`rust/tests/fixtures/job-run-trace-summary/` is Swift's trace-summary Job
+oracle (`JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedTraceSummaryJobs`)
+over a checked-in stand-in CLI, `arktrace`, compiled from `arktrace.c` so both
+runtimes run the same bytes; `cargo test -p arkdeck-hoststore --test
+job_run_trace_summary` replays its plans, runs, reads, child arguments and
+store byte for byte, and `rust/tests/fixtures/arktrace-summary-validator/`
+holds Swift's verdicts on 95 summary envelopes.
+`rust/tests/fixtures/job-run-trace-analysis/` is the trace-analysis Job oracle
+over the same stand-in, answering the reviewed CLI's own context and analysis
+envelopes, and `rust/tests/fixtures/arktrace-analysis-validator/` holds those
+envelopes (`reviewed/`, answered for `zlib.htrace` and
+`trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
+reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
+
+On Windows (TASK-XPA-021, decision 5) there is no ArkTrace distribution: the
+repository pins one `trace_streamer`, a macOS arm64 build
+(`Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx`), and the distribution
+contract the loader verifies is an Apple one (Developer ID signatures,
+notarization and code directory hashes; a tree digest that spells each
+file's POSIX mode). So the loader, its trust checker and the doctor probe
+stay macOS-only, and nothing is loaded on Windows, pinned or not: a Windows
+development root that names `ARKDECK_ARKTRACE_DESCRIPTOR` is refused before
+anything is opened or read. What reads nothing from the host is built there:
+the two judges of the CLI's answers and the request reader
+(`arktrace_summary.rs`, `arktrace_analysis.rs`) with the contract and JSON
+token rules they share (`arktrace_envelope.rs`), and the three recorded
+oracles above replay on Windows with Swift's verdicts. The Windows daemon
+answers the offline Trace surface as a daemon without the distribution:
+`trace.inspect` with Swift's refusal without a Trace inspector
+(`trace-inspect-unavailable`, every recorded request), `trace.cache.status`
+and `trace.cache.purge` refused without the Trace cache owner, and both
+ArkTrace analyzers unavailable (`provider_not_registered`); `cargo test -p
+arkdeck-agentd --test windows_trace_offline_process` runs them against the
+real daemon ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/windows-trace-offline-run.md)).
+
+## Retired facade mode (TASK-XPA-017)
+
+`arkdeck-agentd` no longer runs as the transport facade that forwarded the
+installed socket to a paired Swift daemon (formerly selected by the
+`arkdeck-facade` executable name or `ARKDECK_SWIFT_DAEMON`, with the facade
+serving `history.filter.*` itself). Under that name, or handed
+`ARKDECK_SWIFT_DAEMON` or `ARKDECK_SWIFT_SHA256`, it refuses to start before it
+binds or opens anything (`production::refuse_retired_facade`,
+`tests/retired_facade.rs`); the one-shot modes (analyzers, symbolizer, cutover
+preflight) still answer first. Nothing in this repository builds a facade any
+more: `rust/scripts/package-macos-facade.sh`, the facade transport tests and
+benchmarks, and the Swift branches of the helper build scripts are gone, and
+`arkdeck-agentd` no longer embeds the facade's `com.arkdeck.agentd.facade`
+`__info_plist` (its `build.rs` only served signing the unbundled facade; the
+Rust helper is signed as `ArkDeckAgent.app` with that bundle's Info.plist).
+
+The installed Swift release still ships a signed `arkdeck-facade` beside its
+Swift daemon, and that pair is the cutover's rollback target (runbook §0.2
+`$ROLLBACK`). The Rust CLI keeps installing and reading it as it is: `runtime
+service update --daemon <that bundle>` renders the plist for the facade with
+`ARKDECK_SWIFT_SHA256` pinning the Swift daemon beside it, and `status` checks
+the facade's signature (`arkdeck-cli/tests/runtime_service.rs`,
+`update_installs_the_retained_facade_pair_and_rolls_back_to_it`). The
+production composition still takes the installed facade's transport lock, so
+neither runs beside the other.
+
+## macOS production composition (TASK-XPA-017, not activated)
+
+The mode of `arkdeck-agentd` that is not an isolated development root is the
+one M5's cutover points the LaunchAgent at. Without
+`ARKDECK_RUNTIME_COMPOSITION` it stays the read-only foundation described
+above; with `ARKDECK_RUNTIME_COMPOSITION=production` (its one value) the daemon
+composes every owner over the account's own state, as Swift's daemon lays it
+out. Nothing sets that variable before the cutover: no LaunchAgent, plist,
+receipt or installed service changes here (`src/production.rs`).
+
+Every root comes from one account home, the one Swift's Foundation resolves
+(`CFFIXED_USER_HOME`, else the account's), so a caller cannot split them:
+
+| Root | Owner |
+| --- | --- |
+| `~/Library/Application Support/ArkDeck/Agentd` | Swift's state directory: the Job owner (`runtime-jobs.sqlite3`, `jobs/`, `cli-job-snapshots/`, recovery epochs), Session storage, History, planning, `instance.lock`, `instance.json`, `agentd.sock` |
+| `…/Agentd/{capabilities,targets,artifacts,agent-executions,human-action-snapshots,control-action-snapshots,workspace-projects}` | the owner of the same name; `hdc-control-actions` only beside a managed HDC server |
+| `…/ArkDeck/Sessions`, `…/ArkDeck/Bootstrap/v1` | the default Session root; the tool, bundle and DevEco registries |
+| `~/Library/Containers/com.arkdeck.desktop/Data/Library/Caches/ArkDeck/Trace/traces` | the Trace cache, read only where the App created it |
+
+The Job owner opens Swift's index in place (`JobStore::open_state_root_owner`):
+a first index is created beside the other owners' entries, as Swift's
+`RuntimeJobRepository` creates one, and still never replaces lost history. The
+device-mutation continuity proof is anchored at the same `Agentd` root.
+
+One authority: before any store is created or probed, the daemon takes Swift's
+single-instance lock (`Agentd/instance.lock`, `LOCK_EX|LOCK_NB`), then the
+facade's lock on the `Agentd` directory with the installed socket
+(`LocalListener::bind_facade`, which reclaims only a socket nobody answers on),
+and writes Swift's `instance.json` naming itself. Swift's daemon holds only the
+first lock and the facade only the second; holding both excludes each, and each
+refuses to start beside it. When the instance lock is held and its document
+names the holder, the daemon prints Swift's `arkdeck-agentd already running:
+pid <p>, socket <s>, protocol <v>` and exits 0 having composed nothing; a lock
+held without that document, the facade's lock or a live listener on the socket
+ends the start with exit 69. It never stands by.
+
+With `ARKDECK_HDC_PATH` (Swift's only HDC input) the account's bootstrap
+registry adopts that file while it holds no selection, and its startup
+selection is started as the managed server on Swift's endpoint
+(`OHOS_HDC_SERVER_PORT`, else 127.0.0.1:8710), with the HDC control actions,
+Trace and Debug probes and the exit-70 boundary of the isolated owner. Beside
+that managed server its Target observations read the Runtime's own trusted USB
+relations (`UsbRegistryRelations::system()`, "Trusted USB relations" above),
+as Swift's daemon reads `registeredDAYU200()`. An unpublished HDC, a pending
+tool selection or an occupied endpoint ends the start; without the variable,
+dispatch stays refused as Swift's does, nothing is observed and nothing is
+adopted. `ARKDECK_ANALYZER_PATH` names the analyzer. The composition prints
+what it composed (`arkdeck-agentd owners: …`, with `hdc, managedHdc,
+usbRegistryRelations` beside a managed server) and one line per owner it
+composes without and why: no HDC, a Trace cache the App has not created, no App
+ingress over an overridden home, and every input Swift's LaunchAgent sets for
+an owner not ported yet. Over the account's own home the App ingress is served
+on `com.arkdeck.agentd` with Swift's code-signing requirement and the owner's
+effective UID (`app_ingress::Configuration::production`). Startup recovery and
+the Artifact sweep run as they do for the isolated owner; then it prints
+`arkdeck-agentd listening on <socket>`.
+
+`cargo test -p arkdeck-agentd --test production_composition` runs the real
+daemon in this mode under temporary homes only (environment cleared,
+`CFFIXED_USER_HOME` below `/private/tmp`, so no Mach service is registered);
+see [the run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-017/production-composition-run.md).
+Its deep `doctor` answers from these owners as they are: over a composition
+without an HDC the HDC check is the `hdc.notConfigured` blocker, never a live
+identity it cannot prove, and `doctor --deep --require-healthy` exits 69.
+
+## LaunchAgent service leaves (TASK-XPA-018)
+
+`arkdeck runtime service status|verify|restart|update|uninstall` manage the one
+user-domain LaunchAgent `com.arkdeck.agentd` in `gui/<uid>` as Swift's
+`LaunchAgentService` and `RuntimeCLI.runAgentDaemon` do
+(`arkdeck-cli/src/runtime_service.rs`, `runtime_service_install.rs`). `status` validates the plist (read by
+CoreFoundation, `arkdeck_platform::read_property_list`), the installed helper
+bundle (`validate_production_daemon_bundle`), a signed sibling facade when the
+bundle carries one, the daemon and HDC digests against the install receipt, the
+ArkForge release bundle (its manifest members re-measured) and the ArkTrace
+descriptor (one `openat(O_NOFOLLOW)` walk), then asks launchd whether the
+service is loaded and the daemon for `health`. `verify --job` reopens one
+profiled Job (`observe.device@1`, `flash.full-restore@1`) through `health`,
+`job.status`, `job.evidence` and `artifact.list` only. `restart` refuses unless
+the service is ready and every current Job is a closed unknown-outcome recovery
+lane (`classify_restart`), boots it out and back in (EIO retried, `enable` once
+after three), and proves a new PID speaking the same catalog digest with the same
+closed Jobs. `verify` without `--job` runs `observe.device@1` as a Runtime-owned
+`agent run` through the daemon and reopens the Job it produced the same way
+(where Swift ran it through its client-side executor), answering Swift's members
+plus the settled `agentExecution`. `update` installs a helper bundle as Swift's
+`install` does — options, validations, a staged copy exchanged into place with
+`renamex_np(RENAME_SWAP)`, the plist rendered from Swift's template by
+CoreFoundation's writer (`arkdeck_platform::write_property_list_xml`), the
+receipt as Swift's `JSONEncoder` writes it, bootout and bootstrap — and keeps the
+helper it replaced one generation in `Helpers/.rollback/ArkDeckAgent.app`. It is
+refused before anything changes while an OpenHarmony signing preset is installed,
+since the replacement daemon's identity would have to be re-recorded in its
+receipt and there is no Rust signing owner yet. The typed zero-Runtime
+`install --bundle … --bundle-generation … --tool … --tool-generation …`, only
+with no service installed, loaded or listening, pins the exact bundle generation
+for `installation/runtime-service-installation` in the Bootstrap registry,
+publishes the first HDC selection from the exact tool generation (both through
+`arkdeck-bootstrap`, the owner the Runtime writes that store through), installs
+the retained bundle with the retained HDC as `update` installs, and then keeps
+only that bundle pinned (Swift `acquire`, `initializeServiceSelection`,
+`retainOnly`); a failure after the pin leaves the pin and the selection for a
+retry. `uninstall` removes the plist, helper and receipt as Swift does and then
+releases the installation's pins (`releaseAll`); a release that fails is
+reported after the removal, which stands. The documents are Swift's; a plain
+refusal is a stderr line and Swift's exit status with an empty stdout, and the
+registry's refusals are Swift's session failures (the failure envelope with
+`newDispatchCount: 0` in machine output).
+
+launchd is reached only through `arkdeck_platform::launchd`: fixed argument
+arrays (`print`, `bootout`, `bootstrap`, `enable`) run by one fixed executable,
+`/bin/launchctl`, never a shell. A home relocated with `CFFIXED_USER_HOME` never
+drives the account's launchd domain: its launchd calls go only to the absolute
+executable `ARKDECK_LAUNCHCTL_FOR_RELOCATED_HOME` names (never `/bin/launchctl`),
+and without one they are refused before anything runs; that variable is refused
+for the account's own home. Tests use injected runners or that relocated-home
+executable, so no test reaches the account's service
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cli-run.md),
+[install and update](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-install-run.md)).
+
+The M5 cutover preflight (design §G.4) is `arkdeck-agentd --cutover-preflight
+[--hold-instance-lock]` with `ARKDECK_RUNTIME_COMPOSITION=production`
+(`arkdeck-agentd/src/cutover_preflight.rs`): a one-shot read of the production
+layout that composes nothing, refused under the facade's name and beside another
+composition's input. Without any owner it reads every Job the index or `jobs/`
+names (index row, record and journal), the agent executions, the capability uses
+and the bootstrap tool index (`arkdeck_hoststore::cutover_facts`), decides with
+`cutover_preflight`, and prints one `arkdeck.cutover-preflight/1` document: the
+blocks (a blocking or unlisted Job state, the unresolved journal of a Job that is
+not parked, an active agent execution, an unsettled capability use, a pending
+tool selection, a source it could not read), what is carried over as it is
+(parked and terminal Jobs, outcome-unknown uses) and, with
+`--hold-instance-lock`, the snapshot of the old state directory (relative path,
+byte count and SHA-256 of every file, and a root digest), taken under the
+Runtime's instance lock before the facts are read; a Runtime still holding that
+lock refuses the held pass
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cutover-preflight-run.md)).
+
+Two more blocks name state this Runtime would carry over and then hold stuck
+(协调会话裁定 2026-09-26,
+[run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-017/cutover-preflight-legacy-refusals-run.md)):
+`loaderTransitionAwaitingBinding`, a parked DAYU200 Flash Job no ArkForge lane
+drove whose record and journal hold exactly the enter-Loader transition Swift's
+`flash.bind-current-loader` settles (Swift `loaderTransitionAwaitingBinding` and
+`pendingLoaderTransition`; this Runtime does not port the settlement, F7), named
+with the Target and binding revision to settle it with on the old Swift Runtime
+(`arkdeck flash bind-loader`) before the preflight is run again; and
+`retainedSessions`, the first refusal of a device mutation's continuity proof of
+the retained Sessions (the default Session root and the one the storage settings
+select), in that proof's own code and words. The proof is
+`JobStore::require_retained_sessions`'s scan, run without opening the Job store
+as an owner (`arkdeck_hoststore::cutover_retained_sessions`): an owner would
+create and mark its lock document and create its snapshot directory in the
+state the preflight must leave as it is. The configured root must also satisfy
+storage status's existing selection rules: a canonical path, an existing custom
+root, and the account's default path when `rootKind` is `default`. A missing
+default root remains valid for first installation. Invalid settings are reported
+as `unreadable` / `sessionStorage` before service replacement; neither preflight
+pass creates or repairs the selected root.
+
+`runtime service update` asks the new helper's daemon for it: Swift's daemon
+refuses the argument as unknown (exit 64) and is installed as above; the Rust
+daemon answers, and installing it is the cutover. Its plist names the Rust daemon
+as `ARKDECK_ANALYZER_PATH`, so that daemon is first asked to analyze a probe
+listing as the Runtime runs its analyzer child (the Runtime's own runner, no
+environment, the listing's `/.vol` alias) and must print Swift's recorded answer
+byte for byte ("Crash-ledger analyzer mode" above, the oracle's
+`runtime-service-probe` case); a daemon that does not is refused by name before
+anything changes. Past that gate the lock-free pass must be clear, the old
+service is booted out, the held pass must be clear too — else the old plist is
+bootstrapped back unchanged — its snapshot summary is written to
+`LaunchAgent/cutover-snapshots/`, and the plist asks for
+`ARKDECK_RUNTIME_COMPOSITION=production`.
+
+## macOS owner lifecycle soak
+
+`arkdeck-soak` runs a simulated-provider workload through production Rust owners
+without child processes or device access. Use a new private state directory:
+
+```sh
+cargo run --release --locked -p arkdeck-soak -- \
+  --state-directory /private/tmp/arkdeck-rust-soak \
+  --duration-seconds 60 --restart-interval-seconds 5 --jobs-per-cycle 10
+```
+
+It atomically writes `runtime-soak-metrics.json`, reopens owners between cycles,
+verifies published Artifact evidence and journals, and fails on unresolved
+intents, cleanup debt or excessive RSS/FD growth. Every cycle prints its
+resident set, its growth against the first cycle, the descriptor count and the
+state size, so a failed resource gate leaves a series rather than one number. The default duration is 24
+hours. Each cycle now binds a private `d/ctl.sock`, serves the shared
+`arkdeck-agentd` control loop, and sends new Jobs through the existing bounded
+client (health plus one business request per connection, like Swift). Clean
+preflight recovery still calls the production runner directly, as Swift does.
+A cycle closes its clients, stops accepting, drains for at most five seconds,
+and releases its owners before reopening; incomplete drain fails the run and
+retains the old generation's listener lease until its handlers release state.
+This is a same-process server/owner lifecycle, not an OS-process restart or an
+installed launchd service. The canonical socket path must fit 103 bytes; longer
+roots are rejected before owner state is published. The benchmark helper's short
+`adkb.*` roots and the hosted workflow's `/tmp/adksoak.*` roots fit this boundary.
+`scripts/bench capture --runtime-kind rust` uses the fixture to seed each run's
+store, then measures the isolated release daemon over its socket (SPK-11).
+Historical owner-only soak results retain their original source and scope;
+the new transport coverage needs its own run record.
+Neither the soak nor a capture approves a budget, commits a reference baseline
+or provides hardware acceptance evidence. See
+[the soak record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
+and [the SPK-11 record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md)
+for validation, the three-run Rust numbers and the remaining scope.
+
+The workload tests (`tests/workload.rs`) run one at a time: the gate reads
+process-wide counters, and libtest runs one binary's tests as threads of one
+process, so a sibling test's descriptors would count as another run's growth.
+
+### Windows transport soak
+
+On Windows the same executable soaks the named-pipe serving path: each cycle
+binds a private `\\.\pipe\arkdeck-soak-<run>` with `FILE_FLAG_FIRST_PIPE_INSTANCE`
+(so a generation that did not release every instance fails the next bind),
+serves the shared `serve_control` loop, and connects `--jobs-per-cycle` times
+with the production client, which verifies the server's image and Authenticode
+signer as the CLI does. The Job owners are macOS-only until the Job store
+reaches Windows (G01), so every exchange is a verified health handshake and a
+refused `job.list`, and the document says `workload: windows-pipe-transport/v1`
+and counts no Job. The same growth bounds apply to the Windows counters: the
+peak working set for `maxResidentSetBytes` and open handles
+(`GetProcessHandleCount`) for the descriptor fields; `workingSetBytes` and
+`privateBytes` are recorded beside them. The client pins the soak's own image,
+so run a copy signed with the host-trusted development certificate:
+
+```powershell
+New-Item -ItemType Directory $env:TEMP\soak-bin | Out-Null
+Copy-Item target\release\arkdeck-soak.exe $env:TEMP\soak-bin\
+$signed = pwsh -File scripts\windows-dev-identity.ps1 sign `
+  -Thumbprint $env:ARKDECK_DEV_SIGNER_THUMBPRINT -Path $env:TEMP\soak-bin\arkdeck-soak.exe
+$env:ARKDECK_SOAK_SIGNER_SHA256 = ($signed | ConvertFrom-Json).pin
+& $env:TEMP\soak-bin\arkdeck-soak.exe --state-directory $env:TEMP\adksoak-1 `
+  --duration-seconds 60 --restart-interval-seconds 5 --jobs-per-cycle 10
+```
+
+Without the pin it refuses before creating anything; the Job-store fixtures
+(`--seed-recovery`, `--measure-journal`, `--seed-artifact-bench`) are refused on
+Windows. `cargo test -p arkdeck-soak --test windows_pipe -- --ignored` runs the
+signed leg with `ARKDECK_DEV_SIGNER_THUMBPRINT` set. Enablement only: formal
+Windows measurement belongs to phase A on a quiet reference host.

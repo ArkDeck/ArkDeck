@@ -24,30 +24,26 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | `agent-guides/` | 根 `AGENTS.md` 按任务引用的验收、提交与指令维护指南 | 无；仅拆分读取入口，沿用根文件边界 |
 | `ci/` | 本地与 GitHub 共用的变更分类器、Xcode 稳定镜像入口与手动 UI 测试入口(`run-ui-tests.sh`;不在任何门里):以可信 base/head diff 和 App 实际 target 依赖选择 ArkDeckKit Swift / ArkDeck App 编译车道；`run-xcodebuild.sh` 让不同 worktree 复用同一增量图；base 不可得时 fail closed 跑全部 | 分类、稳定缓存同步规则与契约测试均封闭在目录内；GitHub 消费侧为 `swift-ci.yml` |
 | `release/` | macOS 发布候选版入口(TASK-XPA-017 S5):`build_macos_release.py` 的 `release`(维护者签名、公证、staple 的 DMG)与 `unsigned`(无凭据结构检查);`release_version.py` 维护单一版本源;夹具测试在 Rust CI 的 macOS job 跑 | 版本正本 = `release/release-version.json`;安装说明 = `docs/release/macos-install.md` |
-| `host_loop/` | 常驻循环(discovery/lease/worker/recovery/transport):认领 ready 任务、开 agent PR、观测与调和 | owner/repo/API root/lease 命名空间/env 名等仍散在各模块;收口为 `instance.py` 属 TASK-DEC-002(待做) |
 | `test_agent_pr_workflow.py` | `.github/workflows/` Agent PR 命名空间分区的封闭契约(禁能力扫描) | 无(纯测试) |
 | `catalog_gen/` | Operation Catalog 校验/生成器(CHG-2026-046 T04):校验 `Catalog/` 文档、生成 `RuntimeOperationCatalogGenerated.swift` 与 effect/authorization matrix;check_sdd family 11 调用其零写 drift 检查 | catalog 数据正本 = 仓库顶层 `Catalog/`;生成物路径常量在模块内 |
 | `README.md` | 本文件 | — |
 
 框架的消费侧在 `.github/workflows/agent-pr.yml` 与 `sdd-guard.yml`
 (不在 `scripts/` 下):前者的 open-pr job 直跑
-`agent_pr_identity.py`,后者的 guard job 跑 check-sdd、检查器与 helper 套件及 host_loop 套件。
+`agent_pr_identity.py`,后者的 guard job 跑 check-sdd、检查器与 helper 套件,以及 `tools/experiments/host_loop` 与 `tools/experiments/gj_record`。
 
 ## 产品工具(product,一 change 一目录)
 
 | 条目 | 职责(出处 change) |
 | --- | --- |
-| `archive_characterization/` | DAYU200 归档特征扫描器(CHG-2026-003,已归档) |
-| `m0b_capture/` | M0B DAYU200 bring-up 采集 runbook(CHG-2026-006,人工执行) |
-| `manual_ui_flash/` | 人工 Accessibility UI Flash 驱动器(原 `rockchip_component/` 内与组件无关的驱动，随 CHG-2026-065 迁入；组件构建流水线本体已退役) |
-| `partition_decode/` | DAYU200 钉定镜像分区解码器(CHG-2026-009,离线只读) |
-| `trace_capture/` | TR-001 trace 探针/最小采集 runbook(CHG-2026-021,人工执行) |
-| `ud_capture/` | 受控 UI Dump 采集 harness(CHG-2026-008) |
-| `ui_dump_diagnosis/` | R2 raw INVALID_UNICODE 只读非内容诊断(TASK-UD-R2-DIAG-001) |
 | `ui_dump_redaction/` | UI Dump 派生 golden 脱敏器(host-only 隐私边界) |
 | `bench/` | Runtime 性能基线与回归比对 harness(CHG-2026-074 SPK-1/TASK-XPA-023);自起隔离 daemon 于私有 state 目录测量,不碰设备、不碰已安装 Runtime |
-| `gj_record/` | Golden Journey 真机记录生成器(CHG-2026-074 phase A G9):`capture` 逐条运行已发布 `arkdeck` 命令,把 stdout、退出码与顺序记进仓外 journal;`assemble` 按 headless runbook 判据从 Runtime 自身输出机械判定四态,写出脱敏的 `arkdeck.gj-headless-rerun/1` 记录;拒绝 fake/fixture/plan-only/开发根输入与过期 Catalog digest |
 
 产品工具的实例参数(设备身份、镜像 pins、fixtures、脱敏词表)一律钉在
 **各自目录内**(README + 数据文件),不进框架面;守卫与循环对它们零
 依赖。`__pycache__/` 是未跟踪的 Python 字节码缓存,不属于任何一类。
+
+无 workflow 或产品代码引用、已删除的一次性目录：`m0b_capture`、`ud_capture`、
+`manual_ui_flash`、`archive_characterization`、`ui_dump_diagnosis`、
+`partition_decode`、`trace_capture`。`host_loop` 与 `gj_record` 在
+`tools/experiments/`，因为 SDD Guard 仍 discover 这两个包。
