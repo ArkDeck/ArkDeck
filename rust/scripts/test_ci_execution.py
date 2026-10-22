@@ -674,5 +674,95 @@ pub fn documented() {}
                 tests.execute(self.root, workers=1, directory=directory)
 
 
+bump = load("bump-arkforge-pin")
+
+
+MANIFEST = """\
+# pin comment
+arkforge-core = {{ git = "https://github.com/ArkDeck/ArkForge.git", rev = "{rev}" }}
+arkforge-ipc = {{ git = "https://github.com/ArkDeck/ArkForge.git", rev = "{rev}" }}
+serde = {{ version = "1.0.151" }}
+"""
+
+
+class ArkForgePinBumpTests(unittest.TestCase):
+    REV_A = "0445530207ac5e6689e61e7b51c0edd4de7f2aec"
+    REV_B = "eedaa3e3bae641374e453cad302eb214d55d6b08"
+    REV_C = "1111111111111111111111111111111111111111"
+
+    def test_rewrite_moves_every_crate_to_one_full_revision(self) -> None:
+        text = MANIFEST.format(rev=self.REV_A)
+        rewritten = bump.rewrite(text, self.REV_B)
+        self.assertEqual(set(bump.parse_pins(rewritten).values()), {self.REV_B})
+        self.assertIn("serde", rewritten)
+        self.assertNotIn(self.REV_A, rewritten)
+
+    def test_rewrite_refuses_a_branch_tag_or_split_pin(self) -> None:
+        text = MANIFEST.format(rev=self.REV_A)
+        for refused in ("main", "v1.2.3", self.REV_B[:12], ""):
+            with self.assertRaises(SystemExit):
+                bump.rewrite(text, refused)
+        branched = text.replace(
+            f'rev = "{self.REV_A}"',
+            'branch = "main"',
+            1,
+        )
+        with self.assertRaises(SystemExit):
+            bump.parse_pins(branched)
+        tagged = 'arkforge-ipc = { git = "https://github.com/ArkDeck/ArkForge.git", tag = "v1" }\n'
+        with self.assertRaises(SystemExit):
+            bump.parse_pins(tagged)
+        split = text.replace(self.REV_A, self.REV_B, 1)
+        with self.assertRaises(SystemExit):
+            bump.parse_pins(split)
+
+    def test_relation_is_current_behind_or_diverged(self) -> None:
+        root = Path(self._git_repo())
+        first = self._commit(root, "first")
+        second = self._commit(root, "second")
+        self.assertEqual(bump.relation(root, second, second), "current")
+        self.assertEqual(bump.relation(root, first, second), "behind")
+        side = self._commit(root, "side", parent=first)
+        self.assertEqual(bump.relation(root, side, second), "diverged")
+        self.assertEqual(bump.upstream_head(root), side)
+
+    def test_workflow_bumps_a_revision_and_runs_vectors_before_the_pull_request(self) -> None:
+        workflow = Path(__file__).resolve().parents[2].joinpath(
+            ".github/workflows/arkforge-pin-bump.yml"
+        ).read_text(encoding="utf-8")
+        shell = Path(__file__).with_name("arkforge-pin-bump.sh").read_text(encoding="utf-8")
+        vectors = workflow.index("run: python3 rust/scripts/check-arkforge-pin.py --run-vectors")
+        pull = workflow.index("Open the bump pull request")
+        self.assertLess(workflow.index("run: sh rust/scripts/arkforge-pin-bump.sh"), vectors)
+        self.assertLess(vectors, pull)
+        self.assertIn('branch="agent/arkforge-rev-${REVISION}"', workflow)
+        self.assertIn("refs/heads/${branch}", workflow)
+        self.assertIn('cron: "0 6 * * *"', workflow)
+        self.assertNotIn("actions/checkout", workflow)
+        for refused in ("rev = \"main\"", "tag =", "branch ="):
+            self.assertNotIn(refused, workflow)
+            self.assertNotIn(refused, shell)
+        self.assertLess(shell.index("trap remove EXIT"), shell.index("git clone"))
+        self.assertIn("arkforge-package-auth.sh", shell)
+        self.assertNotIn("cargo test", shell)
+        self.assertNotIn("--run-vectors", shell)
+
+    def _git_repo(self) -> str:
+        temporary = tempfile.TemporaryDirectory(prefix="arkdeck-pin-bump-")
+        self.addCleanup(temporary.cleanup)
+        subprocess.run(["git", "init", temporary.name], check=True, capture_output=True)
+        return temporary.name
+
+    def _commit(self, root: Path, message: str, parent: str | None = None) -> str:
+        if parent is not None:
+            subprocess.run(["git", "-C", str(root), "checkout", "--detach", parent], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(root), "-c", "user.email=pin@example.com", "-c", "user.name=pin",
+             "commit", "--allow-empty", "-m", message],
+            check=True, capture_output=True,
+        )
+        return subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+
+
 if __name__ == "__main__":
     unittest.main()
