@@ -94,20 +94,35 @@ flowchart LR
 
 ## 从源码构建
 
+运行时、CLI 与 Provider 在 Rust workspace（`rust/`）。SwiftPM 只构建
+`Packages/ArkDeckKit` 里的应用侧库。Swift Runtime 已删除（CHG-2026-074，
+TASK-XPA-017）；Swift 不再承载运行时语义，ArkForge 只以提交修订钉在
+`rust/Cargo.toml`。
+
 你需要：
 
-- Apple 芯片上的 macOS 27
-- Xcode 27.0 与 Swift 6.4
+- Apple 芯片上的 macOS 27（桌面应用）
+- Xcode 27.0 与 Swift 6.4（应用与 Swift package）
+- `rust/rust-toolchain.toml` 里的 Rust（stable，1.99.0 或更新，运行时与 CLI）
 - 一个 OpenHarmony `hdc` 可执行文件（真机工作流需要）
 - 一台已完成首次信任授权的 USB 直连设备
 
-构建并测试 Swift Package：
+在仓库根目录构建并测试 Rust 运行时：
 
 ```bash
 git clone https://github.com/ArkDeck/ArkDeck.git
 cd ArkDeck
-swift build --package-path Packages/ArkDeckKit
-swift test --package-path Packages/ArkDeckKit --parallel
+python3 rust/scripts/run-cargo.py test -p arkdeck-cli
+python3 rust/scripts/check-arkforge-pin.py
+```
+
+`check-arkforge-pin.py` 只接受完整提交修订，且每个 `arkforge-*` crate 必须相同。加上 `--run-vectors` 会在该修订上重跑 ArkForge 的线协议与 StepPermit 向量。拉取私有 ArkForge crate 需要读权限；CI 在 `scripts/ci/arkforge-cargo-fetch.sh` 里使用只读 deploy key。
+
+构建并测试 Swift 应用侧 package（不是运行时）：
+
+```bash
+sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
+sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 ```
 
 仓库贡献者可以运行与 GitHub CI 共用的路径感知验证入口。它始终检查 SDD 与 Catalog 一致性，再只选择受当前分支和工作区改动影响的编译车道；比较事实缺失时会运行全部车道，而不是静默跳过验证：
@@ -128,13 +143,20 @@ ArkDeckKit 测试使用 worktree 之外的稳定缓存。App 与 UI 测试改动
 
 ### 安装运行时
 
-SwiftPM 直接生成的可执行文件只用于开发，不能作为生产 LaunchAgent 安装。`runtime service install` 只接受具备预期 Developer ID、hardened runtime、内嵌 provisioning profile 和共享 Keychain entitlement 的 `ArkDeckAgent.app`。请按[无头运行时指南](./Packages/ArkDeckKit/LaunchAgents/README.md)使用团队授权的签名与公证输入构建 helper，或在项目提供已签名发布包后使用发布包。
+生产守护进程是 Rust 的 `arkdeck-agentd`，打包为已签名的 `ArkDeckAgent.app`。
+SwiftPM 不再构建该守护进程或 `arkdeck` CLI。`runtime service install` 只接受
+具备预期 Developer ID、hardened runtime、内嵌 provisioning profile 和共享
+Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages/ArkDeckKit/LaunchAgents/README.md)使用团队授权的签名与公证输入构建，或在项目提供已签名发布包后使用发布包。
 
-从已签名的 `ArkDeckCLI.app` 安装用户级守护进程，并把它指向你的 `hdc`：
+从已签名的 `ArkDeckCLI.app` 安装用户级守护进程，并指明已审查的 bundle 与 tool 代次：
 
 ```bash
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck \
-  runtime service install --hdc /absolute/path/to/hdc
+  runtime service install \
+  --bundle <bundle-id> \
+  --bundle-generation <positive-integer> \
+  --tool <tool-id> \
+  --tool-generation <positive-integer>
 ```
 
 然后确认一切就绪：
@@ -146,14 +168,14 @@ SwiftPM 直接生成的可执行文件只用于开发，不能作为生产 Launc
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck operation list
 ```
 
-`runtime service install` 会校验并固定守护进程和 `hdc` 二进制。检查 `device list` 返回的候选设备后，使用 `arkdeck device adopt --candidate <connect-key>` 完成接管；没有候选或存在歧义时，ArkDeck 不会猜测。工作区配置、本地 HAP 签名、诊断与卸载方式也见无头运行时指南。
+`runtime service install` 会固定该 bundle 代次与 tool 代次。检查 `device list` 返回的候选设备后，使用 `arkdeck device adopt --candidate <connect-key>` 完成接管；没有候选或存在歧义时，ArkDeck 不会猜测。工作区配置、本地 HAP 签名、诊断与卸载方式也见无头运行时指南。
 
 ## 仓库结构
 
 - [`ArkDeck.xcodeproj/`](./ArkDeck.xcodeproj/) — 共享的 Xcode 工程与 scheme
 - [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI macOS 应用
 - [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — macOS 应用的 XCUITest
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package：运行时、Provider、存储、守护进程与 CLI
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 应用侧 Swift package（ClientKit、Core、Trace adapter）。运行时与 CLI 在 `rust/`
 - [`rust/`](./rust/) — 共享 Rust workspace，13 个 crate：`arkdeck-agentd`、`arkdeck-bootstrap`、`arkdeck-cli`、`arkdeck-client`、`arkdeck-contract`、`arkdeck-control`、`arkdeck-hoststore`、`arkdeck-platform`、`arkdeck-provider-arkforge`、`arkdeck-provider-hdc`、`arkdeck-provider-workspace`、`arkdeck-rockchip-binding`、`arkdeck-soak`
 - [`windows/`](./windows/) — Windows 11 x64 的 WinUI 3 客户端、ArkDeck.ClientKit 及其测试（开发中）
 - [`Catalog/`](./Catalog/) — 已发布的操作、Profile 与 Schema

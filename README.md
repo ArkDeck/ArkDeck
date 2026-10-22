@@ -96,18 +96,36 @@ Module boundaries are documented in [Architecture Rules](./docs/ArchitectureRule
 
 ## Building from source
 
+The runtime, CLI, and providers live in the Rust workspace (`rust/`). SwiftPM
+builds only the app-side libraries in `Packages/ArkDeckKit`. The Swift Runtime
+was removed (CHG-2026-074, TASK-XPA-017); Swift carries no runtime semantics,
+and ArkForge is pinned only as a commit revision in `rust/Cargo.toml`.
+
 You need:
 
-- macOS 27 on Apple silicon
-- Xcode 27.0 with Swift 6.4
+- macOS 27 on Apple silicon, for the desktop app
+- Xcode 27.0 with Swift 6.4, for the app and the Swift package
+- Rust from `rust/rust-toolchain.toml` (stable, 1.99.0 or newer), for the runtime and CLI
 - an OpenHarmony `hdc` executable, for real-device work
 - a USB-connected device with first-use trust already granted
 
-Build and test the Swift package:
+Build and test the Rust runtime from the repository root:
 
 ```bash
 git clone https://github.com/ArkDeck/ArkDeck.git
 cd ArkDeck
+python3 rust/scripts/run-cargo.py test -p arkdeck-cli
+python3 rust/scripts/check-arkforge-pin.py
+```
+
+`check-arkforge-pin.py` accepts only a full commit revision, shared by every
+`arkforge-*` crate. Add `--run-vectors` to rerun ArkForge's wire and StepPermit
+vectors at that revision. Fetching the private ArkForge crates needs read
+access; CI uses the read-only deploy key inside `scripts/ci/arkforge-cargo-fetch.sh`.
+
+Build and test the Swift app-side package (not the runtime):
+
+```bash
 sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
 sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 ```
@@ -204,13 +222,24 @@ For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDe
 
 ### Installing the runtime
 
-The bare SwiftPM executables are development artifacts and cannot be installed as the production LaunchAgent. `runtime service install` accepts only an `ArkDeckAgent.app` helper with the expected Developer ID, hardened runtime, embedded provisioning profile and shared Keychain entitlement. Build that helper with team-authorized signing and notarization inputs as described in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md), or use a signed project release package when one is available.
+The production daemon is the Rust `arkdeck-agentd`, packaged as a signed
+`ArkDeckAgent.app`. SwiftPM does not build that daemon or the `arkdeck` CLI.
+`runtime service install` accepts only that helper when it has the expected
+Developer ID, hardened runtime, embedded provisioning profile, and shared
+Keychain entitlement. Build it with team-authorized signing and notarization
+inputs as described in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md),
+or use a signed project release package when one is available.
 
-From a signed `ArkDeckCLI.app`, install the per-user daemon and point it at your `hdc`:
+From a signed `ArkDeckCLI.app`, install the per-user daemon by naming the
+reviewed bundle and tool generations:
 
 ```bash
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck \
-  runtime service install --hdc /absolute/path/to/hdc
+  runtime service install \
+  --bundle <bundle-id> \
+  --bundle-generation <positive-integer> \
+  --tool <tool-id> \
+  --tool-generation <positive-integer>
 ```
 
 Then check that everything is wired up:
@@ -222,14 +251,14 @@ Then check that everything is wired up:
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck operation list
 ```
 
-`runtime service install` verifies and pins both the daemon and the `hdc` binary. Use `arkdeck device adopt --candidate <connect-key>` after reviewing the candidate reported by `device list`; ArkDeck will not guess when the choice is absent or ambiguous. Workspace setup, local HAP signing, diagnostics and uninstall are also covered in the headless runtime guide.
+`runtime service install` pins that bundle generation and tool generation. Use `arkdeck device adopt --candidate <connect-key>` after reviewing the candidate reported by `device list`; ArkDeck will not guess when the choice is absent or ambiguous. Workspace setup, local HAP signing, diagnostics and uninstall are also covered in the headless runtime guide.
 
 ## Repository map
 
 - [`ArkDeck.xcodeproj/`](./ArkDeck.xcodeproj/) — shared Xcode project and schemes
 - [`ArkDeckApp/`](./ArkDeckApp/) — the SwiftUI macOS app
 - [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — XCUITest bundle for the macOS app
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package: runtime, providers, storage, daemon, and CLI
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package for the app-side libraries (ClientKit, Core, Trace adapter). The runtime and CLI are in `rust/`
 - [`rust/`](./rust/) — shared Rust workspace, 13 crates: `arkdeck-agentd`, `arkdeck-bootstrap`, `arkdeck-cli`, `arkdeck-client`, `arkdeck-contract`, `arkdeck-control`, `arkdeck-hoststore`, `arkdeck-platform`, `arkdeck-provider-arkforge`, `arkdeck-provider-hdc`, `arkdeck-provider-workspace`, `arkdeck-rockchip-binding`, `arkdeck-soak`
 - [`windows/`](./windows/) — Windows 11 x64 WinUI 3 client, ArkDeck.ClientKit, and its tests (in development)
 - [`Catalog/`](./Catalog/) — published operations, profiles, and schemas

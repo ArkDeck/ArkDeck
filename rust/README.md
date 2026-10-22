@@ -24,12 +24,15 @@ python scripts/check-contracts.py
 ```
 
 `cargo fetch --locked` needs read access to ArkForge's private repository: its
-crates are taken from it at the revision `Packages/ArkDeckKit/Package.swift`
-pins. Locally, `CARGO_NET_GIT_FETCH_WITH_CLI=true` lets Cargo fetch with your
-Git credentials; CI fetches with the read-only deploy key the Swift lanes use,
-present for that step alone (`scripts/ci/arkforge-cargo-fetch.sh`).
-`python scripts/check-arkforge-pin.py --run-vectors` checks that the two pins
-agree and reruns ArkForge's own wire and StepPermit vectors at that revision.
+crates are taken from it at the single revision `rust/Cargo.toml` pins. The
+Swift package no longer pins ArkForge; that pin was removed with the Swift
+Runtime (CHG-2026-074, TASK-XPA-017). Locally,
+`CARGO_NET_GIT_FETCH_WITH_CLI=true` lets Cargo fetch with your Git credentials;
+CI fetches with the read-only deploy key, present for that step alone
+(`scripts/ci/arkforge-cargo-fetch.sh`). `python scripts/check-arkforge-pin.py
+--run-vectors` checks that every ArkForge crate and `Cargo.lock` share that
+one full revision (never a tag or branch) and reruns ArkForge's own wire and
+StepPermit vectors at it.
 
 `arkdeck-agentd` is a binary; its unit tests (declared by `src/main.rs`) run in
 parallel and start no child process. macOS has no `SOCK_CLOEXEC`, so a child
