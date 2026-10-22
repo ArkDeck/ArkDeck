@@ -210,7 +210,7 @@ dependencies = [
 [[package]]
 name = "arkforge-arkdeck-adapter"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 dependencies = [
  "arkforge-authority-api",
  "arkforge-core",
@@ -220,7 +220,7 @@ dependencies = [
 [[package]]
 name = "arkforge-artifact"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 dependencies = [
  "arkforge-core",
  "arkforge-platform",
@@ -229,7 +229,7 @@ dependencies = [
 [[package]]
 name = "arkforge-authority-api"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 dependencies = [
  "arkforge-core",
 ]
@@ -237,7 +237,7 @@ dependencies = [
 [[package]]
 name = "arkforge-client"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 dependencies = [
  "arkforge-ipc",
  "arkforge-platform",
@@ -246,12 +246,12 @@ dependencies = [
 [[package]]
 name = "arkforge-core"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 
 [[package]]
 name = "arkforge-ipc"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 dependencies = [
  "arkforge-core",
 ]
@@ -259,7 +259,7 @@ dependencies = [
 [[package]]
 name = "arkforge-platform"
 version = "0.1.0"
-source = "git+https://github.com/ArkDeck/ArkForge.git?rev=7251cb0984970e4a8e68f0100f097711b5f8e833#7251cb0984970e4a8e68f0100f097711b5f8e833"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eadcb24203be5c5aab94fbca4faa0951863ffaba#eadcb24203be5c5aab94fbca4faa0951863ffaba"
 
 [[package]]
 name = "block-buffer"
