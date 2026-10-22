@@ -65,7 +65,7 @@ ArkDeck is an early preview (`0.1.0`). Current limitations:
 - Linux has no desktop client. The shared Rust workspace is built and tested on Linux in CI; a Linux product port has not started.
 - Interfaces, catalog schemas, and setup steps may change before a first stable release.
 
-Progress is measured by five journeys that must pass on a physical board (the repo calls them Golden Journeys): device observation, HAP debugging, native library deployment, flash recovery, and an autonomous AI debug loop. Mocks and simulators don't count. Their definitions and status rules live in [PRODUCT-LOOP.md](./PRODUCT-LOOP.md).
+Progress is measured by five journeys that must pass on a physical board (the repo calls them Golden Journeys): device observation, HAP debugging, native library deployment, flash recovery, and an autonomous AI debug loop. Mocks and simulators don't count. Their definitions and status rules live in [docs/archive/PRODUCT-LOOP.md](./docs/archive/PRODUCT-LOOP.md).
 
 ## Architecture
 
@@ -261,16 +261,17 @@ Then check that everything is wired up:
 - [`ArkDeckApp/`](./ArkDeckApp/) — the SwiftUI macOS app
 - [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — XCUITest bundle for the macOS app
 - [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package for the app-side libraries (ClientKit, Core, Trace adapter). The runtime and CLI are in `rust/`
-- [`rust/`](./rust/) — shared Rust workspace, 13 crates: `arkdeck-agentd`, `arkdeck-bootstrap`, `arkdeck-cli`, `arkdeck-client`, `arkdeck-contract`, `arkdeck-control`, `arkdeck-hoststore`, `arkdeck-platform`, `arkdeck-provider-arkforge`, `arkdeck-provider-hdc`, `arkdeck-provider-workspace`, `arkdeck-rockchip-binding`, `arkdeck-soak`
-- [`windows/`](./windows/) — Windows 11 x64 WinUI 3 client, ArkDeck.ClientKit, and its tests (in development)
+- [`rust/`](./rust/) — shared Rust workspace, 13 crates: `arkdeck-agentd`, `arkdeck-bootstrap`, `arkdeck-cli`, `arkdeck-client`, `arkdeck-contract`, `arkdeck-control`, `arkdeck-hoststore`, `arkdeck-platform`, `arkdeck-provider-arkforge`, `arkdeck-provider-hdc`, `arkdeck-provider-workspace`, `arkdeck-rockchip-binding`, `arkdeck-soak`. The short [rust/README.md](./rust/README.md) points at [docs/rust/development-log.md](./docs/rust/development-log.md)
+- [`windows/`](./windows/) — Windows 11 x64 WinUI 3 client, ArkDeck.ClientKit, and its tests (in development). The old SPK-4 spike lives in [`tools/experiments/windows-spikes/`](./tools/experiments/windows-spikes/)
 - [`Catalog/`](./Catalog/) — published operations, profiles, and schemas
 - [`spec/`](./spec/) — language-neutral control and recovery contracts read by the Rust and Windows implementations
 - [`openspec/`](./openspec/) — product contracts, safety invariants, and change history
 - [`docs/`](./docs/) — architecture notes, ADRs, and product design
 - [`scripts/`](./scripts/) — repository checks, CI, and tooling
+- [`tools/experiments/`](./tools/experiments/) — `host_loop` and `gj_record`, which CI still runs, plus the archived Windows spike
 - [`tests/`](./tests/) — host-side product demos, including WaterFlowTraceDemo
-- [`evidence/`](./evidence/) — checked-in run records for completed tasks
-- [`.design-sync/`](./.design-sync/) — design-sync notes for the `@arkdeck/ds` token work
+- [`docs/archive/`](./docs/archive/) — historical product loop, plan, reviews, and run notes
+- [`.design-sync/`](./.design-sync/) — design-sync notes for the `@arkdeck/ds` token work. The CI planner and the Windows component map still read this directory, so it stays on `main`
 - [`.github/`](./.github/) — GitHub Actions workflows and CODEOWNERS
 
 ## Contributing

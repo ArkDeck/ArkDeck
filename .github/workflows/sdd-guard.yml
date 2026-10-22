@@ -76,14 +76,14 @@ jobs:
         run: python3 scripts/ci/test_agent_pr.py
 
       - name: host-loop contract suite
-        working-directory: scripts
+        working-directory: tools/experiments
         run: python3 -m unittest discover -s host_loop -t .
 
       # The Golden Journey record generator judges REAL_DEVICE_PASS; its
       # refusals (fake, plan-only, development root, stale Catalog, unredacted
       # literals) are what keep a record honest, so they run on every PR.
       - name: Golden Journey record generator tests
-        working-directory: scripts
+        working-directory: tools/experiments
         run: python3 -m unittest discover -s gj_record -t .
 
       # Token drift is part of the required guard. Reuse its checkout and

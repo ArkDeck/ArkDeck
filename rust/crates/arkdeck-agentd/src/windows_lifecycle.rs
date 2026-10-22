@@ -1,7 +1,7 @@
 //! The Windows daemon's lifecycle (TASK-XPA-002 S5): which state root it
 //! owns, how it becomes the one daemon of that root, what asks it to stop,
 //! and what it lets go of once it has drained. The platform decision is in
-//! `rust/README.md` (the Windows paragraph) and the S5 run record.
+//! `docs/rust/development-log.md` (the Windows paragraph) and the S5 run record.
 //!
 //! Three compositions, decided from the environment before anything is
 //! opened:

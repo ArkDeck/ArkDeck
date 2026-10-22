@@ -30,7 +30,7 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: nuget
-    directory: /windows/spikes/spk4
+    directory: /tools/experiments/windows-spikes/spk4
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

@@ -243,7 +243,7 @@ class PathClassificationTests(unittest.TestCase):
             "windows/ClientKit/ControlClient.cs",
             "windows/ClientKit.Tests/ClientTests.cs",
             "windows/scripts/generate-clientkit.py",
-            "windows/spikes/spk4/ArkDeck.Spk4/App.xaml",
+            "windows/App/ArkDeck.App.csproj",
             "windows/README.md",
             r"windows\ClientKit\Json\StrictJson.cs",
         ):

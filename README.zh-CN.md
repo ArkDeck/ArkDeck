@@ -65,7 +65,7 @@ ArkDeck 目前是早期预览版（`0.1.0`）。已知的边界：
 - Linux 没有桌面客户端。共享 Rust workspace 会在 Linux CI 上构建和测试；Linux 产品端口尚未开始。
 - 首个稳定版发布前，接口、目录 schema 和配置步骤都可能变化。
 
-进度以五条必须在真机上跑通的旅程来衡量（仓库里称为 Golden Journey）：设备观察、HAP 调试、native 库部署、刷机恢复、自主 AI 调试循环。Mock 和模拟器都不算数。定义与状态规则见 [PRODUCT-LOOP.md](./PRODUCT-LOOP.md)。
+进度以五条必须在真机上跑通的旅程来衡量（仓库里称为 Golden Journey）：设备观察、HAP 调试、native 库部署、刷机恢复、自主 AI 调试循环。Mock 和模拟器都不算数。定义与状态规则见 [docs/archive/PRODUCT-LOOP.md](./docs/archive/PRODUCT-LOOP.md)。
 
 ## 架构
 
@@ -176,16 +176,17 @@ Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages
 - [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI macOS 应用
 - [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — macOS 应用的 XCUITest
 - [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 应用侧 Swift package（ClientKit、Core、Trace adapter）。运行时与 CLI 在 `rust/`
-- [`rust/`](./rust/) — 共享 Rust workspace，13 个 crate：`arkdeck-agentd`、`arkdeck-bootstrap`、`arkdeck-cli`、`arkdeck-client`、`arkdeck-contract`、`arkdeck-control`、`arkdeck-hoststore`、`arkdeck-platform`、`arkdeck-provider-arkforge`、`arkdeck-provider-hdc`、`arkdeck-provider-workspace`、`arkdeck-rockchip-binding`、`arkdeck-soak`
-- [`windows/`](./windows/) — Windows 11 x64 的 WinUI 3 客户端、ArkDeck.ClientKit 及其测试（开发中）
+- [`rust/`](./rust/) — 共享 Rust workspace，13 个 crate：`arkdeck-agentd`、`arkdeck-bootstrap`、`arkdeck-cli`、`arkdeck-client`、`arkdeck-contract`、`arkdeck-control`、`arkdeck-hoststore`、`arkdeck-platform`、`arkdeck-provider-arkforge`、`arkdeck-provider-hdc`、`arkdeck-provider-workspace`、`arkdeck-rockchip-binding`、`arkdeck-soak`。导航见 [rust/README.md](./rust/README.md)，原开发日志在 [docs/rust/development-log.md](./docs/rust/development-log.md)
+- [`windows/`](./windows/) — Windows 11 x64 的 WinUI 3 客户端、ArkDeck.ClientKit 及其测试（开发中）。旧的 SPK-4 spike 在 [`tools/experiments/windows-spikes/`](./tools/experiments/windows-spikes/)
 - [`Catalog/`](./Catalog/) — 已发布的操作、Profile 与 Schema
 - [`spec/`](./spec/) — Rust 与 Windows 实现读取的语言中立控制面与恢复契约
 - [`openspec/`](./openspec/) — 产品契约、安全不变量与变更历史
 - [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
 - [`scripts/`](./scripts/) — 仓库检查、CI 与工具脚本
+- [`tools/experiments/`](./tools/experiments/) — CI 仍会运行的 `host_loop` 与 `gj_record`，以及归档的 Windows spike
 - [`tests/`](./tests/) — 宿主侧产品 demo，包括 WaterFlowTraceDemo
-- [`evidence/`](./evidence/) — 已完成任务的运行记录
-- [`.design-sync/`](./.design-sync/) — `@arkdeck/ds` token 工作的 design-sync 笔记
+- [`docs/archive/`](./docs/archive/) — 历史产品闭环、计划、评审与运行记录
+- [`.design-sync/`](./.design-sync/) — `@arkdeck/ds` token 工作的 design-sync 笔记。CI 规划器和 Windows 组件映射仍读取它，因此留在 `main`
 - [`.github/`](./.github/) — GitHub Actions 工作流与 CODEOWNERS
 
 ## 参与贡献

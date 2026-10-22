@@ -7,8 +7,8 @@
 > 服务、零新 bot、零新 credential**;runbook 改版走 PR。
 >
 > **适用范围收窄(2026-07-30,产品闭环优先阶段)**:本 runbook 仅在安全内核
-> 治理 change(恰四类 Repo 审批与 `PRODUCT-LOOP.md` §3 安全条件)存在活跃任务
-> 时适用;产品缺陷修复由交互式 Agent 会话按仓库根 `PRODUCT-LOOP.md` 直接以
+> 治理 change(恰四类 Repo 审批与 `docs/archive/PRODUCT-LOOP.md` §3 安全条件)存在活跃任务
+> 时适用;产品缺陷修复由交互式 Agent 会话按 `docs/archive/PRODUCT-LOOP.md` 直接以
 > 垂直产品 PR 交付,不进入本循环、不产生批次 digest。
 
 ## 状态机(固定顺序,不得增删跳步)

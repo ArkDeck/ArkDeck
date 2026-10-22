@@ -1,5 +1,5 @@
 //! The Windows daemon's state root and single-instance guard (TASK-XPA-002,
-//! the platform decision recorded in `rust/README.md` and the S5 run record).
+//! the platform decision recorded in `docs/rust/development-log.md` and the S5 run record).
 //!
 //! * The account's state root is `%LOCALAPPDATA%\ArkDeck\Agentd`, resolved by
 //!   the Known Folder API for this process's token and never from the
