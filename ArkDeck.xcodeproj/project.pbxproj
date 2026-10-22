@@ -160,9 +160,9 @@
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
 		F30000000000000000000125 /* FacadeRollbackUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FacadeRollbackUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
-		B544UIT00000000000000001 /* AppShellUITests+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests+Workspace.swift; sourceTree = "<group>"; };
-		B544UIT00000000000000002 /* AppShellUITests+Cancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests+Cancellation.swift; sourceTree = "<group>"; };
-		B544UIT00000000000000003 /* AppShellUITests+Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests+Fixtures.swift; sourceTree = "<group>"; };
+		B544UIT00000000000000001 /* AppShellUITests+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppShellUITests+Workspace.swift"; sourceTree = "<group>"; };
+		B544UIT00000000000000002 /* AppShellUITests+Cancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppShellUITests+Cancellation.swift"; sourceTree = "<group>"; };
+		B544UIT00000000000000003 /* AppShellUITests+Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppShellUITests+Fixtures.swift"; sourceTree = "<group>"; };
 		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStaleFrameUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F21 /* DeviceRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingUITests.swift; sourceTree = "<group>"; };
