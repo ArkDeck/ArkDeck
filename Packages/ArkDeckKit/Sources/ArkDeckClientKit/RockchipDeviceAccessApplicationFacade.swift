@@ -139,6 +139,12 @@ private actor RockchipDeviceAccessFixtureProvider:
   init(arguments: [String]) { self.arguments = arguments }
 
   func refresh() async -> RockchipDeviceAccessPresentation {
+    if arguments.contains("--ui-test-flash-arkforge-handshake-refused") {
+      let refused = Data(
+        #"{"ok":false,"error":{"code":"unsupportedProtocolVersion","message":"ArkForge PROTOCOL_REFUSED: protocol major 2 is not compatible with 1"}}"#
+          .utf8)
+      return RockchipDeviceAccessResponseDecoding.presentation(.success(refused))
+    }
     if arguments.contains("--ui-test-flash-device-access-unavailable") {
       return RockchipDeviceAccessResponseDecoding.presentation(.failure(.unavailable(nil)))
     }

@@ -1011,6 +1011,7 @@ struct FlashWorkspaceView: View {
         Text(reason)
           .font(WorkspaceFont.monospacedValue)
           .modifier(WorkspaceTextSelection())
+          .accessibilityIdentifier("flash.deviceAccess.reason")
       case .available:
         if let advice = model.deviceAccess.advice {
           Label(

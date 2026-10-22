@@ -82,6 +82,7 @@
 		B544UIT00000000000000011 /* AppShellUITests+Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544UIT00000000000000001 /* AppShellUITests+Workspace.swift */; };
 		B544UIT00000000000000012 /* AppShellUITests+Cancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544UIT00000000000000002 /* AppShellUITests+Cancellation.swift */; };
 		B544UIT00000000000000013 /* AppShellUITests+Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544UIT00000000000000003 /* AppShellUITests+Fixtures.swift */; };
+		B544F1A50000000000000002 /* AppShellUITestsFlashRefusal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544F1A50000000000000001 /* AppShellUITestsFlashRefusal.swift */; };
 		A100000000000000000000E0 /* ViewerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* ViewerUITests.swift */; };
 		A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */; };
 		A10000000000000000000F20 /* DeviceRecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F21 /* DeviceRecordingUITests.swift */; };
@@ -163,6 +164,7 @@
 		B544UIT00000000000000001 /* AppShellUITests+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppShellUITests+Workspace.swift"; sourceTree = "<group>"; };
 		B544UIT00000000000000002 /* AppShellUITests+Cancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppShellUITests+Cancellation.swift"; sourceTree = "<group>"; };
 		B544UIT00000000000000003 /* AppShellUITests+Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppShellUITests+Fixtures.swift"; sourceTree = "<group>"; };
+		B544F1A50000000000000001 /* AppShellUITestsFlashRefusal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITestsFlashRefusal.swift; sourceTree = "<group>"; };
 		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStaleFrameUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F21 /* DeviceRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingUITests.swift; sourceTree = "<group>"; };
@@ -471,6 +473,7 @@
 				B544UIT00000000000000001 /* AppShellUITests+Workspace.swift */,
 				B544UIT00000000000000002 /* AppShellUITests+Cancellation.swift */,
 				B544UIT00000000000000003 /* AppShellUITests+Fixtures.swift */,
+				B544F1A50000000000000001 /* AppShellUITestsFlashRefusal.swift */,
 				A100000000000000000000A1 /* KeyboardInputSourcePin.swift */,
 				F30000000000000000000131 /* FixtureStateLocation.swift */,
 				A100000000000000000000E1 /* ViewerUITests.swift */,
@@ -711,6 +714,7 @@
 				B544UIT00000000000000011 /* AppShellUITests+Workspace.swift in Sources */,
 				B544UIT00000000000000012 /* AppShellUITests+Cancellation.swift in Sources */,
 				B544UIT00000000000000013 /* AppShellUITests+Fixtures.swift in Sources */,
+				B544F1A50000000000000002 /* AppShellUITestsFlashRefusal.swift in Sources */,
 				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
 				A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */,
 				A10000000000000000000F20 /* DeviceRecordingUITests.swift in Sources */,
