@@ -33,6 +33,11 @@
 		A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A4 /* FlashLocalizable.xcstrings */; };
 		A100000000000000000000B1 /* HistoryLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B2 /* HistoryLocalizable.xcstrings */; };
 		A100000000000000000000B0 /* DebugWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B5 /* DebugWorkspaceView.swift */; };
+		B544DBG00000000000000011 /* DebugArtifactsWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544DBG00000000000000001 /* DebugArtifactsWorkspace.swift */; };
+		B544DBG00000000000000012 /* DebugLogsWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544DBG00000000000000002 /* DebugLogsWorkspace.swift */; };
+		B544DBG00000000000000013 /* DebugAppsWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544DBG00000000000000003 /* DebugAppsWorkspace.swift */; };
+		B544DBG00000000000000014 /* DebugCommandsWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544DBG00000000000000004 /* DebugCommandsWorkspace.swift */; };
+		B544DBG00000000000000015 /* DebugWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544DBG00000000000000005 /* DebugWorkspaceViewModel.swift */; };
 		A100000000000000000000B6 /* DebugLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B3 /* DebugLocalizable.xcstrings */; };
 		A10000000000000000000012 /* ArkDeckCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000091 /* ArkDeckCore */; };
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
@@ -106,6 +111,11 @@
 		A100000000000000000000A4 /* FlashLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = FlashLocalizable.xcstrings; sourceTree = "<group>"; };
 		A100000000000000000000B2 /* HistoryLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = HistoryLocalizable.xcstrings; sourceTree = "<group>"; };
 		A100000000000000000000B5 /* DebugWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugWorkspaceView.swift; sourceTree = "<group>"; };
+		B544DBG00000000000000001 /* DebugArtifactsWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugArtifactsWorkspace.swift; sourceTree = "<group>"; };
+		B544DBG00000000000000002 /* DebugLogsWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogsWorkspace.swift; sourceTree = "<group>"; };
+		B544DBG00000000000000003 /* DebugAppsWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugAppsWorkspace.swift; sourceTree = "<group>"; };
+		B544DBG00000000000000004 /* DebugCommandsWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugCommandsWorkspace.swift; sourceTree = "<group>"; };
+		B544DBG00000000000000005 /* DebugWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugWorkspaceViewModel.swift; sourceTree = "<group>"; };
 		A100000000000000000000B3 /* DebugLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = DebugLocalizable.xcstrings; sourceTree = "<group>"; };
 		A10000000000000000000022 /* ArkDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArkDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000023 /* ArkDeckApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArkDeckApp.entitlements; sourceTree = "<group>"; };
@@ -390,6 +400,11 @@
 			isa = PBXGroup;
 			children = (
 				A100000000000000000000B5 /* DebugWorkspaceView.swift */,
+				B544DBG00000000000000001 /* DebugArtifactsWorkspace.swift */,
+				B544DBG00000000000000002 /* DebugLogsWorkspace.swift */,
+				B544DBG00000000000000003 /* DebugAppsWorkspace.swift */,
+				B544DBG00000000000000004 /* DebugCommandsWorkspace.swift */,
+				B544DBG00000000000000005 /* DebugWorkspaceViewModel.swift */,
 				F30000000000000000000101 /* DebugRemoteBuildBrowserViewModel.swift */,
 				F31000000000000000000101 /* DebugWorkspaceRefreshState.swift */,
 			);
@@ -653,6 +668,11 @@
 				G100000000000000000005 /* DeviceLocalization.swift in Sources */,
 				A100000000000000000000E2 /* ViewerLocalization.swift in Sources */,
 				A100000000000000000000B0 /* DebugWorkspaceView.swift in Sources */,
+				B544DBG00000000000000011 /* DebugArtifactsWorkspace.swift in Sources */,
+				B544DBG00000000000000012 /* DebugLogsWorkspace.swift in Sources */,
+				B544DBG00000000000000013 /* DebugAppsWorkspace.swift in Sources */,
+				B544DBG00000000000000014 /* DebugCommandsWorkspace.swift in Sources */,
+				B544DBG00000000000000015 /* DebugWorkspaceViewModel.swift in Sources */,
 				B10000000000000000000001 /* TraceWorkspaceView.swift in Sources */,
 				B10000000000000000000002 /* TraceConfigurationView.swift in Sources */,
 				B10000000000000000000003 /* TraceProgressArtifactsView.swift in Sources */,
