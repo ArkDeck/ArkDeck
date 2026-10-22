@@ -1448,9 +1448,14 @@ struct RuntimeHistoryApplicationContractTests {
   @Test func debugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
-    let view = try String(
-      contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),
-      encoding: .utf8)
+    let debugDirectory = repository.appending(path: "ArkDeckApp/Features/Debug")
+    let debugFiles = try FileManager.default.contentsOfDirectory(
+      at: debugDirectory,
+      includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "swift" }
+    .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    let view = try debugFiles.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
     let localization = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Resources/DebugLocalizable.xcstrings"),
       encoding: .utf8)

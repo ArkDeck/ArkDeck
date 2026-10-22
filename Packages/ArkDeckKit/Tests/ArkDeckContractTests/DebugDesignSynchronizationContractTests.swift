@@ -51,9 +51,23 @@ final class DebugDesignSynchronizationContractTests: XCTestCase {
     return try XCTUnwrap(unit["value"] as? String)
   }
 
+  /// The Debug workbench is split across several view files. The synchronization
+  /// seam is the whole feature directory, not whichever file currently holds a
+  /// control.
+  private func debugWorkbenchSource() throws -> String {
+    let directory = repositoryRoot.appending(path: "ArkDeckApp/Features/Debug")
+    let files = try FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "swift" }
+    .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    return try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
+  }
+
   func testPrototypeMirrorsShippedDebugIdentifiers() throws {
     let prototype = try source("docs/design/prototype.html")
-    let debugSource = try source("ArkDeckApp/Features/Debug/DebugWorkspaceView.swift")
+    let debugSource = try debugWorkbenchSource()
 
     let identifiers = [
       "debug.scope",
