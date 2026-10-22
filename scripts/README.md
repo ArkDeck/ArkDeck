@@ -44,6 +44,7 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 依赖。`__pycache__/` 是未跟踪的 Python 字节码缓存,不属于任何一类。
 
 无 workflow 或产品代码引用、已删除的一次性目录：`m0b_capture`、`ud_capture`、
-`manual_ui_flash`、`archive_characterization`、`ui_dump_diagnosis`、
-`partition_decode`、`trace_capture`。`host_loop` 与 `gj_record` 在
-`tools/experiments/`，因为 SDD Guard 仍 discover 这两个包。
+`archive_characterization`、`ui_dump_diagnosis`、`partition_decode`、
+`trace_capture`。`host_loop`、`gj_record` 与 `manual_ui_flash` 在
+`tools/experiments/`：前两个仍由 SDD Guard discover，后者由
+`ManualUIFlashDriverContractTests` 解释执行。

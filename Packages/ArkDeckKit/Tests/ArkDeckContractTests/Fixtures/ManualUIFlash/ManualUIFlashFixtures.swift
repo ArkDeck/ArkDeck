@@ -13,7 +13,7 @@ enum ManualUIFlashFixtureError: Error, CustomStringConvertible {
 }
 
 /// Shared support for the contract tests that interpret
-/// `scripts/manual_ui_flash/manual_ui_flash.swift` through `xcrun swift`.
+/// `tools/experiments/manual_ui_flash/manual_ui_flash.swift` through `xcrun swift`.
 enum ManualUIFlashFixtures {
   /// The one Clang module cache every interpreting test process shares.
   ///

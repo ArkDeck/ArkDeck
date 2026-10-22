@@ -23,5 +23,6 @@ GitHub Releases. History before this file is the git log on `main`.
   top-level `evidence/runs/` notes under `docs/archive/`.
 - Replaced the 300KB `rust/README.md` log with a short navigation page. The
   log is `docs/rust/development-log.md`.
-- Moved `host_loop`, `gj_record`, and `windows/spikes` to `tools/experiments/`.
-  Removed one-off capture directories under `scripts/` that no workflow called.
+- Moved `host_loop`, `gj_record`, `manual_ui_flash`, and `windows/spikes` to
+  `tools/experiments/`. Removed one-off capture directories under `scripts/`
+  that no workflow or product code called.
