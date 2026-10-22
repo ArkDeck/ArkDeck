@@ -86,7 +86,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue, Trust, DeviceScreen, DiagnosticCapture, ToolchainInventory, ToolchainInventoryEmpty, ToolchainInventoryRefused];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, FlashHandshake, FlashVerifyExit7, FlashVerifyExit9, Viewer, Diagnostics, Recovery, History, Continue, Trust, DeviceScreen, DiagnosticCapture, ToolchainInventory, ToolchainInventoryEmpty, ToolchainInventoryRefused];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -244,7 +244,7 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => (mode is ToolchainInventory or ToolchainInventoryEmpty or ToolchainInventoryRefused ? ToolchainInventoryRoute(request, method) : null) ?? (mode == DiagnosticCapture ? DiagnosticCaptureRoute(request, method) : null) ?? (mode == DeviceScreen ? DeviceScreenRoute(request, method) : null) ?? (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
+                _ => (mode is ToolchainInventory or ToolchainInventoryEmpty or ToolchainInventoryRefused ? ToolchainInventoryRoute(request, method) : null) ?? (mode == DiagnosticCapture ? DiagnosticCaptureRoute(request, method) : null) ?? (mode == DeviceScreen ? DeviceScreenRoute(request, method) : null) ?? (mode is Flash or FlashHandshake or FlashVerifyExit7 or FlashVerifyExit9 ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(ObservationsNow())),
@@ -273,6 +273,12 @@ public static partial class ScriptedDaemon
             };
         }
 
+        /// <summary>A finished canonical Flash the verify scenarios can select as their source.</summary>
+        private (string Id, string Operation, string State, string Created)[] VerifySources() =>
+            scenario is FlashVerifyExit7 or FlashVerifyExit9
+                ? [(VerifySourceJobId, "flash.full-restore@1", "succeeded", "2026-09-30T08:05:00Z")]
+                : [];
+
         private int _observationReads;
 
         /// <summary><see cref="Trust"/>: the unauthorized candidate trusts this computer at the
@@ -287,6 +293,7 @@ public static partial class ScriptedDaemon
 
         private (string Id, string Operation, string State, string Created)[] JobsNow() => scenario == Continue ? [.. ContinueJobs, .. _continued] :
         [
+            .. VerifySources(),
             (RunningJobId, "observe.device@1", RunningJobStates[Math.Min(_statusReads, RunningJobStates.Count - 1)], "2026-09-30T08:02:00Z"),
             (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
             (TraceJobId, "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),

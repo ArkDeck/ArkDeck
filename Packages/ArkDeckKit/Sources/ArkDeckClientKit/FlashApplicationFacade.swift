@@ -1121,9 +1121,11 @@ actor FlashProductionApplicationProvider: FlashApplicationProviding {
 }
 
 private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
+  private let arguments: [String]
   private let fixtureStateURL: URL?
 
   init(arguments: [String]) {
+    self.arguments = arguments
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
@@ -1131,6 +1133,15 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
     } else {
       fixtureStateURL = nil
     }
+  }
+
+  /// The history fixture ignores launch arguments once a state file exists.
+  /// Maintenance flags travel in that same file.
+  private func requests(_ flag: String) -> Bool {
+    if let fixtureStateURL, let text = try? String(contentsOf: fixtureStateURL, encoding: .utf8) {
+      return text.contains(flag)
+    }
+    return arguments.contains(flag)
   }
 
   func refreshWorkspace() async -> FlashWorkspacePresentation {
@@ -1195,6 +1206,48 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
       FlashSubmissionPresentation(
         jobID: "job-ui-fixture-flash", state: "succeeded", outcomeUnknown: false,
         timeline: ["jobCreated", "finalized"]))
+  }
+
+  func maintenance(
+    sourceJobID: String, target _: FlashTargetPresentation,
+    archiveURL _: URL?, budgetMs _: Int
+  ) async -> FlashRunResult {
+    let failed = requests("--ui-test-flash-verify-exit-7")
+    let skipped = requests("--ui-test-flash-verify-exit-9")
+    guard failed || skipped else {
+      return .failed("Maintenance is unavailable in this Runtime composition")
+    }
+    let hash = String(repeating: "a", count: 64)
+    let document: [String: Any] = [
+      "schema": "arkforge.flash-verification/v1",
+      "source_job_id": sourceJobID,
+      "source_plan_id": "PLAN-1",
+      "source_plan_sha256": hash,
+      "exit_code": failed ? 7 : 9,
+      "outcome": failed ? "failed" : "partial",
+      "verified": 0,
+      "skipped": skipped ? 1 : 0,
+      "failed": failed ? 1 : 0,
+      "targets": [[
+        "target": "userdata",
+        "range_start": 4096,
+        "range_length": 4096,
+        "expected_sha256": hash,
+        "observed_sha256": NSNull(),
+        "verification_strength": NSNull(),
+        "outcome": failed ? "failed" : "typedSkip",
+        "reason": failed ? "content-mismatch" : "mounted-writable-after-boot",
+      ]],
+    ]
+    guard let data = try? JSONSerialization.data(withJSONObject: document),
+      let result = try? JSONDecoder().decode(FlashMaintenanceResult.self, from: data)
+    else {
+      return .failed("Maintenance fixture document is invalid")
+    }
+    return .completed(
+      FlashSubmissionPresentation(
+        jobID: "job-ui-fixture-verify", state: "succeeded", outcomeUnknown: false,
+        timeline: ["finalized"], maintenanceResult: result))
   }
 
   func status(jobID: String) async -> FlashJobStatusResult {
