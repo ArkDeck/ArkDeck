@@ -20,3 +20,14 @@ rust/tests/fixtures/device-mutation-reconcile-native-published-c6-v4/raw-oracle.
 # Generated sources. GitHub Linguist should not treat them as handwritten code.
 windows/App.Core/Generated/UiStrings.g.cs linguist-generated=true
 windows/ClientKit/Generated/ControlContract.g.cs linguist-generated=true
+
+# Living catalogs and large evidence JSON, tracked by Git LFS from this commit
+# forward. History is not rewritten. Paths are exact so smaller JSON stays in Git.
+rust/scripts/catalog-test-views.json filter=lfs diff=lfs merge=lfs -text
+rust/crates/arkdeck-cli/src/command_registry.json filter=lfs diff=lfs merge=lfs -text
+openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/local-session-owner-shadow-20260910.json filter=lfs diff=lfs merge=lfs -text
+openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/local-shadow-trace-filesystem-20260910.json filter=lfs diff=lfs merge=lfs -text
+openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/local-shadow-trace-structure-20260910.json filter=lfs diff=lfs merge=lfs -text
+openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/local-shadow-trace-reviewed-pin-20260910.json filter=lfs diff=lfs merge=lfs -text
+openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/local-shadow-trace-integers-20260910.json filter=lfs diff=lfs merge=lfs -text
+openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/local-shadow-time-census-20260910.json filter=lfs diff=lfs merge=lfs -text

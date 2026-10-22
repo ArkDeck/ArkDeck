@@ -126,9 +126,13 @@ jobs:
         run: |
           set -eu
           git init .
+          # arkdeck-agentd compiles arkdeck-cli, which include_str!s
+          # command_registry.json. That file is Git LFS.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
+          git lfs pull
           git rev-parse HEAD
       - name: Activate the workspace Rust toolchain
         working-directory: rust
@@ -221,9 +225,13 @@ jobs:
         run: |
           set -eu
           git init .
+          # arkdeck-agentd compiles arkdeck-cli, which include_str!s
+          # command_registry.json. That file is Git LFS.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
+          git lfs pull
           git rev-parse HEAD
       - name: Activate the workspace Rust toolchain
         working-directory: rust
