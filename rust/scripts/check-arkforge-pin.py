@@ -17,6 +17,13 @@ With `--run-vectors` it also reruns, at that revision and from the checkout
 cargo fetched for the lockfile, ArkForge's own `swift_sdk_vectors` (its wire
 bytes) and `permit_vectors` (the StepPermit bytes both authorities mint), so a
 revision bump cannot land without them.
+
+The same checkout must use ArkForge's current layout. The pin check reads
+`api/versions.yaml` and `api/arkforge.proto` without compiling them. Library
+crates stay under `crates/`. Binaries are `cmd/`, the boot-loop helper is
+`hack/`, the spec is `docs/spec/`, and transcripts are `test/transcripts/`.
+The retired `proto/`, `scripts/`, root `spec/`, and root `transcripts/` paths
+must be absent.
 """
 
 import argparse
@@ -30,6 +37,36 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY = "https://github.com/ArkDeck/ArkForge.git"
+IPC_MANIFEST = Path("crates/arkforge-ipc/Cargo.toml")
+CONTRACT_FILES = (
+    Path("api/arkforge.proto"),
+    Path("api/versions.yaml"),
+    Path("cmd/arkforge-cli/Cargo.toml"),
+    Path("cmd/arkforged/Cargo.toml"),
+    Path("crates/arkforge-arkdeck-adapter/Cargo.toml"),
+    Path("crates/arkforge-ipc/Cargo.toml"),
+    Path("hack/restore-boot-loop.py"),
+    Path("docs/spec/README.md"),
+    Path("test/transcripts"),
+)
+RETIRED_PATHS = (
+    Path("proto/arkforge.proto"),
+    Path("scripts/restore-boot-loop.py"),
+    Path("spec/README.md"),
+    Path("transcripts"),
+)
+VERSION_NEEDLES = (
+    "schema: arkforge.contract-versions/v1",
+    "proto: api/arkforge.proto",
+    "package: arkforge.ipc.v1",
+    "protocolMajor: 1",
+    "protocolMinor: 0",
+    'protocolVersion: "1.0"',
+    "contractTag: arkforge-contract-v1.0.0",
+    "arkdeckContract: arkforge.arkdeck-contract/1.0.0",
+    "mappingTable: arkforge.arkdeck-step-map/v1",
+    "controlTable: arkforge.arkdeck-control-map/v1",
+)
 
 
 def fail(message: str) -> None:
@@ -102,12 +139,31 @@ def arkforge_checkout(root: Path) -> Path:
     }
     if len(manifests) != 1:
         fail(f"cargo metadata names {len(manifests)} arkforge-ipc checkouts")
+    manifest = manifests.pop()
+    if manifest.name != "Cargo.toml" or Path(*manifest.parts[-3:]) != IPC_MANIFEST:
+        fail(f"arkforge-ipc must live at {IPC_MANIFEST.as_posix()}, found {manifest}")
     # <checkout>/crates/arkforge-ipc/Cargo.toml
-    return manifests.pop().parents[2]
+    return manifest.parents[2]
 
 
-def run_vectors(root: Path) -> None:
-    checkout = arkforge_checkout(root)
+def check_layout(checkout: Path) -> None:
+    """Read the published contract files and require the moved tree."""
+    for relative in CONTRACT_FILES:
+        if not (checkout / relative).exists():
+            fail(f"pinned ArkForge is missing {relative.as_posix()}")
+    for relative in RETIRED_PATHS:
+        if (checkout / relative).exists():
+            fail(f"pinned ArkForge still has retired path {relative.as_posix()}")
+    proto = (checkout / "api/arkforge.proto").read_text(encoding="utf-8")
+    if 'syntax = "proto3"' not in proto or "package arkforge.ipc.v1;" not in proto:
+        fail("api/arkforge.proto is not the arkforge.ipc.v1 proto3 contract")
+    versions = (checkout / "api/versions.yaml").read_text(encoding="utf-8")
+    for needle in VERSION_NEEDLES:
+        if needle not in versions:
+            fail(f"api/versions.yaml lacks {needle}")
+
+
+def run_vectors(root: Path, checkout: Path) -> None:
     environment = dict(os.environ, CARGO_TARGET_DIR=str(root / "rust/target/arkforge-vectors"))
     for package, test in (
         ("arkforge-ipc", "consumer_contract"),
@@ -130,8 +186,11 @@ def main() -> None:
     pin, locked = check(ROOT)
     print(f"ArkForge {pin}: rust/Cargo.toml and rust/Cargo.lock agree "
           f"({', '.join(locked)})")
+    checkout = arkforge_checkout(ROOT)
+    check_layout(checkout)
+    print(f"ArkForge {pin}: api/arkforge.proto and api/versions.yaml match the moved layout")
     if arguments.run_vectors:
-        run_vectors(ROOT)
+        run_vectors(ROOT, checkout)
 
 
 if __name__ == "__main__":
