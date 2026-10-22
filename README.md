@@ -109,7 +109,9 @@ You need:
 - an OpenHarmony `hdc` executable, for real-device work
 - a USB-connected device with first-use trust already granted
 
-Build and test the Rust runtime from the repository root:
+Build and test the Rust runtime from the repository root. The same entry
+points are wrapped by the root [`justfile`](./justfile) (`just build`,
+`just test`, `just lint`, `just ci`):
 
 ```bash
 git clone https://github.com/ArkDeck/ArkDeck.git
@@ -273,7 +275,12 @@ Then check that everything is wired up:
 
 ## Contributing
 
-Start with [AGENTS.md](./AGENTS.md); it explains how work is organized and which checks to run before handing off a change. The safety invariants under [`openspec/`](./openspec/) are contracts, not suggestions; changes that weaken them won't be merged.
+Start with [CONTRIBUTING.md](./CONTRIBUTING.md). [AGENTS.md](./AGENTS.md) is the
+agent and maintainer boundary. The safety invariants under [`openspec/`](./openspec/)
+are contracts, not suggestions; changes that weaken them won't be merged.
+Report vulnerabilities in private, as described in [SECURITY.md](./SECURITY.md).
+Community expectations are in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+Notable changes are collected in [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
