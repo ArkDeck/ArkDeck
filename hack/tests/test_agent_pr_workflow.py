@@ -23,7 +23,7 @@ RELEASE_RC_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release-
 SWIFTPM_CACHE_KEY = (
     "          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0"
     "-image-${{ steps.runner-image.outputs.version }}"
-    "-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}\n"
+    "-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}\n"
 )
 RUST_POLICY_TOOLS_CACHE_KEY = (
     "arkdeck-cargo-policy-tools-v1-${{ runner.os }}-${{ runner.arch }}"
@@ -449,7 +449,7 @@ def validate_automatic_check_contract(
         "    runs-on: xcode-27\n",
         "DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer",
         "ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm",
-        "python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py",
+        "python3 apple/Packages/ArkDeckKit/Scripts/test_run_swiftpm.py",
         # The SwiftPM cache is keyed by runner image build: a C compile is
         # invalidated by SDK inputs that differ between image builds, so a
         # cross-image restore recompiles every C unit. Restore order is exact
@@ -464,14 +464,14 @@ def validate_automatic_check_contract(
         "          restore-keys: |\n"
         "            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-"
-        "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
+        "${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-"
-        "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
+        "${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
-        "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+        "sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
         "--num-workers 8",
         "        if: >-\n"
         "          success() &&\n"
@@ -488,9 +488,9 @@ def validate_automatic_check_contract(
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         "          restore-keys: |\n"
         "            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
-        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
+        "${{ hashFiles('apple/ArkDeck.xcodeproj/project.pbxproj', 'apple/Packages/ArkDeckKit/Package.swift', 'apple/Packages/ArkDeckKit/Package.resolved') }}-\n"
         "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
-        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
+        "${{ hashFiles('apple/ArkDeck.xcodeproj/project.pbxproj', 'apple/Packages/ArkDeckKit/Package.swift', 'apple/Packages/ArkDeckKit/Package.resolved') }}-\n"
         "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
         "sh hack/ci/run-xcodebuild.sh",
         "        if: >-\n"
@@ -1932,8 +1932,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
-                    "swift --package-path Packages/ArkDeckKit",
+                    "sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+                    "swift --package-path apple/Packages/ArkDeckKit",
                 ),
             ),
             (
@@ -2162,8 +2162,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}",
-                    "-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.ref }}",
+                    "-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}",
+                    "-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-${{ github.ref }}",
                     1,
                 ),
             ),

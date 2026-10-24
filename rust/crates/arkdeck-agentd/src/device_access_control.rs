@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const CORPUS: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.device-access.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.device-access.jsonl"
 );
 
 /// A lane runtime directory short enough for a socket path.

@@ -115,13 +115,13 @@ mod runtime {
     /// The control action Swift's recorded requests name.
     const CONTROL_ACTION: &str = "control-action-accf9f29-7fc0-4a6a-b18c-9105d6cefbaa";
     const SHOW: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.show.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.show.jsonl"
     );
     const LIST: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.list.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.list.jsonl"
     );
     const RECONCILE: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.reconcile.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.reconcile.jsonl"
     );
 
     fn frames(corpus: &str) -> Vec<Value> {

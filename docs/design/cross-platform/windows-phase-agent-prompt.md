@@ -445,7 +445,7 @@ Host github-arkdeck-agent
 **跨机协作。**
 
 - 你看不到 Mac 上的会话。macOS 的 RC 和阶段 A 可能随时往 `rust/**` 合入修复，所以要勤 rebase。
-- 要改 macOS 侧拥有的东西（`hack/release/**`、`Packages/**`、`ArkDeckApp/**`）时，在 commit message 里说明，并把改动控制到最小。
+- 要改 macOS 侧拥有的东西（`hack/release/**`、`Packages/**`、`apple/ArkDeckApp/**`）时，在 commit message 里说明，并把改动控制到最小。
 
 ## 5. 仪表盘与汇报
 

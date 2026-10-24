@@ -42,7 +42,7 @@ fn actual_bootstrap_producer_results_preserve_exact_identity_and_no_execution_as
             // The candidate view consumes the actual new producer recordings.
             continue;
         }
-        let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"));
+        let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"));
         let corpus = std::fs::read_to_string(path).unwrap();
         let mut successes = 0;
         for row in corpus
@@ -178,7 +178,7 @@ fn actual_bundle_pages_preserve_snapshot_and_validate_every_row() {
         );
         return;
     }
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.list.jsonl");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.list.jsonl");
     let corpus = std::fs::read_to_string(path).unwrap();
     let mut pages = 0;
     let mut rows = 0;
@@ -421,7 +421,7 @@ fn actual_retirement_receipts_match_the_requested_bundle_and_retain_content() {
         );
         return;
     }
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.remove.jsonl");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.remove.jsonl");
     let corpus = std::fs::read_to_string(path).unwrap();
     let mut receipts = 0;
     for frame in corpus
@@ -694,7 +694,7 @@ fn actual_tool_retirement_receipts_preserve_both_content_models() {
         );
         return;
     }
-    let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.remove.jsonl");
+    let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.remove.jsonl");
     let corpus = std::fs::read_to_string(path).unwrap();
     let mut kinds = std::collections::BTreeSet::new();
     for frame in corpus
@@ -933,7 +933,7 @@ fn actual_tool_list_pages_validate_every_mixed_family_record_and_snapshot() {
         );
         return;
     }
-    let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.list.jsonl");
+    let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.list.jsonl");
     let corpus = std::fs::read_to_string(path).unwrap();
     let mut kinds = std::collections::BTreeSet::new();
     let mut pages = 0;

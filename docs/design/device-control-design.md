@@ -3,7 +3,7 @@
 > Status：draft v1.6（design input，非 normative；2026-10-04 增加有界预览与键盘虚拟指针，待 PR review）
 > Golden Journey：GJ-1 设备观察入口、GJ-2 真机问题复现
 > 交互稿：[`prototype.html?page=device-control`](prototype.html?page=device-control)
-> 实现事实源：`ArkDeckApp/Features/Device/`、`DeviceLocalizable.xcstrings` 与 `Packages/ArkDeckKit/Sources/ArkDeckClientKit/Device*.swift`。准入和外部效果仍以已发布 Catalog / Runtime contracts 为准。
+> 实现事实源：`apple/ArkDeckApp/Features/Device/`、`DeviceLocalizable.xcstrings` 与 `apple/Packages/ArkDeckKit/Sources/ArkDeckClientKit/Device*.swift`。准入和外部效果仍以已发布 Catalog / Runtime contracts 为准。
 
 ## 1. 本版修正
 

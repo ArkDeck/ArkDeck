@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn more_issues_than_swift_bounds_are_refused() {
         let recorded: Value = include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.inspect.jsonl"
+            "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.inspect.jsonl"
         )
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())

@@ -1,22 +1,22 @@
 use arkdeck_cli::{parse, validate_read_only_response};
 use serde_json::{Value, json};
 const STATUS: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
 );
 const DESCRIBE: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl"
 );
 const JOB_LIST: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.list.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.list.jsonl"
 );
 const JOB_SHOW: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl"
 );
 const TIMELINE: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.timeline.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.timeline.jsonl"
 );
 const EVIDENCE: &str = include_str!(
-    "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.evidence.jsonl"
+    "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.evidence.jsonl"
 );
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|s| (*s).to_owned()).collect()
@@ -674,7 +674,7 @@ mod endpoint {
             (vec!["artifact", "quota", "--timeout", SHARED_BUDGET], "artifact.quota",
                 json!({"totalBytes": 8589934592_u64, "usedBytes": 1, "remainingBytes":8589934591_u64})),
             (vec!["runtime", "storage", "status", "--timeout", SHARED_BUDGET], "runtime.storage.status",
-                sample(include_str!("../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.status.jsonl"))["result"].clone()),
+                sample(include_str!("../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.status.jsonl"))["result"].clone()),
         ] {
             let (out, requests) = run_delayed(
                 &argv, json!({"id":"cli-read-test", "ok":true, "result":result}), SHARED_DELAYS_MS,

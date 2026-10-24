@@ -325,7 +325,7 @@ jobs:
         run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py
 
       # The Rust helper pair's release layout (G5 slice 20a,
-      # Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh), laid
+      # apple/Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh), laid
       # out from the binaries the tests above built, signed ad hoc and checked
       # without any signing identity: the file tree, Info.plist and its App
       # version parity, entitlements, signing parameters, arm64, and the two
@@ -339,8 +339,8 @@ jobs:
           output="$RUNNER_TEMP/arkdeck-unsigned-rust-helpers"
           ARKDECK_RUST_HELPER_BINARIES="$ARKDECK_RUST_CACHE_ROOT/workspace/rust/target/debug" \
           ARKDECK_UNSIGNED_HELPER_OUTPUT="$output" \
-            bash Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh
-          python Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py "$output"
+            bash apple/Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh
+          python apple/Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py "$output"
 
       # The release DMG entry (hack/release/build_macos_release.py, TASK-XPA-017
       # S5) driven end to end with recording signing, notary and build tools

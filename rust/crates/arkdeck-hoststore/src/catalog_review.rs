@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn app_generated_literal_is_exactly_the_runtime_projection() {
         let source = include_str!(
-            "../../../../Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift"
+            "../../../../apple/Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift"
         );
         let (_, rest) = source.split_once("#\"\"\"\n").unwrap();
         let (json, _) = rest.split_once("\n\"\"\"#").unwrap();

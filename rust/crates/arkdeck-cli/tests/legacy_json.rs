@@ -216,7 +216,7 @@ mod runtime {
     /// A status Swift's daemon recorded, in `state`.
     fn status(state: &str) -> Value {
         include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
+            "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
         )
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())

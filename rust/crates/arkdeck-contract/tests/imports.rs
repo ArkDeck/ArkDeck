@@ -3,8 +3,9 @@ use arkdeck_contract::{
 };
 use serde_json::{Value, json};
 fn corpus(method: &str) -> Vec<Value> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames",
+    );
     std::fs::read_to_string(root.join(format!("artifact.import.{method}.jsonl")))
         .unwrap()
         .lines()

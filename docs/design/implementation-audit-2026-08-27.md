@@ -83,10 +83,10 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 ### 关键实现入口
 
-- [Session reader](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift)：fresh correlation、发布清单、两份索引一致性、受限读取、完整性与缺失判断。
-- [History facade](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift)：原始 typed parameters 与至多 16 MiB 的显式 Artifact reader；顺序分块和最终 SHA-256；sensitive 需 opt-in。
-- [只读延续 caller](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceContinuation.swift)：fresh source/target、Catalog 校验、新 request/idempotency/Job、一次 run；unknown/deduplicated/foreign Job 不继续。
-- [取消 caller](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobControlApplicationFacade.swift)：独立于只读 History；fresh job.status 的 Job/operation/target/session 必须一致，已知非终态才发 cancel；请求不等于已取消。
+- [Session reader](../../apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift)：fresh correlation、发布清单、两份索引一致性、受限读取、完整性与缺失判断。
+- [History facade](../../apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift)：原始 typed parameters 与至多 16 MiB 的显式 Artifact reader；顺序分块和最终 SHA-256；sensitive 需 opt-in。
+- [只读延续 caller](../../apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceContinuation.swift)：fresh source/target、Catalog 校验、新 request/idempotency/Job、一次 run；unknown/deduplicated/foreign Job 不继续。
+- [取消 caller](../../apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobControlApplicationFacade.swift)：独立于只读 History；fresh job.status 的 Job/operation/target/session 必须一致，已知非终态才发 cancel；请求不等于已取消。
 - [新增组件](arkdeck-ds/src/components/session.tsx)与[可交互画廊](session-components.html)：25 个已声明 class 映射对应 24 个组件；输入边界、缺图、缺校准、未知结果不由组件补造。
 
 ## 3. 全入口矩阵
@@ -210,16 +210,16 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 以下每个文件都由上表中的对应页面/子面覆盖，包含同文件的私有 View；ViewModel/facade/资源随交互追到调用点。
 
-- [App / scenes / navigation](../../ArkDeckApp/App/ArkDeckApp.swift)
-- [Workspace chrome](../../ArkDeckApp/DesignSystem/WorkspaceChrome.swift)、[执行模式徽章](../../ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift)
-- [Device detail / trust](../../ArkDeckApp/Features/Devices/DeviceWorkspace.swift)
-- [Overview record](../../ArkDeckApp/Features/Overview/OverviewRecordView.swift)、[Resume sheet](../../ArkDeckApp/Features/Overview/OverviewResumeSheet.swift)、[HDC / impact](../../ArkDeckApp/Features/HDC/HDCStatusView.swift)
-- [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)、[maintenance controls](../../ArkDeckApp/Features/Flash/FlashMaintenanceView.swift)、[maintenance result](../../ArkDeckApp/Features/Flash/FlashMaintenanceResultView.swift)
-- [Debug 五标签与 sheets](../../ArkDeckApp/Features/Debug/DebugWorkspaceView.swift)、[artifacts](../../ArkDeckApp/Features/Debug/DebugArtifactsWorkspace.swift)、[logs](../../ArkDeckApp/Features/Debug/DebugLogsWorkspace.swift)、[apps](../../ArkDeckApp/Features/Debug/DebugAppsWorkspace.swift)、[commands](../../ArkDeckApp/Features/Debug/DebugCommandsWorkspace.swift)
-- [Viewer 五 Inspector](../../ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift)
-- [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)、[Trace 标记编辑器](../../ArkDeckApp/Features/Trace/TraceFlagDraftEditor.swift)、[标记标签编辑器](../../ArkDeckApp/Features/Trace/TraceFlagTagEditor.swift)
-- [Device](../../ArkDeckApp/Features/Device/DeviceWorkspaceView.swift)、[Diagnostics](../../ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift)
-- [History](../../ArkDeckApp/Features/History/RuntimeHistoryView.swift)、[Jobs / recovery](../../ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift)、[Settings 七标签](../../ArkDeckApp/Features/Settings/SettingsRootView.swift)
+- [App / scenes / navigation](../../apple/ArkDeckApp/App/ArkDeckApp.swift)
+- [Workspace chrome](../../apple/ArkDeckApp/DesignSystem/WorkspaceChrome.swift)、[执行模式徽章](../../apple/ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift)
+- [Device detail / trust](../../apple/ArkDeckApp/Features/Devices/DeviceWorkspace.swift)
+- [Overview record](../../apple/ArkDeckApp/Features/Overview/OverviewRecordView.swift)、[Resume sheet](../../apple/ArkDeckApp/Features/Overview/OverviewResumeSheet.swift)、[HDC / impact](../../apple/ArkDeckApp/Features/HDC/HDCStatusView.swift)
+- [Flash workspace](../../apple/ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../apple/ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../apple/ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)、[maintenance controls](../../apple/ArkDeckApp/Features/Flash/FlashMaintenanceView.swift)、[maintenance result](../../apple/ArkDeckApp/Features/Flash/FlashMaintenanceResultView.swift)
+- [Debug 五标签与 sheets](../../apple/ArkDeckApp/Features/Debug/DebugWorkspaceView.swift)、[artifacts](../../apple/ArkDeckApp/Features/Debug/DebugArtifactsWorkspace.swift)、[logs](../../apple/ArkDeckApp/Features/Debug/DebugLogsWorkspace.swift)、[apps](../../apple/ArkDeckApp/Features/Debug/DebugAppsWorkspace.swift)、[commands](../../apple/ArkDeckApp/Features/Debug/DebugCommandsWorkspace.swift)
+- [Viewer 五 Inspector](../../apple/ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift)
+- [Trace workspace](../../apple/ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../apple/ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../apple/ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../apple/ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)、[Trace 标记编辑器](../../apple/ArkDeckApp/Features/Trace/TraceFlagDraftEditor.swift)、[标记标签编辑器](../../apple/ArkDeckApp/Features/Trace/TraceFlagTagEditor.swift)
+- [Device](../../apple/ArkDeckApp/Features/Device/DeviceWorkspaceView.swift)、[Diagnostics](../../apple/ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift)
+- [History](../../apple/ArkDeckApp/Features/History/RuntimeHistoryView.swift)、[Jobs / recovery](../../apple/ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift)、[Settings 七标签](../../apple/ArkDeckApp/Features/Settings/SettingsRootView.swift)
 
 ## 4. 验证与证据分类
 
@@ -1136,7 +1136,7 @@ VoiceOver 读全值）。**可见变化**：面板上下内边距由 24/24 改�
 
 **执行模式徽章的归属。** `RuntimeExecutionModeBadge` 由 History 与 Job 检查器两个 Feature
 渲染，却定义在 `Features/History/RuntimeHistoryView.swift`。现移入
-`ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift`，实现逐字不变，只补一段说明它
+`apple/ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift`，实现逐字不变，只补一段说明它
 为何不属于 History。`appViewFiles` 随之为 21 个，§3 的生产 View 索引同步。
 
 ### 本批未覆盖
@@ -1168,7 +1168,7 @@ VoiceOver 读全值）。**可见变化**：面板上下内边距由 24/24 改�
    **根因未定**，本批不改 History。
 
 第三条 `HDCStatusUITests.testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe` 是
-环境前置缺失——`Packages/ArkDeckKit/.build/debug/ArkDeckFakeHDCFixture` 在本工作副本里
+环境前置缺失——`apple/Packages/ArkDeckKit/.build/debug/ArkDeckFakeHDCFixture` 在本工作副本里
 从未构建。补齐后改后运行即通过（失败 3→2、通过 45→46）。这是本批对原生结果的唯一正向影响，
 与共享件收敛无关。
 
@@ -1249,7 +1249,7 @@ Debug 上。没有直接归因为噪声，而是补跑到五次全套逐条比�
 五次运行里共有 6 个不同的用例至少失败过一次。批次六最好的一次（47/1）优于 `main` 最好的
 一次（45/3）。C 的两条新失败在同一分支上单独重跑通过。故 C 的 44/4 判为套件方差，不是回归。
 
-**方差的一个已定位来源**：`ArkDeckAppUITests/HDC/HDCStatusUITests.swift:494` 的
+**方差的一个已定位来源**：`apple/ArkDeckAppUITests/HDC/HDCStatusUITests.swift:494` 的
 `expandAdvancedDiagnostics` 用「固定次数滚动 + 单次 click + 5 秒等待」找
 `hdc.toolchain.path`，没有重试；它被 `walkEveryDiagnosticState` 共用，因此失败会记在恰好
 抽到不利布局/时序的那个测试上，而不是记在这个 helper 上。F56 登记的
@@ -1633,7 +1633,7 @@ Diagnostics / Settings / UIDump 三个目录。**归因一律先在干净 `main`
 
 F61 登记的「ds 交互测试不在任何 PR 门里」已由维护者拍板加门（chip `task_519ac5fa`），
 并由另一会话实现、推上 `agent/ain-022-ds-interaction-gate`：在 `swift-ci.yml` 的 plan 车道体系
-里新增第三条 `ds` 车道，触发面为套件真实读取的四个目录（`ArkDeckApp/`、`ArkDeckAppUITests/`、
+里新增第三条 `ds` 车道，触发面为套件真实读取的四个目录（`apple/ArkDeckApp/`、`apple/ArkDeckAppUITests/`、
 `Packages/`、`docs/design/`），折进现有 `swift` required 聚合器。状态由「已登记待决策」
 翻为**已决策、已实现、待合入**。
 

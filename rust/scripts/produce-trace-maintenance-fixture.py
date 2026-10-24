@@ -19,7 +19,7 @@ p.add_argument('--swift-build', type=Path, required=True, help='existing arm64-a
 p.add_argument('--fixture', type=Path, required=True, help='new /private/tmp fixture root')
 a = p.parse_args()
 source = ROOT/'rust/tests/fixtures/trace-maintenance/produce-native.swift'
-resolved = ROOT/'Packages/ArkDeckKit/Package.resolved'
+resolved = ROOT/'apple/Packages/ArkDeckKit/Package.resolved'
 pin = next(x['state']['revision'] for x in json.loads(resolved.read_bytes())['pins'] if x['identity'] == 'arktrace')
 checkout = a.swift_build.parents[1]/'checkouts/ArkTrace'
 revision = subprocess.check_output(['git', '-C', str(checkout), 'rev-parse', 'HEAD'], text=True).strip()

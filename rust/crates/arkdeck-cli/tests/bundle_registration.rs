@@ -92,7 +92,7 @@ fn actual_swift_fixture_receipts_keep_identity_and_map_invalid_receipts_to_unkno
     if !arkdeck_contract::METHODS.contains(&args.method) {
         return;
     }
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.register.jsonl");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.register.jsonl");
     let frames = std::fs::read_to_string(path).unwrap();
     let mut successes = 0;
     for frame in frames

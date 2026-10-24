@@ -926,7 +926,7 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
     );
     let tool_row = &registered["result"];
     let macos: Value = include_str!(
-        "../../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.register.jsonl"
+        "../../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.register.jsonl"
     )
     .lines()
     .map(|line| serde_json::from_str::<Value>(line).unwrap())

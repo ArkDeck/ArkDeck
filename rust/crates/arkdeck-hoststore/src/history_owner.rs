@@ -331,7 +331,7 @@ mod tests {
 
     fn corpus(method: &str) -> Vec<Value> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-            "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+            "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
         ));
         fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("{path:?}: {error}"))
@@ -367,7 +367,7 @@ mod tests {
     }
 
     /// The committed control-frame corpus's History filter answers
-    /// (`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/
+    /// (`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/
     /// history.filter.*.jsonl`), replayed over one store in the order that
     /// reaches each recorded generation, at the recorded time. The corpus's
     /// `internalError` "History filter store is not configured" frames are

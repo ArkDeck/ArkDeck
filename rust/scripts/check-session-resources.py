@@ -28,7 +28,7 @@ def main():
     args = parser.parse_args()
     daemon = (args.bin_dir/'arkdeck-agentd').resolve()
     cli = (args.cli_path or args.bin_dir/'arkdeck').resolve()
-    registry = json.loads((ROOT/'Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
+    registry = json.loads((ROOT/'apple/Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
     identity = hashlib.sha256(json.dumps(registry,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     rows=[]
     children=[]

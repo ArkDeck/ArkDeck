@@ -24,7 +24,7 @@ impl HostServices for Probe {
     fn trace_probe(&self, target_id: &str) -> Result<Value, WireError> {
         self.targets.lock().unwrap().push(target_id.to_owned());
         let corpus = include_str!(
-            "../../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
+            "../../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
         );
         Ok(corpus
             .lines()

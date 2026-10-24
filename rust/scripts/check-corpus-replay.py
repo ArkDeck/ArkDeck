@@ -215,7 +215,7 @@ def main() -> None:
     fixture = args.fixture.resolve(strict=True)
     daemon = (args.bin_dir / 'arkdeck-agentd').resolve(strict=True)
     cli = (args.bin_dir / 'arkdeck').resolve(strict=True)
-    registry = json.loads((ROOT / 'Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
+    registry = json.loads((ROOT / 'apple/Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
     identity = hashlib.sha256(
         json.dumps(registry, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     oracle = json.loads((fixture / 'cases.json').read_text())

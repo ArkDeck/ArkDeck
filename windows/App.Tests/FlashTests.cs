@@ -116,7 +116,7 @@ public sealed class FlashTests
     [TestMethod]
     public void TheCatalogReviewIsTheOneTheMacOsAppCompilesIn()
     {
-        var swift = File.ReadAllText(RepoPaths.At("Packages", "ArkDeckKit", "Sources", "ArkDeckCore", "FlashReviewCatalogGenerated.swift"));
+        var swift = File.ReadAllText(RepoPaths.At("apple", "Packages", "ArkDeckKit", "Sources", "ArkDeckCore", "FlashReviewCatalogGenerated.swift"));
         var literal = swift[(swift.IndexOf("#\"\"\"", StringComparison.Ordinal) + 4)..swift.IndexOf("\"\"\"#", StringComparison.Ordinal)];
         using var expected = JsonDocument.Parse(literal);
         using var embedded = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("windows", "App.Core", "Catalog", "flash-catalog-review.json")));

@@ -23,26 +23,26 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-REGISTRY = "Packages/ArkDeckKit/Contracts/control-protocol.json"
+REGISTRY = "apple/Packages/ArkDeckKit/Contracts/control-protocol.json"
 METHODS = "api/control/methods"
-CORPUS = "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
+CORPUS = "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
 BASELINE = ROOT / "api/baselines/swift-single-v1.json"
 GENERATED = ROOT / "rust/crates/arkdeck-contract/src/control_generated.rs"
 BASE_REF = "origin/main"
 INPUTS = [
     REGISTRY,
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolGenerated.swift",
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/CanonicalCBOR.swift",
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolContract.swift",
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlFrameJSON.swift",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolGenerated.swift",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/CanonicalCBOR.swift",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolContract.swift",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/ControlFrameJSON.swift",
     "api/contracts/runtime-control-plane.schema.json",
     "api/contracts/cli-canonical-json-vectors.json",
     "api/contracts/cli-result.schema.json",
     "api/contracts/cli-error-registry.yaml",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/operation.list.json",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/device.candidates.json",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/operation.list.json",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/device.candidates.json",
     "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
     "api/contracts/journal-event.schema.json",
     "api/contracts/workflow-step.schema.json",
@@ -51,7 +51,7 @@ INPUTS = [
     "catalog/operations",
     "catalog/profiles",
     "catalog/generated/effect-authorization-matrix.md",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC",
 ]
 KEYWORDS = {"type", "properties", "additionalProperties", "required", "items", "enum", "anyOf",
             "oneOf", "const", "pattern", "minLength", "not"}
@@ -120,6 +120,7 @@ def published_base() -> str:
 # published_inputs reads whichever spelling the commit stores, then records
 # the checkout spelling so a published view and this tree share one vocabulary.
 LEGACY_INPUT_PREFIXES = (
+    ("apple/Packages/", "Packages/"),
     ("api/contracts/", "openspec/contracts/"),
     ("api/control/", "spec/control/"),
     ("api/baselines/", "spec/baselines/"),

@@ -234,7 +234,7 @@ mod runtime {
     /// and the refusal of a daemon without an inspector.
     fn frames() -> Vec<Value> {
         include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.inspect.jsonl"
+            "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.inspect.jsonl"
         )
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())

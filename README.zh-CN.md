@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="./ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/icon_1024x1024.png" width="152" alt="ArkDeck 波形应用图标">
+  <img src="./apple/ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/icon_1024x1024.png" width="152" alt="ArkDeck 波形应用图标">
 </p>
 
 <h1 align="center">ArkDeck</h1>
@@ -95,7 +95,7 @@ flowchart LR
 ## 从源码构建
 
 运行时、CLI 与 Provider 在 Rust workspace（`rust/`）。SwiftPM 只构建
-`Packages/ArkDeckKit` 里的应用侧库。Swift Runtime 已删除（CHG-2026-074，
+`apple/Packages/ArkDeckKit` 里的应用侧库。Swift Runtime 已删除（CHG-2026-074，
 TASK-XPA-017）；Swift 不再承载运行时语义，ArkForge 只以提交修订钉在
 `rust/Cargo.toml`。
 
@@ -121,8 +121,8 @@ python3 rust/scripts/check-arkforge-pin.py
 构建并测试 Swift 应用侧 package（不是运行时）：
 
 ```bash
-sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
-sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
+sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
+sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 ```
 
 仓库贡献者可以运行与 GitHub CI 共用的路径感知验证入口。它始终检查 SDD 与 Catalog 一致性，再只选择受当前分支和工作区改动影响的编译车道；比较事实缺失时会运行全部车道，而不是静默跳过验证：
@@ -139,14 +139,14 @@ python3 hack/ci/plan.py \
 
 ArkDeckKit 测试使用 worktree 之外的稳定缓存。App 与 UI 测试改动会通过 `build-for-testing` 编译 Xcode scheme；这不会启动模拟器，也不构成真机验收。
 
-桌面应用方面，用 Xcode 打开 `ArkDeck.xcodeproj`，运行共享的 `ArkDeck` scheme。这足以进行应用开发和宿主侧测试。安装后台 Runtime 需要单独构建已签名的 helper；真正刷写 DAYU200 还需要姊妹仓库 [ArkForge](https://github.com/ArkDeck/ArkForge) 出的已签名 `arkforged` daemon——刷机路径是该 daemon 内的原生 RockUSB，产品路径不涉及任何厂商刷机工具。
+桌面应用方面，用 Xcode 打开 `apple/ArkDeck.xcodeproj`，运行共享的 `ArkDeck` scheme。这足以进行应用开发和宿主侧测试。安装后台 Runtime 需要单独构建已签名的 helper；真正刷写 DAYU200 还需要姊妹仓库 [ArkForge](https://github.com/ArkDeck/ArkForge) 出的已签名 `arkforged` daemon——刷机路径是该 daemon 内的原生 RockUSB，产品路径不涉及任何厂商刷机工具。
 
 ### 安装运行时
 
 生产守护进程是 Rust 的 `arkdeck-agentd`，打包为已签名的 `ArkDeckAgent.app`。
 SwiftPM 不再构建该守护进程或 `arkdeck` CLI。`runtime service install` 只接受
 具备预期 Developer ID、hardened runtime、内嵌 provisioning profile 和共享
-Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages/ArkDeckKit/LaunchAgents/README.md)使用团队授权的签名与公证输入构建，或在项目提供已签名发布包后使用发布包。
+Keychain entitlement 的这份 helper。请按[无头运行时指南](./apple/Packages/ArkDeckKit/LaunchAgents/README.md)使用团队授权的签名与公证输入构建，或在项目提供已签名发布包后使用发布包。
 
 从已签名的 `ArkDeckCLI.app` 安装用户级守护进程，并指明已审查的 bundle 与 tool 代次：
 
@@ -172,10 +172,10 @@ Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages
 
 ## 仓库结构
 
-- [`ArkDeck.xcodeproj/`](./ArkDeck.xcodeproj/) — 共享的 Xcode 工程与 scheme
-- [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI macOS 应用
-- [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — macOS 应用的 XCUITest
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 应用侧 Swift package（ClientKit、Core、Trace adapter）。运行时与 CLI 在 `rust/`
+- [`apple/ArkDeck.xcodeproj/`](./apple/ArkDeck.xcodeproj/) — 共享的 Xcode 工程与 scheme
+- [`apple/ArkDeckApp/`](./apple/ArkDeckApp/) — SwiftUI macOS 应用
+- [`apple/ArkDeckAppUITests/`](./apple/ArkDeckAppUITests/) — macOS 应用的 XCUITest
+- [`apple/Packages/ArkDeckKit/`](./apple/Packages/ArkDeckKit/) — 应用侧 Swift package（ClientKit、Core、Trace adapter）。运行时与 CLI 在 `rust/`
 - [`rust/`](./rust/) — 共享 Rust workspace，13 个 crate：`arkdeck-agentd`、`arkdeck-bootstrap`、`arkdeck-cli`、`arkdeck-client`、`arkdeck-contract`、`arkdeck-control`、`arkdeck-hoststore`、`arkdeck-platform`、`arkdeck-provider-arkforge`、`arkdeck-provider-hdc`、`arkdeck-provider-workspace`、`arkdeck-rockchip-binding`、`arkdeck-soak`。导航见 [rust/README.md](./rust/README.md)，原开发日志在 [docs/rust/development-log.md](./docs/rust/development-log.md)
 - [`windows/`](./windows/) — Windows 11 x64 的 WinUI 3 客户端、ArkDeck.ClientKit 及其测试（开发中）。旧的 SPK-4 spike 在 [`tools/experiments/windows-spikes/`](./tools/experiments/windows-spikes/)
 - [`catalog/`](./catalog/) — 已发布的操作、Profile 与 Schema
@@ -184,7 +184,7 @@ Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages
 - [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
 - [`hack/`](./hack/) — 仓库检查、CI 与工具脚本
 - [`tools/experiments/`](./tools/experiments/) — CI 仍会运行的 `host_loop` 与 `gj_record`，以及归档的 Windows spike
-- [`tests/`](./tests/) — 宿主侧产品 demo，包括 WaterFlowTraceDemo
+- [`test/fixtures/`](./test/fixtures/) — 宿主侧产品 demo，包括 WaterFlowTraceDemo
 - [`docs/archive/`](./docs/archive/) — 历史产品闭环、计划、评审与运行记录
 - [`.design-sync/`](./.design-sync/) — `@arkdeck/ds` token 工作的 design-sync 笔记。CI 规划器和 Windows 组件映射仍读取它，因此留在 `main`
 - [`.github/`](./.github/) — GitHub Actions 工作流与 CODEOWNERS

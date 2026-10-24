@@ -3,7 +3,7 @@
 //!
 //! * Over its pipe, with a plain pipe handle (no signer needed): the
 //!   committed control-frame corpus's `history.filter.list|save|delete`
-//!   answers (`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/
+//!   answers (`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/
 //!   ControlFrames`) are replayed in the order that reaches each recorded
 //!   generation, across restarts: every result is the recorded one but the
 //!   time the daemon's own clock writes, every refusal its code and details.
@@ -221,7 +221,7 @@ fn request(pipe: &str, method: &str, params: Value) -> Value {
 
 fn corpus(method: &str) -> Vec<Value> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     ));
     std::fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("{path:?}: {error}"))

@@ -495,8 +495,8 @@ TASK-SVC-005 Deliverable 3 要求验证设备/导入/任务/History/Settings 的
 `AppShellUITests` 的纯呈现 opt-in 不提交 operation，这个边界不适用于同一 target 中的
 所有设备测试。
 
-**目标名不是目录名。** 源码在 `ArkDeckAppUITests/`，但 XCUITest target 叫
-`ArkDeckHDCUITests`（`ArkDeck.xcodeproj/project.pbxproj:485`），`-only-testing:` 只认后者。
+**目标名不是目录名。** 源码在 `apple/ArkDeckAppUITests/`，但 XCUITest target 叫
+`ArkDeckHDCUITests`（`apple/ArkDeck.xcodeproj/project.pbxproj:485`），`-only-testing:` 只认后者。
 
 **必须走 `hack/ci/run-ui-tests.sh`**，它负责 ad-hoc 签名、独立 DerivedData 和键盘布局守卫；
 裸 `xcodebuild` 的失败形态看起来像机器坏了。UI 栈是**全机唯一**的（一个 testmanagerd、一个前台，

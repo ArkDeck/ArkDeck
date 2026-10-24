@@ -684,7 +684,7 @@ fn a_request_outside_the_app_allowlist_gets_swift_s_transport_refusal_and_nothin
 /// Swift's recorded refusal of `method` with this code and message.
 fn swift_refusal(method: &str, code: &str, message: &str) -> WireError {
     let corpus = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     )))
     .unwrap();
     corpus
@@ -729,7 +729,7 @@ fn a_host_without_the_import_owners_refuses_as_swift_s_handler_does() {
 
 fn swift_commit_refusal(code: &str, message: &str) -> Option<WireError> {
     let corpus = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl",
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl",
     ))
     .unwrap();
     corpus

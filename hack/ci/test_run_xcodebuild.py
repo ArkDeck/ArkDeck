@@ -28,7 +28,7 @@ class RunUITestsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "ArkDeck.xcodeproj").mkdir()
+            (root / "apple/ArkDeck.xcodeproj").mkdir(parents=True)
             scripts = root / "hack/ci"
             scripts.mkdir(parents=True)
             wrapper = scripts / "run-ui-tests.sh"
@@ -101,15 +101,15 @@ class RunXcodebuildTests(unittest.TestCase):
         script = root / "hack/ci/run-xcodebuild.sh"
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
-        project = root / "ArkDeck.xcodeproj/project.pbxproj"
+        project = root / "apple/ArkDeck.xcodeproj/project.pbxproj"
         project.parent.mkdir(parents=True)
         project.write_text("// project\n", encoding="utf-8")
-        source = root / "ArkDeckApp/App.swift"
+        source = root / "apple/ArkDeckApp/App.swift"
         source.parent.mkdir(parents=True)
         source.write_text(source_contents, encoding="utf-8")
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(
-            ["git", "-C", str(root), "add", "ArkDeck.xcodeproj", "ArkDeckApp", "hack"],
+            ["git", "-C", str(root), "add", "apple/ArkDeck.xcodeproj", "apple/ArkDeckApp", "hack"],
             check=True,
         )
         os.utime(source, (modified_time, modified_time))
@@ -172,7 +172,7 @@ class RunXcodebuildTests(unittest.TestCase):
         ]
         self.assertEqual(
             arguments[0:2],
-            ["-project", str(canonical_cache / "workspace/ArkDeck.xcodeproj")],
+            ["-project", str(canonical_cache / "workspace/apple/ArkDeck.xcodeproj")],
         )
         self.assertIn(str(canonical_cache / "DerivedData"), arguments)
         self.assertIn(str(canonical_cache / "SourcePackages"), arguments)
@@ -273,7 +273,7 @@ class RunXcodebuildTests(unittest.TestCase):
 
     def test_project_and_ui_runner_remain_arm64_only(self) -> None:
         repo_root = SCRIPT.parents[2]
-        project = (repo_root / "ArkDeck.xcodeproj/project.pbxproj").read_text()
+        project = (repo_root / "apple/ArkDeck.xcodeproj/project.pbxproj").read_text()
         for identifier in ("A10000000000000000000070", "A10000000000000000000071"):
             settings = re.search(
                 rf"{identifier} /\* (?:Debug|Release) \*/ = \{{.*?buildSettings = \{{(.*?)\n\s*\}};",
@@ -310,7 +310,7 @@ class RunXcodebuildTests(unittest.TestCase):
         xcodebuild = self.make_fake_xcodebuild(temporary)
 
         first = self.invoke(first_script, cache_root, xcodebuild)
-        mirrored = cache_root / "workspace/ArkDeckApp/App.swift"
+        mirrored = cache_root / "workspace/apple/ArkDeckApp/App.swift"
         first_stat = mirrored.stat()
         second = self.invoke(second_script, cache_root, xcodebuild)
         second_stat = mirrored.stat()
@@ -339,7 +339,7 @@ class RunXcodebuildTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            (cache_root / "workspace/ArkDeckApp/App.swift").read_text(encoding="utf-8"),
+            (cache_root / "workspace/apple/ArkDeckApp/App.swift").read_text(encoding="utf-8"),
             "let value = 2\n",
         )
 
@@ -454,14 +454,14 @@ class TraceResourcePhaseTests(unittest.TestCase):
         cls.repo_root = SCRIPT.parents[2]
         result = subprocess.run(
             ["/usr/bin/plutil", "-convert", "json", "-o", "-",
-             str(cls.repo_root / "ArkDeck.xcodeproj/project.pbxproj")],
+             str(cls.repo_root / "apple/ArkDeck.xcodeproj/project.pbxproj")],
             text=True, capture_output=True, check=True,
         )
         cls.objects = json.loads(result.stdout)["objects"]
         cls.phase = cls.objects["C20000000000000000000030"]
 
     def file_list(self, name: str) -> list[str]:
-        return (self.repo_root / "ArkDeckApp" / name).read_text().splitlines()
+        return (self.repo_root / "apple" / "ArkDeckApp" / name).read_text().splitlines()
 
     def test_resource_phase_is_incremental_after_final_helper_signing(self) -> None:
         self.assertNotEqual(str(self.phase.get("alwaysOutOfDate", "0")), "1")
@@ -503,7 +503,7 @@ class TraceResourcePhaseTests(unittest.TestCase):
         source = "$(SRCROOT)/Packages/ArkDeckKit"
         licenses = sorted(
             path.name for path in
-            (self.repo_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES").glob("*.txt")
+            (self.repo_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES").glob("*.txt")
         )
         self.assertTrue(licenses)
         expected_inputs = [
@@ -535,7 +535,7 @@ class TraceResourcePhaseTests(unittest.TestCase):
                 destination.write_bytes(b"canonical unsigned helper fixture")
             else:
                 shutil.copyfile(self.repo_root / relative, destination)
-        canonical_manifest = source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json"
+        canonical_manifest = source_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json"
         canonical_bytes = canonical_manifest.read_bytes()
         canonical = json.loads(canonical_bytes)
         products = temporary / "products"
@@ -566,7 +566,7 @@ class TraceResourcePhaseTests(unittest.TestCase):
             self.assertEqual(canonical_manifest.read_bytes(), canonical_bytes)
             self.assertEqual(helper.read_bytes(), final_bytes)
             self.assertFalse(stale_license.exists())
-            expected_licenses = source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES"
+            expected_licenses = source_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES"
             self.assertCountEqual(
                 [path.name for path in license_root.iterdir()],
                 [path.name for path in expected_licenses.iterdir()],

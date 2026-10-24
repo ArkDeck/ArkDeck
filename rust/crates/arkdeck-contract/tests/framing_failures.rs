@@ -363,7 +363,7 @@ fn health() -> Response {
 #[test]
 fn health_handshake_refuses_identity_method_set_and_digest_shape_drift() {
     validate_health(&health()).unwrap();
-    let registry = common::load_json("Packages/ArkDeckKit/Contracts/control-protocol.json");
+    let registry = common::load_json("apple/Packages/ArkDeckKit/Contracts/control-protocol.json");
     assert_eq!(registry["methods"], json!(METHODS));
     for (field, value) in [
         ("status", json!("ready")),

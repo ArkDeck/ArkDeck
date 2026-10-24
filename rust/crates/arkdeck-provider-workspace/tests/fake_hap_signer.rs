@@ -8,7 +8,7 @@
 //! every failure text carry neither password.
 //!
 //! `rust/tests/fixtures/fake-hap-signer/main.swift` is a byte-identical copy of
-//! `Packages/ArkDeckKit/Tests/ArkDeckFakeHapSignerFixture/main.swift`, so that
+//! `apple/Packages/ArkDeckKit/Tests/ArkDeckFakeHapSignerFixture/main.swift`, so that
 //! the contract views, which hold only `rust/` and the contract inputs, run
 //! the same fixture; `the_vendored_fixture_is_the_swift_fixture` keeps them
 //! equal. Every test here spawns children, so they share this binary alone.
@@ -36,7 +36,7 @@ use std::time::{Duration, Instant};
 
 const SWIFT_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../../Packages/ArkDeckKit/Tests/ArkDeckFakeHapSignerFixture/main.swift"
+    "/../../../apple/Packages/ArkDeckKit/Tests/ArkDeckFakeHapSignerFixture/main.swift"
 );
 const VENDORED_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),

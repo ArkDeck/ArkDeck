@@ -26,11 +26,11 @@ import uuid
 import catalog_test_views
 
 ROOT = Path(__file__).resolve().parents[2]
-REVIEW_PROJECTION = "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift"
+REVIEW_PROJECTION = "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift"
 # The bundled OpenHarmony code-sign helper the Rust tests verify and compose
 # (arkdeck-agentd's code-sign helper process test, the provider's helper
 # facts): a checked-in package resource beside rust/, not a protocol input.
-CODE_SIGN_HELPER = "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
+CODE_SIGN_HELPER = "apple/Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
 # The OpenHarmony integration registries, profile and lock that
 # arkdeck-provider-hdc's registration tests read (CHG-2026-078): checked-in
 # integration inputs beside rust/, not protocol inputs.
@@ -38,10 +38,10 @@ INTEGRATIONS = "openspec/integrations"
 # Embedded by the current Windows ArkTrace implementation, independently of
 # which published/candidate/historical protocol and Catalog inputs it consumes.
 ARKTRACE_BUILD_INPUTS = (
-    "Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-x86_64/manifest.json",
-    "Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json",
-    "Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-license-inventory.json",
-    "Packages/ArkDeckKit/ThirdParty/ArkTraceRust/dependency-licenses.json",
+    "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-x86_64/manifest.json",
+    "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json",
+    "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-license-inventory.json",
+    "apple/Packages/ArkDeckKit/ThirdParty/ArkTraceRust/dependency-licenses.json",
 )
 
 
@@ -500,7 +500,7 @@ def verify_contract_bundle_digests() -> None:
         return
     roots = {
         "contracts": ROOT / "api/contracts",
-        "fixtures": ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI",
+        "fixtures": ROOT / "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI",
     }
     for path, digest in sorted(json.loads(table.read_text()).items()):
         root, _, relative = path.partition("/")

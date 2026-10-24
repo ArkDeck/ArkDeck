@@ -60,7 +60,7 @@ def fixture_inspection(*, abi="armeabi-v7a", digest=record.ROLLBACK_FIXTURE_SHA2
     # this synthetic journal's request/content/binding are substituted; the
     # committed contract corpus and its pins are never changed.
     source = Path(__file__).resolve().parents[3] / (
-        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl")
+        "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl")
     frames = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines()]
     value = next(frame["result"] for frame in frames if frame.get("ok") is True
                  and frame["result"]["import"]["metadata"]["kind"] == "native-library")

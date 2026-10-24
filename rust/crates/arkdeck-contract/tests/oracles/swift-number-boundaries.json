@@ -1,7 +1,7 @@
 {
   "function" : "PortableCanonicalJSON.serialize(Double)",
   "sourceCommit" : "a076ca31ef97ef4285981af053d07b7fe0f052bd",
-  "sourcePath" : "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
+  "sourcePath" : "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
   "sourceSHA256" : "beca3dbfb02c5705841ba273b868cbfd01d8bf31edbb25f6ab1100a967b8b779",
   "validationClass" : "nativeSwiftPureEncoding",
   "vectors" : [

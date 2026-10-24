@@ -122,7 +122,7 @@ mod runtime {
     use serde_json::{Value, json};
 
     const SELECT: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.select.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.select.jsonl"
     );
 
     /// The corpus's answered frame and its refusal of a Runtime with no

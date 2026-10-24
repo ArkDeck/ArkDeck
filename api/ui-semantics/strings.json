@@ -1,6 +1,6 @@
 {
   "schemaVersion": "arkdeck.ui-semantics.strings/1",
-  "description": "Bilingual strings of the ArkDeck App surfaces the Windows client shows (TASK-XPA-007). An entry with a table is the macOS App's entry of the same key in ArkDeckApp/Resources/<table>.xcstrings, values unchanged; an entry whose table is null exists on Windows only (a Windows surface with no macOS counterpart, such as the daemon-unavailable recovery banner). windows/scripts/generate-ui-strings.py writes the Windows .resw files from this file and keeps the .xcstrings entries equal to it; --check fails on any drift.",
+  "description": "Bilingual strings of the ArkDeck App surfaces the Windows client shows (TASK-XPA-007). An entry with a table is the macOS App's entry of the same key in apple/ArkDeckApp/Resources/<table>.xcstrings, values unchanged; an entry whose table is null exists on Windows only (a Windows surface with no macOS counterpart, such as the daemon-unavailable recovery banner). windows/scripts/generate-ui-strings.py writes the Windows .resw files from this file and keeps the .xcstrings entries equal to it; --check fails on any drift.",
   "languages": [
     "en",
     "zh-Hans"

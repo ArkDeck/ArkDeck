@@ -74,7 +74,7 @@ public sealed class DiagnosticChannelTests
                 new("contractIdentity", new JsonString(ControlContract.ContractIdentity)), new("protocolVersion", new JsonString(ControlContract.ProtocolVersion)),
                 new("catalogDigest", new JsonString(new string('a',64))), new("providers", new JsonArray([])),
                 new("publishedMethods", new JsonArray(ControlContract.Methods.Select(m => (JsonValue)new JsonString(m)))), new("status", new JsonString("ok"))])
-                : StrictJson.Parse(Encoding.UTF8.GetBytes(File.ReadLines(RepoPaths.At("Packages","ArkDeckKit","Tests","ArkDeckContractTests","Fixtures","ControlFrames",method+".jsonl")).First()))["result"];
+                : StrictJson.Parse(Encoding.UTF8.GetBytes(File.ReadLines(RepoPaths.At("apple", "Packages", "ArkDeckKit","Tests","ArkDeckContractTests","Fixtures","ControlFrames",method+".jsonl")).First()))["result"];
             foreach (var b in Wire.EncodeFrame(new JsonObject([new("id",frame["id"]),new("ok",JsonBool.True),new("result",result)]),ControlContract.MaxResponseBytes)) outgoing.Enqueue(b);
             return ValueTask.CompletedTask;
         }

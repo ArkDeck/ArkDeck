@@ -25,7 +25,7 @@ fn published_view() -> bool {
 
 fn signing() -> Value {
     include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.register.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.register.jsonl"
     )
     .lines()
     .map(|line| serde_json::from_str::<Value>(line).unwrap())
@@ -74,7 +74,7 @@ fn consumers_publish_registration_credential_type_and_keep_old_view_refusal() {
 #[test]
 fn existing_recorded_null_presets_still_conform() {
     for line in include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.list.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.list.jsonl"
     )
     .lines()
     {

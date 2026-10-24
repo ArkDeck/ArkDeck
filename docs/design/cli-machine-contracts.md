@@ -4,7 +4,7 @@ Task: TASK-AIN-026 (product spec §14, §15.1, §18)
 
 `api/contracts/cli-*`, `app-product-capability-registry.yaml`,
 `runtime-control-plane.schema.json` and
-`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**` are generated
+`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**` are generated
 from the build that publishes them. Nothing in the bundle is restated by hand:
 every product is a projection of a Swift fact source the CLI already owns, and
 a contract test holds the committed files to the binary. A registry change
@@ -14,11 +14,11 @@ hand fails the same test.
 ## Entry point
 
 ```bash
-arkdeck maintainer contracts export --contracts-directory api/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI
+arkdeck maintainer contracts export --contracts-directory api/contracts --fixtures-directory apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI
 ```
 
 ```bash
-arkdeck maintainer contracts check --contracts-directory api/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI --output json
+arkdeck maintainer contracts check --contracts-directory api/contracts --fixtures-directory apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI --output json
 ```
 
 `export` writes every product and removes stale fixture files; `check` compares
@@ -67,12 +67,12 @@ request and response as one canonical JSON line when
 variable), and
 
 ```bash
-ARKDECK_CONTROL_FRAME_LOG=/tmp/arkdeck-frames sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test
-python3 Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas /tmp/arkdeck-frames
+ARKDECK_CONTROL_FRAME_LOG=/tmp/arkdeck-frames sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test
+python3 apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas /tmp/arkdeck-frames
 ```
 
 rewrites the schemas and selects the committed corpus
-`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/<method>.jsonl`
+`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/<method>.jsonl`
 (the smallest frame of every distinct request and response shape). Results and
 error details are closed to the fields the daemon emitted; request parameters
 are closed to the fields a contract test exercised, so a parameter no test
@@ -172,7 +172,7 @@ rejects at least one counterexample, so a schema loosened by hand fails too.
 
 ## What changed in the App
 
-`ArkDeckApp/**` only registers stable feature ids: `ArkDeckNavigationItem`,
+`apple/ArkDeckApp/**` only registers stable feature ids: `ArkDeckNavigationItem`,
 `DebugWorkspaceTab` and `ViewerInspectorTab` each map exhaustively to an
 `AppNavigationCapability`/`AppDebugTabCapability`/`AppViewerTabCapability`
 case whose raw value is the registry id. No interaction, navigation or visible
@@ -208,7 +208,7 @@ text changed, so no design mirror is touched.
 
 ## Residuals
 
-- §14 names `Packages/ArkDeckKit/Tests/Fixtures/CLI/**`; the fixtures live
+- §14 names `apple/Packages/ArkDeckKit/Tests/Fixtures/CLI/**`; the fixtures live
   under the contract test target's existing `Fixtures/` directory so the same
   `#filePath`-relative lookup every other fixture family uses applies.
 - The fixture set covers the parser-level rows of §15.1 (1, 2, 4, 5, 7 and the

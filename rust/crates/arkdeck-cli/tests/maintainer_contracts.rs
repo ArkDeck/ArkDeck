@@ -248,7 +248,8 @@ fn published_view() -> bool {
 fn the_committed_bundle_checks_clean() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let contracts = repository.join("api/contracts");
-    let fixtures = repository.join("Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI");
+    let fixtures =
+        repository.join("apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI");
     if published_view() || !contracts.join("cli-command-registry.yaml").is_file() {
         return;
     }

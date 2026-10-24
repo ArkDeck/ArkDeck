@@ -74,7 +74,7 @@ fn with_helper(census: &str) -> String {
 /// The checked-in helper resource, the one both packages ship.
 fn resource() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign")
+        .join("../../../apple/Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign")
         .join("arkdeck-code-sign-enable")
 }
 

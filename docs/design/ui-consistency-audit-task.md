@@ -54,7 +54,7 @@
   ID 与覆盖表逐一相等，本任务直接在矩阵上更新结论，不另建平行表。
 - **设计组件**：[`arkdeck-ds/src/index.ts`](arkdeck-ds/src/index.ts) 的受控导出集 +
   `.design-sync/previews/*.tsx`（覆盖表 `previewFiles`，当前 31 个）。
-- **App 视图**：覆盖表 `appViewFiles`（当前 20 个）+ `ArkDeckApp/DesignSystem/` 下的
+- **App 视图**：覆盖表 `appViewFiles`（当前 20 个）+ `apple/ArkDeckApp/DesignSystem/` 下的
   共享实现（当前唯一共享件 `WorkspaceChrome.swift`）。
 - **设计输入**：覆盖表 `designInputs`（当前 21 个文件）。
 - 清单本身与 reviewed `main` 不符时（inventory equality 由
@@ -123,7 +123,7 @@ C-DUP 的收敛取舍）单列，不静默改。
 2. **矩阵与覆盖表**：§3 全入口矩阵的结论列就地更新；清单变化同步
    `implementation-coverage.json`（含 `lastReviewedRevision`），由交互测试守护。
 3. **修正本身**：设计侧改动落 `docs/design/**` 与 `.design-sync/**`；确需动
-   App/测试时才触 `ArkDeckApp/**`、`ArkDeckAppUITests/**` 等 TASK-AIN-021 已授权
+   App/测试时才触 `apple/ArkDeckApp/**`、`apple/ArkDeckAppUITests/**` 等 TASK-AIN-021 已授权
    路径，并带上对应原生回归。
 
 ## 8. 验证

@@ -44,7 +44,7 @@ import catalog_test_views
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "api/baselines/swift-single-v1.json"
 CANDIDATE_INPUTS = ROOT / "api/baselines/swift-candidate-inputs.json"
-REGISTRY = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
+REGISTRY = ROOT / "apple/Packages/ArkDeckKit/Contracts/control-protocol.json"
 SUPPORTED = {"health", "doctor", "operation.list", "device.observations"}
 # These methods reach the Import owner, including immutable discovery lists.
 MACHINE_OUTPUT = ROOT / "rust/tests/fixtures/readonly-machine-output"

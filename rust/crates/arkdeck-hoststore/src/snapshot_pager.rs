@@ -778,7 +778,7 @@ mod tests {
     fn a_foreign_or_reclaimed_cursor_is_refused_in_swifts_words() {
         let recorded: Value = {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-                "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/session.list.jsonl",
+                "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/session.list.jsonl",
             );
             let text = fs::read_to_string(path).unwrap();
             serde_json::from_str::<Value>(text.lines().next().unwrap()).unwrap()["error"].clone()

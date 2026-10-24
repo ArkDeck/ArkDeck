@@ -1390,7 +1390,7 @@ CLI 同时存在四个独立版本：
 本地版本查询不连接 Runtime；Runtime response 的 `meta.controlProtocolVersion` 表示当前固定版本。
 
 CHG-075 将发布前自有控制格式统一为唯一严格 `1.0.0`。单一
-`Packages/ArkDeckKit/Contracts/control-protocol.json` 固定 method 集、版本和帧限制；
+`apple/Packages/ArkDeckKit/Contracts/control-protocol.json` 固定 method 集、版本和帧限制；
 canonical registry SHA-256 形成 `contractIdentity`。不存在协议选择、major 交集、
 `protocol.negotiate`、`--require-protocol`、旧 handler 或 fallback。
 
@@ -1511,7 +1511,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `docs/design/cli-*.md`。
 - §14 机器契约产物已落地（`TASK-AIN-026`，实现见 `cli-machine-contracts.md`）：
   `arkdeck maintainer contracts export|check` 从 Swift 事实源生成全部十项
-  `api/contracts/` 产物与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**`
+  `api/contracts/` 产物与 `apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**`
   （208 个 argv fixture、envelope/page/`nextAction` 样本），`CLIMachineContractTests` 以零漂移、
   fixture 回放与 schema 正反例把产物钉在 protected `main` 上；`--version` 的
   `pageSchemaVersion`/`nextActionSchemaVersion` 为 `arkdeck.cli.page/1`/`arkdeck.cli.next-action/1`。
@@ -1593,7 +1593,7 @@ api/contracts/cli-canonical-json-vectors.json
 api/contracts/cli-feature-coverage.json
 api/contracts/app-product-capability-registry.yaml
 api/contracts/runtime-control-plane.schema.json
-Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**
+apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**
 ```
 
 0.5 起这些产物由 `arkdeck maintainer contracts export` 从 Swift 事实源生成，
@@ -2106,7 +2106,7 @@ CLI 称为“全功能”；macOS 达成不表示 Windows 已实现，Windows �
   [`workflow-journal-recovery`](../../openspec/specs/workflow-journal-recovery/spec.md)、
   [`session-artifact-storage`](../../openspec/specs/session-artifact-storage/spec.md)：
   Target/Job/Artifact/recovery 语义；
-- [`HumanActionRequired.swift`](../../Packages/ArkDeckKit/Sources/ArkDeckRuntime/HumanActionRequired.swift)：
+- [`HumanActionRequired.swift`](../../apple/Packages/ArkDeckKit/Sources/ArkDeckRuntime/HumanActionRequired.swift)：
   当前 HAR document/vocabulary 的盘点来源，不是 accepted Core 或 production owner contract；目标 HAR
   owner union 与 wire 语义必须先固化到 §14 的 language-neutral generated control contract，Windows
   不得以该 Swift 文件作为规范；

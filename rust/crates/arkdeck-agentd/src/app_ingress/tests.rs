@@ -327,7 +327,7 @@ fn app_observation_handles_are_closed_and_never_become_caller_facts() {
         fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
             self.calls.lock().unwrap().push(Value::Null);
             let corpus = include_str!(
-                "../../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/device.observations.jsonl"
+                "../../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/device.observations.jsonl"
             );
             let result = corpus
                 .lines()

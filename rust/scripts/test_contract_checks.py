@@ -437,7 +437,7 @@ class ContractChecksTests(unittest.TestCase):
                     "maximumResponseFrameBytes": 2000, "methods": methods}
         identity = contract.sha(json.dumps(registry, sort_keys=True, separators=(",", ":")).encode())
         directories = {contract.METHODS, contract.CORPUS, "catalog/operations", "catalog/profiles",
-                       "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC"}
+                       "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC"}
         for name in contract.INPUTS:
             if name in directories:
                 (self.root / name).mkdir(parents=True)
@@ -447,7 +447,7 @@ class ContractChecksTests(unittest.TestCase):
         self.write("catalog/generated/effect-authorization-matrix.md", b"Catalog digest: `" + b"a" * 64 + b"`\n")
         self.write("catalog/operations/example.json", {})
         self.write("catalog/profiles/example.json", {})
-        self.write("Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/example.txt", b"host fixture\n")
+        self.write("apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/example.txt", b"host fixture\n")
         for method in methods:
             schema = {"x-arkdeck-contractIdentity": identity,
                       "$defs": {part: {"type": "object", "properties": {}, "additionalProperties": False}
@@ -1144,7 +1144,7 @@ class WorkspacePresetListSchemaTests(unittest.TestCase):
     """List carries the same closed preset resource as the mutation/read leaves."""
 
     ROOT = Path(__file__).resolve().parents[2]
-    CORPUS = ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
+    CORPUS = ROOT / "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
 
     @classmethod
     def schema(cls, method):
@@ -1164,7 +1164,7 @@ class WorkspacePresetListSchemaTests(unittest.TestCase):
                 "projectRef": signing["projectRef"], "presets": [copy.deepcopy(signing)]}
 
     def test_derivation_preserves_the_published_schema_and_shared_credential_type(self):
-        path = self.ROOT / "Packages/ArkDeckKit/Scripts/generate-control-contract.py"
+        path = self.ROOT / "apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py"
         spec = importlib.util.spec_from_file_location("arkdeck_preset_list_generator", path)
         generator = importlib.util.module_from_spec(spec)
         with patch.object(sys, "argv", [str(path), "--check"]):

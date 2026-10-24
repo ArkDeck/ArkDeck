@@ -5,7 +5,7 @@
 //!
 //! * Over its pipe, with a plain pipe handle (no signer needed):
 //!   - the answers Swift recorded for an empty registry
-//!     (`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/
+//!     (`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/
 //!     ControlFrames`) are answered byte for byte, the snapshot page's
 //!     revision aside: the empty bundle and tool pages, a page size out of
 //!     range, an invalid tool reference to remove, a relative HDC to
@@ -306,7 +306,7 @@ fn refused(pipe: &str, method: &str, params: Value, code: &str, message: &str) {
 /// or an error code).
 fn recorded(method: &str, params: &Value, answer: &str) -> Value {
     let corpus = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     ));
     std::fs::read_to_string(&corpus)
         .unwrap()

@@ -3,7 +3,7 @@
 > Status：draft v0.3（design input，非 normative；2026-09-06 按当前代码与已提交测量更新，并补充 Windows 原生客户端工程流程）。本文是 `openspec/changes/chg-2026-074-shared-rust-runtime-core/` 的设计输入，不是 accepted spec 或 ADR；本次文档更新不改变 Task 状态、批准范围或平台支持声明。
 > 代码核对基线：`origin/main = d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`（2026-09-06，本地 checkout）；Catalog digest `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，ratified baseline CORE-3.0.0（candidate CORE-4.0.0）。单 v1 交接基线见 [SVC-005 baseline](../../../openspec/changes/chg-2026-075-single-v1-contracts/evidence/runs/TASK-SVC-005/single-v1-baseline.md)；它钉住 `371cd9d2`，其控制契约与 corpus 在本次 HEAD 上未变。
 > 边界：本文不修改生产代码、Catalog、accepted specs、baseline、Profile 或安全策略。按 `openspec/architecture/core-portability.md:30,34`，本方案要开工必须先经维护者批准一个 architecture/platform change，即 `CHG-2026-074`（proposal、tasks、verification、design、spec-impact 见该 change 目录）。
-> 引用约定：仓库事实用 `path:line`（相对仓库根，`Sources/…`/`Tests/…` 省略 `Packages/ArkDeckKit/` 前缀）；外部仓库 ArkForge 以 `ArkForge/<path>:line` 标注（本地只读 checkout，git tip `5a369a2`）；平台/工具链判断引用官方一手资料 URL。
+> 引用约定：仓库事实用 `path:line`（相对仓库根，`Sources/…`/`Tests/…` 省略 `apple/Packages/ArkDeckKit/` 前缀）；外部仓库 ArkForge 以 `ArkForge/<path>:line` 标注（本地只读 checkout，git tip `5a369a2`）；平台/工具链判断引用官方一手资料 URL。
 > r6 依赖边界延续： [CHG-2026-075 的 TASK-SVC-001..004](../../../openspec/changes/chg-2026-075-single-v1-contracts/tasks.md) 已标记 done；XPA-001 的 96 份逐 method schema 已交付，仍为 in-progress，待 headless GJ re-pass。SVC-005 仍为 ready，交接基线不等于发布验收。本文的 Swift oracle、字段冻结、互读、回滚均使用 post-SVC 当前实现，不恢复被移除的协议、历史格式或 authority。
 > 历史事实范围：§B/§E 未重新测量的代码规模、外部 ArkForge checkout 与旧 review 引用仍按 `238a2fb2` 的扫描解释；§I 使用仓内最新提交的 SPK-1 JSON 原始数值，测量发生于 2026-09-04，不能声称是本次 HEAD 的性能结果。本次新增流程均是后续实现指导，工具可用性待 Windows Spike 验证。
 > 阅读顺序：A 结论 → B 事实与冲突 → C 决策矩阵 → D 目标架构 → E/F 边界与契约 → G 迁移 → H UX parity → I 性能 → J 任务 DAG → K 风险 → L 维护者决策。
@@ -40,7 +40,7 @@
 | 1 | 权威顺序 | Constitution Safety invariants/POL-* > `PRODUCT-LOOP.md` > `AGENTS.md` > specs/contracts > profile > enforcement/policy > 代码 | F | `AGENTS.md:22-24`；`PRODUCT-LOOP.md:1075-1076` |
 | 2 | 阶段 | 产品闭环优先阶段自 2026-07-30 生效；治理框架冻结；一个问题 = 一个垂直任务 = 一个 PR | F | `PRODUCT-LOOP.md:3,25-49,187-224` |
 | 3 | GJ 状态 | GJ-1～GJ-5 于 2026-09-02 在 digest `508783ac…` 上 headless `REAL_DEVICE_PASS`；29 个 canonical operation 真机覆盖 29/29（2026-09-03 补跑） | F | `docs/design/references/v1.6-goal/real-device-validation.md:209-227,217-218,260-262`；`docs/design/references/v1.6-goal/gj-headless-rerun-2026-09-02.json:3-10,834`；`docs/design/arkdeck-cli-product-spec.md:1573` |
-| 4 | 当前 digest 与 GJ digest 一致 | 生成物、registry、coverage 三处同一 digest；Catalog 30 个 descriptor（29 canonical + `flash.dayu200` alias） | F | `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift:7`；`catalog/generated/effect-authorization-matrix.md:6`；`api/contracts/cli-command-registry.yaml:3`；`api/contracts/cli-feature-coverage.json:4` |
+| 4 | 当前 digest 与 GJ digest 一致 | 生成物、registry、coverage 三处同一 digest；Catalog 30 个 descriptor（29 canonical + `flash.dayu200` alias） | F | `apple/Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift:7`；`catalog/generated/effect-authorization-matrix.md:6`；`api/contracts/cli-command-registry.yaml:3`；`api/contracts/cli-feature-coverage.json:4` |
 | 5 | 冻结解除条件已满足 | §20 冻结「新平台支持/大规模 Package 重构」直到 GJ-1/GJ-2 PASS；现已 PASS。但 §12「结构性改动必须和一个 GJ 同车」仍然有效 | F | `PRODUCT-LOOP.md:1004-1029,702-725` |
 | 6 | 四类 Repo 审批 | 新 operation/破坏性修改、新 provider、新 integration/device profile、E2 策略变化必须 change + 维护者 review | F | `AGENTS.md:37-40`；`PRODUCT-LOOP.md:1081-1083` |
 | 7 | Core 可移植性现行决策 | 「language-neutral contracts + 各平台 native 实现」；三份 Profile 固定策略值 `native-conforming-shared-contract-vector-suite`；引入共享 Rust/C++/WASM library 须先走 architecture/platform change 并同步更新受影响 Profile | F | `openspec/architecture/core-portability.md:9,11,30,34` |
@@ -50,14 +50,14 @@
 | 11 | Windows 实现语言的现行假设 | 规格设想 C#/.NET 或 C++ 独立实现、共享 fixtures 而非 Swift 源码；「Windows 复刻可以只阅读 language-neutral registry/schema/fixtures」 | F | `arkdeck-cli-product-spec.md:1325-1327,2141-2142`；`openspec/platforms/windows/profile.md:15-21` |
 | 12 | Windows Slice D 未开始 | 不阻断 macOS-only claim，阻断跨平台 claim | F | `arkdeck-cli-product-spec.md:1584-1586,1874-1882` |
 | 13 | 单 v1 控制面 | LF JSON；请求 `{protocolVersion,contractIdentity,id,method,params?}`；固定 `1.0.0` 与 contract identity；请求上限 4 MiB、响应上限 8 MiB；客户端在同一连接上先验证 `health` 再发送业务帧；一请求恰一响应，重连重验、丢失响应不 replay | F | `Sources/ArkDeckCore/ControlProtocolGenerated.swift:5-9`；`Sources/ArkDeckCore/ControlProtocolContract.swift:12-27,53-64`；`Sources/ArkDeckAgentClient/AgentClient.swift:40-56,195-209` |
-| 14 | 当前方法集 | registry、Swift 生成物、逐方法 schema 均为 96 个方法；无 `protocol.negotiate` 或 target/legacy 分流。CLI `device candidates` 实际请求 `device.observations`；当前 HDC 状态方法为 `runtime.hdc.status` | F | `Packages/ArkDeckKit/Contracts/control-protocol.json`；`Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift:1519-1524`；`api/contracts/runtime-control-plane.schema.json` |
+| 14 | 当前方法集 | registry、Swift 生成物、逐方法 schema 均为 96 个方法；无 `protocol.negotiate` 或 target/legacy 分流。CLI `device candidates` 实际请求 `device.observations`；当前 HDC 状态方法为 `runtime.hdc.status` | F | `apple/Packages/ArkDeckKit/Contracts/control-protocol.json`；`Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift:1519-1524`；`api/contracts/runtime-control-plane.schema.json` |
 | 15 | 逐 method schema 已交付 | `api/control/methods/` 下 96 份 schema，含 request/result/errorCode/errorDetails；`Fixtures/ControlFrames/` 有 96 份录制 corpus。schema 由测试实际记录推导；corpus 只覆盖已录制路径，不证明错误分支穷尽 | F | `api/control/README.md`；`Tests/ArkDeckContractTests/ControlMethodSchemaContractTests.swift`；SVC-005 `single-v1-baseline.md` |
 | 16 | 事件流 | 只有 pull：`job.events` 游标分页（pageSize 默认 100、上限 1000，AEAD 封装 cursor）；CLI 250 ms 轮询；无 server push | F | `AgentDaemon.swift:1155-1187`；`Sources/ArkDeckStorage/JournalEventPages.swift:12,121-135`；`Sources/ArkDeckCLI/CLIJobEvents.swift:83-165,164` |
 | 17 | 对端身份 | UDS 检查 `getpeereid`，但 UID 不符**仍处理请求**，只影响 console 资格；ADR-0005 明言「本用户可达即授权边界（MVP）」 | F | `AgentDaemon.swift:5144-5194`；`docs/adr/0005-agentd-uds-control-plane.md:12-14` |
-| 18 | App 到 daemon 的路径 | 沙箱 App 无法 `connect()` AF_UNIX（实测 EPERM），唯一通道是 launchd Mach service `com.arkdeck.agentd`（`NSXPCListener`，`shouldAcceptNewConnection` 接受一切，按帧白名单准入）；App 不 import `ArkDeckAgentClient` | F | `ArkDeckApp/ArkDeckApp.entitlements:26-41`；`AgentXPCListener.swift:26,44-51,159-222`；`Sources/ArkDeckWorkflows/XPCConnectionBox.swift:26-98`；`Packages/ArkDeckKit/LaunchAgents/com.arkdeck.agentd.plist`（注释）|
+| 18 | App 到 daemon 的路径 | 沙箱 App 无法 `connect()` AF_UNIX（实测 EPERM），唯一通道是 launchd Mach service `com.arkdeck.agentd`（`NSXPCListener`，`shouldAcceptNewConnection` 接受一切，按帧白名单准入）；App 不 import `ArkDeckAgentClient` | F | `apple/ArkDeckApp/ArkDeckApp.entitlements:26-41`；`AgentXPCListener.swift:26,44-51,159-222`；`Sources/ArkDeckWorkflows/XPCConnectionBox.swift:26-98`；`apple/Packages/ArkDeckKit/LaunchAgents/com.arkdeck.agentd.plist`（注释）|
 | 19 | XPC 门的实际范围 | 代码转发只读白名单 **加** typed `job.plan/submit/run/cancel` 门；entitlements 注释仍称「只转发只读白名单」 | F（冲突） | `Sources/ArkDeckCore/AgentXPCContract.swift:120-142,147-240`；`AgentXPCListener.swift:156-158,190-221`；`ArkDeckApp.entitlements:34-37` |
-| 20 | App 的组合方式 | App 22,612 行 Swift/33 文件；`@main` 组合根构造 14 个 `*ApplicationFacade.make()`；facade 与 `*Presentation` 类型位于 `ArkDeckWorkflows`（引擎模块）；App 无单元测试 target，59 个 UI test 方法 | H | `ArkDeckApp/App/ArkDeckApp.swift:88-157,100-135`；`ArkDeck.xcodeproj/project.pbxproj:468,490`；`Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift:26,143,295` |
-| 21 | 部署目标冲突 | Package 与 Xcode 工程要求 macOS 26；Profile/ADR-0002 写 macOS 14/arm64 | F（冲突） | `Packages/ArkDeckKit/Package.swift:7`；`ArkDeck.xcodeproj/project.pbxproj:691,710,739,777`；`openspec/platforms/macos/profile.md:9`；`docs/adr/0002-macos-v1-sandboxed-distribution.md:18` |
+| 20 | App 的组合方式 | App 22,612 行 Swift/33 文件；`@main` 组合根构造 14 个 `*ApplicationFacade.make()`；facade 与 `*Presentation` 类型位于 `ArkDeckWorkflows`（引擎模块）；App 无单元测试 target，59 个 UI test 方法 | H | `apple/ArkDeckApp/App/ArkDeckApp.swift:88-157,100-135`；`apple/ArkDeck.xcodeproj/project.pbxproj:468,490`；`Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift:26,143,295` |
+| 21 | 部署目标冲突 | Package 与 Xcode 工程要求 macOS 26；Profile/ADR-0002 写 macOS 14/arm64 | F（冲突） | `apple/Packages/ArkDeckKit/Package.swift:7`；`apple/ArkDeck.xcodeproj/project.pbxproj:691,710,739,777`；`openspec/platforms/macos/profile.md:9`；`docs/adr/0002-macos-v1-sandboxed-distribution.md:18` |
 | 22 | 代码规模（本次实测，HEAD 238a2fb2） | Packages Sources 157,432 行/267 文件；App 22,612 行；ContractTests 101,656 行/193 文件；UI tests 5,963 行。用户线索「约 15 万行」偏低 | H | `find … -name '*.swift' \| xargs wc -l`；模块明细见 §E |
 | 23 | 尚无生产 Rust/Windows 工程 | 无生产 `rust/` workspace、`windows/`、C# 工程或 `api/ui-semantics/`；已有 SPK-2 的 Rust `listener/Cargo.toml` 与源码，属于隔离实验。生产 App/daemon 仍经 `NSXPCConnection`/`NSXPCListener`，实验通过不等于 XPA-003 已迁移 | F | `git ls-files`；CHG-074 `evidence/runs/TASK-XPA-003/spk-2/listener/`；`Sources/ArkDeckWorkflows/XPCConnectionBox.swift:5-11`；`Sources/ArkDeckAgentDaemon/AgentXPCListener.swift:26-44` |
 | 24 | **ArkForge 已是 Rust daemon 先例** | 15 crate workspace、76,377 行 Rust、零第三方运行时依赖、Rust 1.98/edition 2024、`panic="abort"`；UDS（0700/0600）与 Windows Named Pipe（logon SID DACL、`PIPE_REJECT_REMOTE_CLIENTS`、`FILE_FLAG_FIRST_PIPE_INSTANCE`、client SQOS identification）；length-prefixed Protobuf，16 MiB 帧、深度 16；Swift SDK 3,524 行以内联 hex 向量维持字节一致；`api/` 为语言无关正本，Rust 为 oracle 生成 conformance fixtures | H（外部仓库） | `ArkForge/Cargo.toml:1-36`；`ArkForge/docs/architecture.md:338-400,1508-1584`；`ArkForge/crates/arkforge-ipc/src/wire.rs:1-22`；`ArkForge/crates/arkforge-platform/src/lib.rs:1-5,246-259`；`ArkForge/crates/arkforge-platform/src/platform.rs:34-45,474,513`；`ArkForge/docs/decisions/AFD-0005-language-neutral-spec.md:1-39`；`ArkForge/crates/arkforge-ipc/tests/swift_sdk_vectors.rs:20-37` |
@@ -345,7 +345,7 @@ flowchart TB
 | ArkDeckTraceAdapter | 319 / 2 | 0 | UniformTypeIdentifiers | ArkTrace 薄适配 |
 | ArkDeckApp（Xcode） | 22,612 / 33 | — | SwiftUI 26, AppKit 9 | 8 页面 + Settings + Trace Viewer |
 
-出处：`Packages/ArkDeckKit/Package.swift:53-153`；import 统计来自本次逐模块 grep；`ArkDeck.xcodeproj/project.pbxproj:468,490`。
+出处：`apple/Packages/ArkDeckKit/Package.swift:53-153`；import 统计来自本次逐模块 grep；`apple/ArkDeck.xcodeproj/project.pbxproj:468,490`。
 
 ### E.2 `migrate / retain / split / wrap / retire / defer` 矩阵
 
@@ -369,7 +369,7 @@ flowchart TB
 | ArkDeckWorkflows：`AnalyzerProvider/*`（crash signature、hilog summary、ArkTrace summary/analysis envelope 校验） | **migrate（纯计算优先）** | `arkdeck-provider-analyzer` | 三个派生分析器 ~2k 行纯计算；trace 类依赖 trace_streamer/ArkTrace，Windows 先 **defer**（诚实 unavailable） |
 | ArkDeckWorkflows：`ArkForgeLaneHost/Session/ControlPerformer/ExecutionAuthority/ManagedControlPort/LoaderObservation`、`RockchipRuntimeComposition` | **migrate（Rust↔Rust）** | `arkdeck-provider-arkforge` | 直接消费 `arkforge-client` 与 `adapters/arkforge-arkdeck-adapter`，去掉 Swift SDK 中转；StepPermit CBOR 向量沿用 |
 | ArkDeckWorkflows：`RockchipDeviceBinding`（IOKit USB 枚举） | **wrap** | 经 `arkforged discoverDevices` | ArkForge 已有原生 IOKit/WinUSB 枚举（`ArkForge/crates/arkforged/src/service.rs:58-80`），ArkDeck 不再自持 IOKit。过渡（2026-09-24，维护者委托裁定 Q1=B）：target adoption 的可信 USB relation 暂由 `arkdeck-platform` 只读读取 I/O Registry（`usb_host_devices`，与 Swift `TargetUSBRelation.registeredDAYU200()` 同源；不打开设备、不发 USB 传输），M4 之后再评估收回 `arkforged` |
-| ArkDeckWorkflows：13 个 `*ApplicationFacade` 与 `*Presentation` | **split** | 语义投影 → `arkdeck-runtime`（daemon 计算的 status/availability/nextAction/HAR/recovery 投影，已部分存在）；平台胶水 → `ArkDeckClientKit` / `ArkDeck.ClientKit` | 消除 App 对引擎模块的依赖（`ArkDeckApp/App/ArkDeckApp.swift:100-135`） |
+| ArkDeckWorkflows：13 个 `*ApplicationFacade` 与 `*Presentation` | **split** | 语义投影 → `arkdeck-runtime`（daemon 计算的 status/availability/nextAction/HAR/recovery 投影，已部分存在）；平台胶水 → `ArkDeckClientKit` / `ArkDeck.ClientKit` | 消除 App 对引擎模块的依赖（`apple/ArkDeckApp/App/ArkDeckApp.swift:100-135`） |
 | ArkDeckWorkflows：`XPCConnectionBox` | **retire** | `ArkDeckClientKit::XPCTransport`（xpc C API） | NSXPC 与 Rust 侧 `xpc_connection` 不同线协议，必须一起换 |
 | ArkDeckWorkflows：`AutoUpdate/*` | **retain（macOS platformService）** | Swift ClientKit/App | Ed25519 feed 校验、Finder 交接是 macOS 特有；语义（检查/下载/验签/用户发起）写入 `ui-semantics` 以便 Windows App Installer 路径对齐 |
 | ArkDeckWorkflows：`RemoteBuildSource`（Citadel/NIOSSH，Keychain SSH 凭据） | **retain（DEC-013 platformService）** | Swift App 侧 | CLI 等价路径已定义（`arkdeck-cli-product-spec.md:1625-1627`）；Windows 首版不提供 |
@@ -411,7 +411,7 @@ flowchart TB
 | 资产 | 今日事实源 | 目标事实源 | 迁移动作 |
 |---|---|---|---|
 | Catalog descriptor + digest | `catalog/operations/*.json`，Python 生成 Swift（`hack/catalog_gen/generate.py:974-978`） | 不变；生成器改为同时生成 Rust（`RuntimeOperationCatalogGenerated.rs`）并断言 digest 相等 | 零漂移检查扩到两种语言 |
-| 单 v1 控制协议 envelope | `Packages/ArkDeckKit/Contracts/control-protocol.json` 与 `ControlProtocolGenerated.swift`；固定版本与 identity | 保持一个 canonical registry，Rust/C# 消费同一输入；若迁移路径须同步全部引用，不能另建第二份正本 | 保留当前 envelope、health 校验、帧上限与错误语义；不恢复 negotiation bootstrap |
+| 单 v1 控制协议 envelope | `apple/Packages/ArkDeckKit/Contracts/control-protocol.json` 与 `ControlProtocolGenerated.swift`；固定版本与 identity | 保持一个 canonical registry，Rust/C# 消费同一输入；若迁移路径须同步全部引用，不能另建第二份正本 | 保留当前 envelope、health 校验、帧上限与错误语义；不恢复 negotiation bootstrap |
 | 逐 method typed schema | 已交付 96 份 `api/control/methods/<method>.json` 与实际录制 corpus | 同一路径，生成 Swift/Rust/C# 客户端输入 | XPA-001 保持 schema 与真实帧一致并完成剩余验收；Windows 与 ClientKit 生成工作仍待实现 |
 | Job 状态机/终态/转换 | Swift `switch` | `api/job-state-machine.yaml`（states、terminal、mode×state→destinations、directives、invariant violations） | Swift 测试导出并断言相等后冻结；Rust 直接加载 |
 | reason codes / error registry / exit codes | `cli-error-registry.yaml`（45 码）、Swift `RuntimeAvailabilityReasonCode`（7）、`cli-next-action.schema.json`（7） | 合并为 `api/registries/*.yaml` | 从 Swift 导出一次后冻结 |
@@ -516,7 +516,7 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 - **四条并行车道（各占一个 worktree）与文件所有权。** A 引擎/设备路径（014、013）：`arkdeck-hoststore`、
   `arkdeck-agentd`、`arkdeck-provider-hdc` 的 operation 部分；B 平台执行器（016）：`arkdeck-platform`、
   `arkdeck-provider-hdc` 的 process/observation 部分；C 客户端（019、018）：`ArkDeckClientKit`、
-  `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`arkdeck-cli`，独占 UI 测试跑道；D 供应者与性能（015、017 的
+  `apple/ArkDeckApp/**`、`apple/ArkDeckAppUITests/**`、`arkdeck-cli`，独占 UI 测试跑道；D 供应者与性能（015、017 的
   ArkForge lane、025）：`arkdeck-provider-workspace/analyzer/arkforge`、`hack/bench`、`rust-perf.yml`。
   共享文件（`Package.swift`、`project.pbxproj`、`Cargo.toml`/`Cargo.lock`、`control-protocol.json`、
   `api/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；
@@ -654,7 +654,7 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 | 领域 | 现有断言/实测 | 出处 | 性质 |
 |---|---|---|---|
 | 冷启动候选枚举（真机） | ≤ 1,250 ms | `Tests/ArkDeckContractTests/DeviceCandidatesContractTests.swift:85-109` | 硬断言，opt-in `ARKDECK_REAL_DEVICE_LATENCY_ACCEPTANCE=1` |
-| App 冷启动到设备行可见 | ≤ 2 s；独立实测 0.994 s；批量 3.6–7.6 s | `ArkDeckAppUITests/AppShell/AppShellUITests.swift:33-68`；`docs/design/implementation-audit-2026-08-27.md:53`；`real-device-validation.md:83,134,138,161` | 硬断言 opt-in；无百分位保证 |
+| App 冷启动到设备行可见 | ≤ 2 s；独立实测 0.994 s；批量 3.6–7.6 s | `apple/ArkDeckAppUITests/AppShell/AppShellUITests.swift:33-68`；`docs/design/implementation-audit-2026-08-27.md:53`；`real-device-validation.md:83,134,138,161` | 硬断言 opt-in；无百分位保证 |
 | XPC 每请求成本 | 只打印 min/p50/p90/max，无绝对断言；memo 比值 `warm*20 < cold` | `RuntimeXPCTransportCostTests.swift:8-21,207-232,327-335` | 日志/比值，`ARKDECK_XPC_COST=1` |
 | 客户端 deadline | 150 ms 预算在 2 s 内返回等 | `AgentClientDeadlineContractTests.swift:78-153` | 硬断言（上限，不是预算） |
 | journal 追加/恢复 | 10k 事件：durable append < 1 s、recovery < 5 s、增量校验 < 4 KiB；实测 append 3.6–5.3 ms/事件、recovery 1.56 s、peak RSS 42 MiB | `JournalRecoveryContractTests.swift:16-47`；`openspec/changes/chg-2026-071-interactive-device-control/evidence/runs/TASK-IDC-001/data/journal-append-bench.txt` | 硬断言 opt-in `ARKDECK_RUN_LONG_JOURNAL_TESTS=1` |
@@ -864,7 +864,7 @@ flowchart TD
 - 依赖：XPA-002 已交付的 macOS read-only foundation（r8：不含其 Windows 验收）、SPK-2（已过）。Windows 链在 XPA-017 之后开始，不与本任务并行（r8；本任务已 done，r12 起 Windows 链与 macOS 阶段 A 并行）。
 - Production reachability：客户端 → Rust façade（UDS/XPC）→ 转发到 Swift daemon 私有 socket → 既有 admission；façade 不解释语义、不缓存、不改帧（只做单 v1 帧校验与准入）。
 - 来源上下文（r3）：每帧前置一行 origin 前导（§F.2「来源上下文」行）；否则 Swift 看到的对端是 façade，`human-action.resume` 的交互式 impact 确认永久失效。
-- 路径：`rust/**`、`Packages/ArkDeckKit/LaunchAgents/**`（plist 与 service 指向）、`Sources/ArkDeckAgentDaemonMain/**`（私有 socket 参数）、`Sources/ArkDeckAgentDaemon/**`（r3：私有监听器与 origin 行 → context，不动 handler/admission）、`Sources/ArkDeckWorkflows/XPCConnectionBox.swift`（改 xpc C API）、`ArkDeckApp/**`（仅 transport）、`Tests/**`。
+- 路径：`rust/**`、`apple/Packages/ArkDeckKit/LaunchAgents/**`（plist 与 service 指向）、`Sources/ArkDeckAgentDaemonMain/**`（私有 socket 参数）、`Sources/ArkDeckAgentDaemon/**`（r3：私有监听器与 origin 行 → context，不动 handler/admission）、`Sources/ArkDeckWorkflows/XPCConnectionBox.swift`（改 xpc C API）、`apple/ArkDeckApp/**`（仅 transport）、`Tests/**`。
 - 交付物：façade daemon；`runtime service install/update` 支持双二进制；黑盒契约测试参数化；**同 PR 内**把 Swift daemon 的 `NSXPCListener` 换成与 façade 相同的 raw libxpc 帧监听器并把 App 换到 `xpc_connection`（r5，见 §G.1 回滚段）。
 - AC：现有 `AgentDaemonContractTests`/`AgentXPCTransportContractTests` 黑盒子集对 façade 全绿；IPC p95 增量 ≤ 1 ms（SPK-1 基线）；GJ-1～5 headless PASS；回滚演练通过，且包含「更新后的 App → 回滚后的同 release Swift daemon」（XPC 契约测试 + App UI smoke，r5）。
 - 验证：contract、differential（façade 前后帧字节相等）、fault-injection（r3 分两窗：转发前杀 façade → 结构化错误且可证明零派发；转发后回包前杀 façade / 中途杀 Swift daemon → 不带零派发证明的结构化中断错误、durable 状态以 Swift 已写为准、façade 不重发、客户端读回裁决，见 §G.5）、来源上下文契约（前台终端 CLI 经 façade 拿到 console 挑战，后台/重定向 CLI 拿回原 HAR，伪造 `arkdeckOrigin` 的客户端帧被拒、零派发）、UI test（App 经 XPC 的 Overview/History）。
@@ -918,7 +918,7 @@ flowchart TD
 - 平台/GJ：Windows GJ-1 的 App 呈现 AC（AC-UX-001/003/004 在 Windows 首次可验）。
 - 依赖：XPA-006、SPK-4。
 - Reachability：WinUI → `ArkDeck.ClientKit`（生成 records）→ pipe → 只读方法 + `job.submit` typed 门。
-- 路径：新 `windows/**`（App 与 ClientKit）、`api/ui-semantics/**`、生成器脚本、`ArkDeckApp/Resources/*.xcstrings`（改为生成物，但内容不变）、`hack/ci/plan.py` + `hack/ci/test_plan.py` + `.github/workflows/swift-ci.yml`/`windows-*.yml` + `hack/tests/test_agent_pr_workflow.py`（r3/r5：新增 `windows` 车道并折进 `swift` 聚合器，契约测试同 PR 更新；非 Windows 主机上 `--run-local` 对该车道显式报不可运行、非零退出，而非静默绿）。
+- 路径：新 `windows/**`（App 与 ClientKit）、`api/ui-semantics/**`、生成器脚本、`apple/ArkDeckApp/Resources/*.xcstrings`（改为生成物，但内容不变）、`hack/ci/plan.py` + `hack/ci/test_plan.py` + `.github/workflows/swift-ci.yml`/`windows-*.yml` + `hack/tests/test_agent_pr_workflow.py`（r3/r5：新增 `windows` 车道并折进 `swift` 聚合器，契约测试同 PR 更新；非 Windows 主机上 `--run-local` 对该车道显式报不可运行、非零退出，而非静默绿）。
 - 交付物：MSIX 工程、UIA 名称、live region、键盘路径、双语。
 - AC：UIA 树快照与 macOS AX 快照语义一致（导航项/状态/动作）；Narrator 读出 Job 状态变化；无 disabled 占位。
 - 工程落实：按 §H.5 固定工具链并提供 build/run/test/package 入口；消费当前单 v1 schema 与连接校验；按 §H.6 提供稳定控件标识和语义快照。

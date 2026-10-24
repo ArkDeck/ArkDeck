@@ -2,7 +2,7 @@
 
 > Status: current(2026-09-28 CHG-2026-074 删除 Swift Runtime 与 Swift CLI(TASK-XPA-017/018);
 > 2026-08-19 CHG-2026-064 起进程内决策平面移除;ADR-0008 typed-only agent surface 同一世界观)。
-> 执法点:Swift 侧是 `Packages/ArkDeckKit/Package.swift` 的依赖声明(编译器强制)+
+> 执法点:Swift 侧是 `apple/Packages/ArkDeckKit/Package.swift` 的依赖声明(编译器强制)+
 > `Tests/ArkDeckContractTests/ArchitectureBoundaryContractTests.swift`(结构测试);
 > Rust 侧是 `rust/Cargo.toml` 工作区与 `rust/scripts/check-readonly.py` 的 crate 依赖检查。
 > 本文只描述**模块边界**;设备安全边界与 E0/E1/E2 授权见 Constitution 与 ADR。
@@ -57,7 +57,7 @@ graph TD
 ClientKit    → Core
 TraceAdapter → (nothing in ArkDeckKit; ArkTrace 外部包)
 Core         → (nothing)
-App(ArkDeck.xcodeproj)→ ClientKit, Core, TraceAdapter(UI 测试 target:ClientKit, Core)
+App(apple/ArkDeck.xcodeproj)→ ClientKit, Core, TraceAdapter(UI 测试 target:ClientKit, Core)
 ```
 
 Package.swift 声明的 target 集合被精确钉住:上述库、App UI 测试用的 `ArkDeckFakeHDCFixture`

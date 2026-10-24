@@ -5,14 +5,14 @@
 App's CFBundleShortVersionString) and `build` (its CFBundleVersion). The App
 and the Rust helper pair must carry exactly these two values: the App holds the
 daemon to both in its XPC server requirement
-(`Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`,
+(`apple/Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`,
 `serverCodeRequirement`), so a helper from another build is a mismatch even at
 the same marketing version. The copies:
 
-- `ArkDeck.xcodeproj/project.pbxproj`: every `MARKETING_VERSION` and
+- `apple/ArkDeck.xcodeproj/project.pbxproj`: every `MARKETING_VERSION` and
   `CURRENT_PROJECT_VERSION` (the App target's Debug and Release);
-- `ArkDeckApp/Info.plist`: must keep reading those two build settings;
-- `Packages/ArkDeckKit/Distribution/macOS/ArkDeckCLI-Info.plist` and
+- `apple/ArkDeckApp/Info.plist`: must keep reading those two build settings;
+- `apple/Packages/ArkDeckKit/Distribution/macOS/ArkDeckCLI-Info.plist` and
   `ArkDeckAgent-Info.plist`: CFBundleShortVersionString and CFBundleVersion.
   `check-rust-helpers.py` compares these with the pbxproj pair.
 
@@ -38,9 +38,9 @@ from pathlib import Path
 RELEASE = Path(__file__).resolve().parent
 REPO = RELEASE.parents[1]
 SOURCE = RELEASE / "release-version.json"
-PROJECT = REPO / "ArkDeck.xcodeproj/project.pbxproj"
-APP_INFO = REPO / "ArkDeckApp/Info.plist"
-DISTRIBUTION = REPO / "Packages/ArkDeckKit/Distribution/macOS"
+PROJECT = REPO / "apple/ArkDeck.xcodeproj/project.pbxproj"
+APP_INFO = REPO / "apple/ArkDeckApp/Info.plist"
+DISTRIBUTION = REPO / "apple/Packages/ArkDeckKit/Distribution/macOS"
 HELPER_INFOS = (
     DISTRIBUTION / "ArkDeckCLI-Info.plist",
     DISTRIBUTION / "ArkDeckAgent-Info.plist",
@@ -93,7 +93,7 @@ def drift(repo: Path = REPO) -> list[str]:
     for key, placeholder in APP_INFO_VALUE.items():
         if app_info.get(PLIST_KEY[key]) != placeholder:
             problems.append(
-                f"ArkDeckApp/Info.plist {PLIST_KEY[key]} must stay {placeholder}, "
+                f"apple/ArkDeckApp/Info.plist {PLIST_KEY[key]} must stay {placeholder}, "
                 f"is {app_info.get(PLIST_KEY[key])!r}"
             )
     for info in HELPER_INFOS:

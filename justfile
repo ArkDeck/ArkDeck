@@ -15,7 +15,7 @@ build-rust:
 
 # Build the Swift package. This is the app-side libraries, not the runtime.
 build-swift:
-    sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
+    sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
 
 # Build the macOS app with the shared Xcode runner. Extra arguments are forwarded.
 build-app *args:
@@ -33,9 +33,9 @@ test-swift filter="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ -n "{{filter}}" ]]; then
-        sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter "{{filter}}"
+        sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter "{{filter}}"
     else
-        sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
+        sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
     fi
 
 # Run the default Rust and Swift test entry points.

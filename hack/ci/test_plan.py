@@ -64,7 +64,7 @@ class PathClassificationTests(unittest.TestCase):
         inputs.extend([
             "docs/design/arkdeck-ds/new-input.tsx",
             "catalog/operations/new-operation.json",
-            "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+            "apple/ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
         ])
         for path in inputs:
             with self.subTest(path=path):
@@ -82,7 +82,7 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_package_tests_run_swift_without_rebuilding_app(self):
         self.assert_lanes(
-            ["Packages/ArkDeckKit/Tests/ArkDeckCoreTests/SHA256HexTests.swift"],
+            ["apple/Packages/ArkDeckKit/Tests/ArkDeckCoreTests/SHA256HexTests.swift"],
             swift=True,
             app=False,
             ds=True,
@@ -96,7 +96,7 @@ class PathClassificationTests(unittest.TestCase):
         ):
             with self.subTest(target=target):
                 self.assert_lanes(
-                    [f"Packages/ArkDeckKit/Sources/{target}/Example.swift"],
+                    [f"apple/Packages/ArkDeckKit/Sources/{target}/Example.swift"],
                     swift=True,
                     app=True,
                     ds=True,
@@ -104,16 +104,16 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_non_app_package_targets_skip_redundant_xcode_lane(self):
         for path in (
-            "Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift",
-            "Packages/ArkDeckKit/LaunchAgents/README.md",
+            "apple/Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift",
+            "apple/Packages/ArkDeckKit/LaunchAgents/README.md",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True)
 
     def test_package_manifest_runs_both_composition_lanes(self):
         for path in (
-            "Packages/ArkDeckKit/Package.swift",
-            "Packages/ArkDeckKit/Package.resolved",
+            "apple/Packages/ArkDeckKit/Package.swift",
+            "apple/Packages/ArkDeckKit/Package.resolved",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=True, ds=True)
@@ -123,13 +123,13 @@ class PathClassificationTests(unittest.TestCase):
         # merged all-green while breaking two @arkdeck/ds interaction tests,
         # because no lane ran the suite that reads these sources.
         self.assert_lanes(
-            ["ArkDeckApp/Features/Flash/FlashWorkspaceView.swift"],
+            ["apple/ArkDeckApp/Features/Flash/FlashWorkspaceView.swift"],
             swift=False,
             app=True,
             ds=True,
         )
         self.assert_lanes(
-            ["ArkDeckAppUITests/AppShell/AppShellUITests.swift"],
+            ["apple/ArkDeckAppUITests/AppShell/AppShellUITests.swift"],
             swift=False,
             app=True,
             ds=True,
@@ -137,7 +137,7 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_xcode_project_changes_skip_uninvolved_lanes(self):
         self.assert_lanes(
-            ["ArkDeck.xcodeproj/project.pbxproj"], swift=False, app=True, ds=False
+            ["apple/ArkDeck.xcodeproj/project.pbxproj"], swift=False, app=True, ds=False
         )
 
     def test_planner_and_workflow_changes_cannot_self_skip(self):
@@ -215,22 +215,22 @@ class PathClassificationTests(unittest.TestCase):
             "ArkDeckCore/ControlProtocolContract.swift",
             "ArkDeckCore/ControlFrameJSON.swift",
         ):
-            path = f"Packages/ArkDeckKit/Sources/{name}"
+            path = f"apple/Packages/ArkDeckKit/Sources/{name}"
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=True, ds=True, rust=True)
 
     def test_control_producer_and_fixture_only_changes_select_rust_without_app(self):
         for path in (
-            "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
-            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
-            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
+            "apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py",
+            "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
+            "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
         # The registry and the recorded frames are ClientKit inputs as well.
         for path in (
-            "Packages/ArkDeckKit/Contracts/control-protocol.json",
-            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
+            "apple/Packages/ArkDeckKit/Contracts/control-protocol.json",
+            "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
         ):
             with self.subTest(path=path):
                 self.assert_lanes(
@@ -268,7 +268,7 @@ class PathClassificationTests(unittest.TestCase):
         # Job state classes and the CLI coverage commands; the end-to-end tests
         # sign their daemon copy with the development identity script.
         declared += [
-            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames",
+            "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames",
             "api/ui-semantics",
             "api/recovery/job-state-preflight.json",
             "api/contracts/cli-feature-coverage.json",
@@ -287,7 +287,7 @@ class PathClassificationTests(unittest.TestCase):
             "rust/tests/fixtures/hilog-summary-analyzer",
             "catalog/operations/capture.diagnostics.v1.json",
             "catalog/operations/analyzer.summarize-hilog.v1.json",
-            "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
+            "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
         ]
         for path in declared:
             source = root / path
@@ -303,7 +303,7 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_device_shared_strings_select_the_windows_consumer_lane(self):
         self.assert_lanes(
-            ["ArkDeckApp/Resources/DeviceLocalizable.xcstrings"],
+            ["apple/ArkDeckApp/Resources/DeviceLocalizable.xcstrings"],
             swift=False, app=True, ds=True, windows=True,
         )
 
@@ -314,7 +314,7 @@ class PathClassificationTests(unittest.TestCase):
             "api/recovery/README.md",
             "docs/design/cross-platform/windows-phase-agent-prompt.md",
             "docs/design/arkdeck-ds/src/styles.css",
-            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
+            "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
         ):
             with self.subTest(path=path):
                 self.assertFalse(PLAN.classify_paths([path]).windows)
@@ -324,12 +324,12 @@ class PathClassificationTests(unittest.TestCase):
         # Rust macOS workspace job; Swift's contract tests pin the release
         # script, so Swift stays selected as for any package path.
         for path in (
-            "Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py",
-            "Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh",
-            "Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh",
-            "Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh",
-            "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable",
-            "Packages/ArkDeckKit/Distribution/macOS/ArkDeckAgent.entitlements",
+            "apple/Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py",
+            "apple/Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh",
+            "apple/Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh",
+            "apple/Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh",
+            "apple/Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable",
+            "apple/Packages/ArkDeckKit/Distribution/macOS/ArkDeckAgent.entitlements",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
@@ -464,7 +464,7 @@ class GitPlanTests(unittest.TestCase):
         }}
 
     def test_merge_group_covers_all_queued_changes_after_main_advances(self):
-        lower = self.commit_file("Packages/ArkDeckKit/Tests/Lower.swift", "lower")
+        lower = self.commit_file("apple/Packages/ArkDeckKit/Tests/Lower.swift", "lower")
         head = self.commit_file("rust/crates/upper.rs", "upper")
         self.git("update-ref", "refs/remotes/origin/main", lower)
         result = PLAN.plan_from_event(self.root, self.queue_event())
@@ -473,7 +473,7 @@ class GitPlanTests(unittest.TestCase):
         self.assertTrue(result.lanes.swift)
         self.assertTrue(result.lanes.rust)
         self.assertEqual(set(result.changed_files), {
-            "Packages/ArkDeckKit/Tests/Lower.swift", "rust/crates/upper.rs"})
+            "apple/Packages/ArkDeckKit/Tests/Lower.swift", "rust/crates/upper.rs"})
 
     def test_merge_group_docs_only_selects_no_compiled_lane(self):
         self.commit_file("docs/example.md", "docs")
@@ -534,7 +534,7 @@ class GitPlanTests(unittest.TestCase):
     def test_agent_plan_is_cumulative_against_main(self):
         self.git("switch", "-qc", "agent/package")
         first = self.commit_file(
-            "Packages/ArkDeckKit/Tests/ExampleTests.swift", "// test\n"
+            "apple/Packages/ArkDeckKit/Tests/ExampleTests.swift", "// test\n"
         )
         head = self.commit_file("docs/note.md", "docs\n")
         plan = PLAN.plan_from_push_event(
@@ -567,7 +567,7 @@ class GitPlanTests(unittest.TestCase):
         # with #1905's, one pending run per concurrency group. #1905's run then
         # planned 99dda729..6cf99fb6 and never looked at #1903's files. A red
         # run leaves the same hole; the last green commit closes both.
-        source = "Packages/ArkDeckKit/Sources/ArkDeckCore/Example.swift"
+        source = "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/Example.swift"
         unvalidated = self.commit_file(source, "// swift\n")
         head = self.commit_file("docs/note.md", "docs\n")
         own_push = PLAN.plan_between(
@@ -722,7 +722,7 @@ class GitPlanTests(unittest.TestCase):
 
     def test_cross_surface_rename_reports_removed_swift_path(self):
         self.git("switch", "-qc", "agent/rename")
-        source = "Packages/ArkDeckKit/Sources/ArkDeckCore/Old.swift"
+        source = "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/Old.swift"
         self.commit_file(source, "// source\n")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
         base = self.oid("HEAD")
@@ -748,8 +748,8 @@ class GitPlanTests(unittest.TestCase):
             )
 
     def test_local_plan_includes_tracked_and_untracked_worktree_changes(self):
-        (self.root / "ArkDeckApp" / "App").mkdir(parents=True)
-        (self.root / "ArkDeckApp" / "App" / "New.swift").write_text(
+        (self.root / "apple" / "ArkDeckApp" / "App").mkdir(parents=True)
+        (self.root / "apple" / "ArkDeckApp" / "App" / "New.swift").write_text(
             "// app\n", encoding="utf-8"
         )
         (self.root / "README.md").write_text("edited\n", encoding="utf-8")
@@ -760,7 +760,7 @@ class GitPlanTests(unittest.TestCase):
             use_merge_base=False,
             include_worktree=True,
         )
-        self.assertIn("ArkDeckApp/App/New.swift", plan.changed_files)
+        self.assertIn("apple/ArkDeckApp/App/New.swift", plan.changed_files)
         self.assertIn("README.md", plan.changed_files)
         self.assertFalse(plan.lanes.swift)
         self.assertTrue(plan.lanes.app)

@@ -13,7 +13,7 @@ internal static class RepoPaths
     public static string At(params string[] parts) => Path.Combine([Root, .. parts]);
 
     public static string Corpus(string method) =>
-        At("Packages", "ArkDeckKit", "Tests", "ArkDeckContractTests", "Fixtures", "ControlFrames", method + ".jsonl");
+        At("apple", "Packages", "ArkDeckKit", "Tests", "ArkDeckContractTests", "Fixtures", "ControlFrames", method + ".jsonl");
 
     private static string FindRoot()
     {

@@ -10,7 +10,7 @@ macOS `.xcstrings` and the Windows `.resw`). Outputs:
   in a .resw name as an x:Uid property path);
 - windows/App.Core/Generated/UiStrings.g.cs: the keys as C# constants, so App code cannot
   name a key the catalogue lacks;
-- ArkDeckApp/Resources/<table>.xcstrings: every entry that names a macOS table must have
+- apple/ArkDeckApp/Resources/<table>.xcstrings: every entry that names a macOS table must have
   exactly the source's en and zh-Hans values there (values unchanged). `--write` rewrites
   only a value that differs and leaves every other byte and key of the table alone.
 
@@ -36,7 +36,7 @@ from xml.sax.saxutils import escape
 
 REPO = Path(__file__).resolve().parents[2]
 SOURCE = REPO / "api" / "ui-semantics" / "strings.json"
-XCSTRINGS_DIR = REPO / "ArkDeckApp" / "Resources"
+XCSTRINGS_DIR = REPO / "apple" / "ArkDeckApp" / "Resources"
 RESW = {
     "en": REPO / "windows" / "App" / "Strings" / "en-US" / "Resources.resw",
     "zh-Hans": REPO / "windows" / "App" / "Strings" / "zh-Hans" / "Resources.resw",
@@ -50,17 +50,17 @@ PLACEHOLDER = re.compile(r"%(?:(\d+)\$)?(@|lld|ld|d)")
 # selects on each; hack/ci/test_plan.py loads this tuple).
 INPUTS = (
     "api/ui-semantics/strings.json",
-    "ArkDeckApp/Resources/Localizable.xcstrings",
-    "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
-    "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
-    "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
-    "ArkDeckApp/Resources/DebugLocalizable.xcstrings",
-    "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
-    "ArkDeckApp/Resources/TraceLocalizable.xcstrings",
-    "ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
-    "ArkDeckApp/Resources/UIDumpLocalizable.xcstrings",
-    "ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings",
-    "ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/Localizable.xcstrings",
+    "apple/ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/JobsLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/DebugLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/FlashLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/TraceLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
 )
 
 
@@ -103,7 +103,7 @@ def load() -> list[dict]:
             raise SourceError(f"strings.json: {key} and {names[name]} map to one resource name {name}")
         names[name] = key
         table = entry["table"]
-        if table is not None and f"ArkDeckApp/Resources/{table}.xcstrings" not in INPUTS:
+        if table is not None and f"apple/ArkDeckApp/Resources/{table}.xcstrings" not in INPUTS:
             raise SourceError(f"strings.json: {key} names table {table}; add its .xcstrings to INPUTS")
         if table is None and not key.startswith("windows."):
             raise SourceError(f"strings.json: Windows-only key {key} must start with 'windows.'")

@@ -50,10 +50,10 @@ Equivalent commands, if `just` is not installed:
 
 ```bash
 python3 rust/scripts/run-cargo.py build
-sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
+sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
 
 python3 rust/scripts/run-cargo.py test -p arkdeck-cli
-sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
+sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 
 python3 rust/scripts/run-cargo.py fmt --all --check
 python3 rust/scripts/run-cargo.py clippy -p arkdeck-contract --all-targets -- -D warnings
@@ -77,7 +77,7 @@ Targeted checks before push:
 - Contract inputs (`control-protocol.json`, `api/control/methods/**`, ControlFrames,
   CLI argv corpora): `python3 rust/scripts/generate-contract.py --check`
 - `openspec/**`, `docs/**`, or `AGENTS.md`: `sh hack/check-sdd.sh`
-- Swift: `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <Class>`
+- Swift: `sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <Class>`
 - App changes: `sh hack/ci/run-xcodebuild.sh` for the affected scheme
 
 The Rust runner keeps `CARGO_BUILD_JOBS=2` and isolates caches with

@@ -83,7 +83,7 @@ public sealed class ToolchainInventoryTests
     [TestMethod]
     public void PublishedBundleCorpusKeepsTheOriginalHelperTrustProjection()
     {
-        var rows = File.ReadLines(RepoPaths.At("Packages", "ArkDeckKit", "Tests", "ArkDeckContractTests", "Fixtures", "ControlFrames", "runtime.bundle.list.jsonl"))
+        var rows = File.ReadLines(RepoPaths.At("apple", "Packages", "ArkDeckKit", "Tests", "ArkDeckContractTests", "Fixtures", "ControlFrames", "runtime.bundle.list.jsonl"))
             .Select(Parse).Where(frame => frame["ok"] is JsonBool { Value: true })
             .SelectMany(frame => ((JsonArray)((JsonObject)frame["result"])["items"]).Items).Select(RuntimeBundle.Parse).ToArray();
         Assert.AreEqual(2, rows.Length);

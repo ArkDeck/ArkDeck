@@ -5,7 +5,7 @@ The Windows client reads the same language-neutral inputs the Rust contract
 generator (`rust/scripts/generate-contract.py`) reads for its bindings, so the
 two clients cannot drift silently:
 
-* `Packages/ArkDeckKit/Contracts/control-protocol.json` — protocol version,
+* `apple/Packages/ArkDeckKit/Contracts/control-protocol.json` — protocol version,
   frame limits and the published method list; the contract identity is the
   SHA-256 of its sorted, compact JSON, as the Rust generator computes it.
 * `api/control/methods/*.json` — one typed schema per method. The ClientKit
@@ -31,7 +31,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-REGISTRY = "Packages/ArkDeckKit/Contracts/control-protocol.json"
+REGISTRY = "apple/Packages/ArkDeckKit/Contracts/control-protocol.json"
 METHODS = "api/control/methods"
 BASELINE = "api/baselines/swift-single-v1.json"
 SCHEMA_PATTERNS = "rust/crates/arkdeck-contract/src/schema_patterns.json"

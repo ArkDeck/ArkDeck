@@ -38,6 +38,7 @@ REMOTE_OPERATIONS_PATH = (
 )
 GENERATED_SWIFT_PATH = (
     REPO_ROOT
+    / "apple"
     / "Packages"
     / "ArkDeckKit"
     / "Sources"

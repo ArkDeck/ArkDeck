@@ -14,7 +14,7 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 | `App.UITests/` | MSTest + FlaUI (UIA3): UIA semantic snapshots of the running App; needs a desktop session (`ARKDECK_APP_UITESTS=1`), otherwise reported skipped |
 | `scripts/generate-clientkit.py` | Generator of `ClientKit/Generated/ControlContract.g.cs`; `--check` fails on drift |
 | `scripts/generate-ui-strings.py` | Generator of the App's `.resw` from `api/ui-semantics/strings.json` (values equal to the macOS `.xcstrings`); `--check` fails on drift |
-| `scripts/generate-app-icons.py` | Generator of `App/Assets/AppIcon.ico` (16–256 px) and the MSIX visual assets (scale-100/200, the taskbar target sizes) from the macOS AppIcon (`ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset`), resampled, never drawn; `--check` compares decoded pixels |
+| `scripts/generate-app-icons.py` | Generator of `App/Assets/AppIcon.ico` (16–256 px) and the MSIX visual assets (scale-100/200, the taskbar target sizes) from the macOS AppIcon (`apple/ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset`), resampled, never drawn; `--check` compares decoded pixels |
 | `scripts/generate-xaml-tokens.py` | Generator of `App/Themes/ArkDeckTokens.xaml` from `docs/design/arkdeck-ds/src/tokens.css` (product accent on controls, ruling 16); `--check` fails on drift |
 | `ArkDeck.Windows.slnx` | The solution the `windows` CI lane builds and tests |
 | `spikes/spk4/` | The SPK-4 WinUI 3 spike (its own solution and pins; not part of the lane) |
@@ -22,7 +22,7 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 ## ArkDeck.ClientKit
 
 - **Contract, generated.** `generate-clientkit.py` reads the same inputs as the Rust contract
-  generator: `Packages/ArkDeckKit/Contracts/control-protocol.json` (version, 4 MiB / 8 MiB frame
+  generator: `apple/Packages/ArkDeckKit/Contracts/control-protocol.json` (version, 4 MiB / 8 MiB frame
   limits, method list; the contract identity is the SHA-256 of its sorted compact JSON),
   `api/control/methods/*.json`, `api/baselines/swift-single-v1.json` (cross-check) and the shared
   pattern vocabulary `rust/crates/arkdeck-contract/src/schema_patterns.json`. It writes constants,

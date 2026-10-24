@@ -189,13 +189,13 @@ the same terminal state and additionally proves it survived the release, and
 ## Reproducing
 
 ```bash
-cd Packages/ArkDeckKit
+cd apple/Packages/ArkDeckKit
 swift build -c release --product arkdeck-agentd
 swift build -c release --product ArkDeckRuntimeSoakFixture
 cd ../../scripts
 python3 -m bench capture \
-  --daemon ../Packages/ArkDeckKit/.build/release/arkdeck-agentd \
-  --soak ../Packages/ArkDeckKit/.build/release/ArkDeckRuntimeSoakFixture \
+  --daemon ../apple/Packages/ArkDeckKit/.build/release/arkdeck-agentd \
+  --soak ../apple/Packages/ArkDeckKit/.build/release/ArkDeckRuntimeSoakFixture \
   --build-configuration release --out-dir /tmp/arkdeck-perf
 ```
 

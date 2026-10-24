@@ -86,7 +86,7 @@ $CliName = 'arkdeck.exe'
 $DaemonName = 'arkdeck-agentd.exe'
 $ManifestName = 'manifest.json'
 # The code-sign helper: where the checkout holds it, and where the daemon looks beside itself.
-$HelperSource = 'Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable'
+$HelperSource = 'apple/Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable'
 $HelperPath = 'ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable'
 $Schema = 'arkdeck.windows-xcopy-package/1'
 $SmokeSchema = 'arkdeck.windows-xcopy-smoke/1'

@@ -1,7 +1,7 @@
 # `hack/bench` — performance baseline and regression harness
 
 The control harness uses the current registry in
-`Packages/ArkDeckKit/Contracts/control-protocol.json`. It verifies the exact
+`apple/Packages/ArkDeckKit/Contracts/control-protocol.json`. It verifies the exact
 health/contract identity on the same connection before each business request;
 old peers are refused without fallback or replay.
 

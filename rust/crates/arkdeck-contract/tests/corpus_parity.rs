@@ -16,7 +16,7 @@ mod common;
 
 fn corpus(method: &str) -> Vec<Value> {
     let bytes = fs::read(common::repo_root().join(format!(
-        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     )))
     .unwrap();
     assert_eq!(bytes.last(), Some(&b'\n'), "{method}: torn corpus tail");
@@ -37,13 +37,13 @@ fn wire_response(row: &Value, id: &str) -> Value {
 #[test]
 fn all_methods_and_recorded_shapes_in_the_input_manifest_replay_through_rust() {
     let inputs = strict_json(CONTRACT_INPUTS.as_bytes()).unwrap();
-    let registry = common::load_json("Packages/ArkDeckKit/Contracts/control-protocol.json");
+    let registry = common::load_json("apple/Packages/ArkDeckKit/Contracts/control-protocol.json");
     assert_eq!(inputs["methodCount"], METHODS.len());
     assert_eq!(METHOD_SCHEMAS.len(), METHODS.len());
     assert_eq!(serde_json::to_value(METHODS).unwrap(), registry["methods"]);
     let files = fs::read_dir(
         common::repo_root()
-            .join("Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"),
+            .join("apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"),
     )
     .unwrap()
     .map(|entry| entry.unwrap().path())

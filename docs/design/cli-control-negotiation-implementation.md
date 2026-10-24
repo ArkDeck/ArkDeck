@@ -25,9 +25,9 @@ request after a lost reply. Identity-check failure can prove zero business
 dispatch; a failure after sending a mutation remains subject to the existing
 unknown-outcome rules. Contract identity grants no Runtime authority.
 
-The vocabulary is `Packages/ArkDeckKit/Contracts/control-protocol.json`.
+The vocabulary is `apple/Packages/ArkDeckKit/Contracts/control-protocol.json`.
 Regenerate its Swift projection with
-`python3 Packages/ArkDeckKit/Scripts/generate-control-contract.py`; `--check`
+`python3 apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py`; `--check`
 verifies drift. The CLI machine-contract exporter generates its matching schema,
 registry, coverage and argv fixtures. `--version` reports local
 `controlProtocolVersion` and `controlContractIdentity` without connecting.

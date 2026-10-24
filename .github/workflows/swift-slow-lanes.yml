@@ -31,9 +31,9 @@ on:
   push:
     branches: ["agent/**"]
     paths:
-      - "ArkDeckApp/**"
-      - "ArkDeckAppUITests/**"
-      - "ArkDeck.xcodeproj/**"
+      - "apple/ArkDeckApp/**"
+      - "apple/ArkDeckAppUITests/**"
+      - "apple/ArkDeck.xcodeproj/**"
       - ".github/workflows/swift-slow-lanes.yml"
   schedule:
     # 18:00 UTC nightly (02:00 UTC+8), off the interactive working day.

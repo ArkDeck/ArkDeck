@@ -116,7 +116,7 @@ mod runtime {
     use serde_json::{Value, json};
 
     const CORPUS: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.reconcile.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.reconcile.jsonl"
     );
 
     fn frames() -> Vec<Value> {

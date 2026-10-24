@@ -135,10 +135,10 @@ mod runtime {
     use serde_json::{Value, json};
 
     const PREVIEW: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.impact-preview.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.impact-preview.jsonl"
     );
     const RESTART: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.restart.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.restart.jsonl"
     );
 
     /// A corpus's answered frame and its refusal.

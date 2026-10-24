@@ -1,0 +1,355 @@
+@testable import ArkDeckClientKit
+import ArkDeckCore
+import Foundation
+import Testing
+
+struct UIDumpApplicationFacadeContractTests {
+  @Test func viewerRequestPinsTargetAndEnablesOnlyPublishedCaptureInputs() throws {
+    let target = UIDumpTargetPresentation(
+      id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f", adoptedAtUTC: "2026-08-22T00:00:00Z")
+    let request = try ViewerCaptureRequestBuilder.request(target: target, nonce: "test")
+
+    #expect(request.operation.reference == "capture.diagnostics@1")
+    #expect(request.target.targetID == "target-a")
+    #expect(request.target.expectedBindingRevision == 7)
+    #expect(request.inputs["durationSeconds"] == .integer(1))
+    #expect(request.inputs["captureHilog"] == .bool(false))
+    #expect(request.inputs["hilogFilters"] == .array([]))
+    #expect(request.inputs["uiDump"] == .bool(true))
+    #expect(request.inputs["crashLogs"] == .bool(false))
+    #expect(request.inputs["uiScreenshot"] == .bool(true))
+    #expect(request.inputs["uiComponentTree"] == .bool(true))
+    #expect(request.inputs["redactionProfile"] == .string("standard"))
+  }
+
+  @Test func advancedDumpRequestPinsOnlyTypedComponentDetailInputs() throws {
+    let target = UIDumpTargetPresentation(
+      id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-22T00:00:00Z")
+    let request = try ViewerCaptureRequestBuilder.advancedDumpRequest(
+      target: target,
+      selection: ViewerAdvancedDumpSelection(windowID: "60", componentID: "841"),
+      nonce: "advanced")
+
+    #expect(request.operation.reference == "capture.diagnostics@1")
+    #expect(request.target.targetID == "target-a")
+    #expect(request.target.expectedBindingRevision == 7)
+    #expect(request.inputs["advancedDump"] == .bool(true))
+    #expect(request.inputs["windowId"] == .string("60"))
+    #expect(request.inputs["componentId"] == .string("841"))
+    #expect(request.inputs["captureHilog"] == .bool(false))
+    #expect(request.inputs["uiDump"] == .bool(false))
+    #expect(request.inputs["uiScreenshot"] == .bool(false))
+    #expect(request.inputs["uiComponentTree"] == .bool(false))
+  }
+
+  @Test func viewerOnlyTreatsFreshConnectedCandidateAsCaptureReady() {
+    let connected = DeviceCandidatePresentation(
+      connectKey: "usb-a", state: "Connected", adoptedTargetID: "target-a", bindingRevision: 7)
+    let offline = DeviceCandidatePresentation(
+      connectKey: "usb-b", state: "Offline", adoptedTargetID: "target-b", bindingRevision: 8)
+    let stale = DeviceCandidatePresentation(
+      connectKey: "usb-c", state: "Connected", adoptedTargetID: "target-c", bindingRevision: 9,
+      stateObservationHealth: .stale)
+
+    #expect(UIDumpWorkspaceResponseDecoding.targetConnection(for: connected) == .connected)
+    #expect(!UIDumpWorkspaceResponseDecoding.targetConnection(for: offline).isCaptureReady)
+    #expect(!UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).isCaptureReady)
+    #expect(
+      UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).failureReason
+        == "HDC reported Connected, but that observation is stale")
+  }
+
+  @Test func parserRetainsRawFieldsAndUsesDeviceIdentityWhenUnique() throws {
+    let capture = try ViewerCaptureParser.parse(
+      screenshotData: png(width: 720, height: 1280),
+      treeData: Data("""
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","hostWindowId":"60","hitTestBehavior":"HitTestMode.Transparent","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true,"childOnly":"not-root"},"children":[]}]}
+      """.utf8),
+      rawDumpData: Data(#"{"windows":[{"id":"w1"}]}"#.utf8),
+      identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
+
+    #expect(capture.coordinatesAreVerified)
+    let toggle = try #require(capture.nodes.first { $0.deviceID == "42" })
+    #expect(toggle.identity == "device:42")
+    #expect(toggle.parentIdentity == "device:1")
+    #expect(capture.node(identity: "device:1")?.hitTestBehavior == "HitTestMode.Transparent")
+    let rootRawFields = try #require(capture.formattedRawFields(for: "device:1"))
+    #expect(rootRawFields.contains("unknown"))
+    #expect(
+      !rootRawFields.contains("children"),
+      "Raw dump must contain only the selected component, never its descendant tree")
+    #expect(!rootRawFields.contains("childOnly"))
+    #expect(
+      capture.formattedRawFields(for: "device:42")?.contains("childOnly") == true,
+      "provider-specific fields owned by the selected component must remain available")
+    #expect(
+      capture.advancedDumpSelection(for: "device:42")
+        == ViewerAdvancedDumpSelection(windowID: "60", componentID: "42"),
+      "Advanced Dump must use the selected component and its enclosing window, not raw fields")
+    #expect(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID == "42")
+  }
+
+  @Test func advancedDumpParserUsesCapturedKeyColonValueText() throws {
+    let fields = try ViewerAdvancedDumpParser.parse(Data("""
+      WaterFlow dump:
+        accessibilityId : 841
+        layoutConstraint: { minWidth: 0, maxWidth: 1280 }
+        scrollable : true
+      """.utf8))
+
+    #expect(fields[0] == ViewerDumpField(key: "WaterFlow dump", value: ""))
+    #expect(fields[1] == ViewerDumpField(key: "accessibilityId", value: "841"))
+    #expect(
+      fields[2]
+        == ViewerDumpField(key: "layoutConstraint", value: "{ minWidth: 0, maxWidth: 1280 }"))
+    #expect(fields[3] == ViewerDumpField(key: "scrollable", value: "true"))
+  }
+
+  @Test func advancedDumpParserRejectsSidecarNoticeInsteadOfFallingBackToRawFields() {
+    #expect(throws: ViewerCaptureFailure.advancedDumpRequiresSidecar) {
+      try ViewerAdvancedDumpParser.parse(
+        Data("Dump saved to /data/app/example/files/arkui-comp.dump\n".utf8))
+    }
+  }
+
+  @Test func parserFallsBackToStablePathForDuplicateDeviceIDsAndDisablesUnprovenCoordinates() throws {
+    let capture = try ViewerCaptureParser.parse(
+      screenshotData: png(width: 720, height: 1280),
+      treeData: Data("""
+      {"attributes":{"id":"same","type":"Page","bounds":"[0,0][700,1280]"},"children":[{"attributes":{"id":"same","type":"Text"},"children":[]}]}
+      """.utf8),
+      rawDumpData: nil,
+      identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
+
+    #expect(!capture.coordinatesAreVerified)
+    #expect(capture.nodes.map(\.identity) == ["path:0", "path:0.0"])
+    #expect(ViewerHitTesting.node(in: capture, x: 1, y: 1) == nil)
+  }
+
+  @Test func screenshotMappingClipsProviderBoundsToTheCapturedDisplay() throws {
+    let raw = try #require(ViewerBounds(x: -40, y: 1200, width: 800, height: 160))
+    let visible = try #require(
+      ViewerScreenshotMapping.visibleBounds(
+        raw, screenshotWidth: 720, screenshotHeight: 1280))
+
+    #expect(visible == ViewerBounds(x: 0, y: 1200, width: 720, height: 80))
+  }
+
+  @Test func screenshotMappingAccumulatesClippingAncestorsForDrawingAndHitTesting() throws {
+    let parent = viewerNode(
+      identity: "parent", parent: nil, children: ["child"], type: "List",
+      bounds: ViewerBounds(x: 0, y: 0, width: 100, height: 100), clipsChildren: true)
+    let child = viewerNode(
+      identity: "child", parent: "parent", children: [], type: "ListItem",
+      bounds: ViewerBounds(x: 80, y: 80, width: 100, height: 100))
+    let capture = ViewerCapture(
+      screenshotData: png(width: 200, height: 200), screenshotWidth: 200, screenshotHeight: 200,
+      roots: ["parent"], nodes: [parent, child], rawDumpDocument: nil,
+      identity: ViewerCaptureIdentity(
+        jobID: "job-clipping", targetID: "target-a", bindingRevision: 1,
+        capturedAtUTC: "2026-08-22T00:00:00Z"),
+      coordinatesAreVerified: true)
+
+    #expect(
+      ViewerScreenshotMapping.visibleBounds(of: child, in: capture)
+        == ViewerBounds(x: 80, y: 80, width: 20, height: 20))
+    #expect(ViewerHitTesting.node(in: capture, x: 90, y: 90)?.identity == "child")
+    #expect(
+      ViewerHitTesting.node(in: capture, x: 120, y: 120) == nil,
+      "a child clipped out by the list cannot remain a screenshot hit target")
+  }
+
+  @Test func hitTestingSelectsFloatingNavigationAboveDeeperContent() {
+    let full = ViewerBounds(x: 0, y: 0, width: 200, height: 200)
+    let navigation = ViewerBounds(x: 10, y: 150, width: 180, height: 40)
+    let root = viewerNode(
+      identity: "root", parent: nil, children: ["content", "tabbar", "overlay"],
+      bounds: full)
+    let content = viewerNode(
+      identity: "content", parent: "root", children: ["poster"], type: "List",
+      bounds: full, zIndex: 0, depth: 1)
+    let poster = viewerNode(
+      identity: "poster", parent: "content", children: [], type: "Image",
+      bounds: full, depth: 2)
+    let tabbar = viewerNode(
+      identity: "tabbar", parent: "root", children: ["item"], type: "TabBar",
+      bounds: navigation, hitTestBehavior: "HitTestMode.Transparent", zIndex: 3, depth: 1)
+    let item = viewerNode(
+      identity: "item", parent: "tabbar", children: ["icon"], type: "Column",
+      bounds: navigation, depth: 2)
+    let icon = viewerNode(
+      identity: "icon", parent: "item", children: [], type: "SymbolGlyph",
+      bounds: ViewerBounds(x: 140, y: 155, width: 40, height: 30), depth: 3)
+    let overlay = viewerNode(
+      identity: "overlay", parent: "root", children: [], type: "Column",
+      bounds: full, hitTestBehavior: "HitTestMode.Transparent", zIndex: 88, depth: 1)
+    let capture = ViewerCapture(
+      screenshotData: png(width: 200, height: 200), screenshotWidth: 200, screenshotHeight: 200,
+      roots: ["root"], nodes: [root, content, poster, tabbar, item, icon, overlay],
+      rawDumpDocument: nil,
+      identity: ViewerCaptureIdentity(
+        jobID: "job-floating-navigation", targetID: "target-a", bindingRevision: 1,
+        capturedAtUTC: "2026-08-24T00:00:00Z"),
+      coordinatesAreVerified: true)
+
+    #expect(
+      ViewerHitTesting.node(in: capture, rootIdentity: "root", x: 160, y: 170)?.identity
+        == "icon",
+      "the foreground TabBar branch must win over a much deeper poster branch")
+  }
+
+  @Test func deepTreeIndentPreservesEveryLevelWithoutLosingReadableWidth() {
+    let viewport = 760.0
+    let indent = ViewerTreeLayoutPolicy.leadingIndent(
+      depth: 50, maximumDepth: 50, viewportWidth: viewport)
+    let previous = ViewerTreeLayoutPolicy.leadingIndent(
+      depth: 49, maximumDepth: 50, viewportWidth: viewport)
+
+    #expect(abs(indent - 456) <= 0.001)
+    #expect(
+      indent - previous >= 8,
+      "deep siblings must retain a perceivable hierarchy instead of sharing a clamped edge")
+    #expect(
+      viewport - indent >= 300,
+      "a real fifty-level dump must not place the selected row's label outside the pane")
+    #expect(
+      ViewerTreeLayoutPolicy.leadingIndent(
+        depth: 2, maximumDepth: 8, viewportWidth: viewport)
+        == 42)
+  }
+
+  @Test func visibleTreeProjectionIsLinearAndCycleSafe() {
+    let root = viewerNode(identity: "root", parent: nil, children: ["section"])
+    let section = viewerNode(
+      identity: "section", parent: "root", children: ["target"], type: "Stack")
+    // Provider data should not contain a cycle, but a malformed capture must
+    // still leave Viewer responsive rather than recursively repainting forever.
+    let target = viewerNode(
+      identity: "target", parent: "section", children: ["section"], type: "Text", text: "Wi-Fi")
+    let capture = ViewerCapture(
+      screenshotData: png(width: 720, height: 1280),
+      screenshotWidth: 720,
+      screenshotHeight: 1280,
+      roots: ["root"],
+      nodes: [root, section, target],
+      rawDumpDocument: nil,
+      identity: ViewerCaptureIdentity(
+        jobID: "job-cycle", targetID: "target-a", bindingRevision: 1,
+        capturedAtUTC: "2026-08-22T00:00:00Z"),
+      coordinatesAreVerified: true)
+
+    #expect(
+      capture.visibleTreeNodes(
+        rootIdentity: nil, query: "", expandedNodeIdentities: ["root", "section", "target"])
+        .map(\.identity)
+        == ["root", "section", "target"])
+    #expect(
+      capture.visibleTreeNodes(rootIdentity: nil, query: "wi-fi", expandedNodeIdentities: [])
+        .map(\.identity)
+        == ["root", "section", "target"])
+    #expect(
+      capture.searchMatches(rootIdentity: nil, query: "wi-fi").map(\.identity)
+        == ["target"],
+      "the result counter must exclude ancestors shown only as tree context")
+    #expect(capture.subtreeNodes(rootIdentity: "section").map(\.identity) == ["section", "target"])
+  }
+
+  @Test func viewerSourceKeepsTreeTwoAxisScrollableAndCentersEveryReveal() throws {
+    let source = try String(
+      contentsOf: repository.appending(
+        path: "apple/ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift"),
+      encoding: .utf8)
+
+    #expect(source.contains("ScrollView([.horizontal, .vertical])"))
+    #expect(source.contains(".scrollIndicators(.visible, axes: [.horizontal, .vertical])"))
+    #expect(source.contains(".scrollPosition($treeScrollPosition)"))
+    #expect(source.contains("position.scrollTo(id: identity, anchor: .center)"))
+    #expect(source.contains("treeScrollPosition.scrollTo(y: verticalOffset)"))
+    #expect(source.contains("viewer.search.matchCount"))
+    #expect(source.contains("viewer.search.previous"))
+    #expect(source.contains("viewer.search.next"))
+    #expect(
+      !source.contains("static let unavailable = \"Unavailable\""),
+      "missing optional fields must be omitted instead of rendered as Unavailable")
+  }
+
+  @Test func parserRetainsOpaqueOptionalRawDumpWithoutRejectingVerifiedTree() throws {
+    let rawDump = Data("Window #0: opaque provider inventory\\n".utf8)
+    let capture = try ViewerCaptureParser.parse(
+      screenshotData: png(width: 720, height: 1280),
+      treeData: Data("""
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]"},"children":[]}
+      """.utf8),
+      rawDumpData: rawDump,
+      identity: ViewerCaptureIdentity(jobID: "job-opaque", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
+
+    #expect(capture.rawDumpDocument == rawDump)
+    #expect(capture.coordinatesAreVerified)
+  }
+
+  @Test func productionFacadeContainsNoFixtureOrRawCommandFallback() throws {
+    let source = try String(
+      contentsOf: repository.appending(
+        path: "apple/Packages/ArkDeckKit/Sources/ArkDeckClientKit/UIDumpApplicationFacade.swift"),
+      encoding: .utf8)
+    #expect(source.contains("method: \"job.submit\""))
+    #expect(source.contains("method: \"artifact.read\""))
+    #expect(source.contains("allowSensitive\": .bool(true)"))
+    #expect(!source.contains("FixtureApplicationProvider"))
+    #expect(!source.contains("hidumper"))
+    #expect(!source.contains("candidateArguments"))
+  }
+
+  private func png(width: Int, height: Int) -> Data {
+    var bytes: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]
+    for value in [width, height] {
+      bytes.append(UInt8((value >> 24) & 0xff))
+      bytes.append(UInt8((value >> 16) & 0xff))
+      bytes.append(UInt8((value >> 8) & 0xff))
+      bytes.append(UInt8(value & 0xff))
+    }
+    return Data(bytes)
+  }
+
+  private func viewerNode(
+    identity: String,
+    parent: String?,
+    children: [String],
+    type: String = "Page",
+    text: String? = nil,
+    bounds: ViewerBounds? = nil,
+    clipsChildren: Bool = false,
+    hitTestBehavior: String? = nil,
+    zIndex: Double? = nil,
+    depth: Int = 0
+  ) -> ViewerNode {
+    ViewerNode(
+      identity: identity,
+      deviceID: identity,
+      parentIdentity: parent,
+      children: children,
+      type: type,
+      text: text,
+      inspectorID: nil,
+      bounds: bounds,
+      visible: true,
+      enabled: nil,
+      clickable: nil,
+      focusable: nil,
+      focused: nil,
+      clipsChildren: clipsChildren,
+      hitTestBehavior: hitTestBehavior,
+      zIndex: zIndex,
+      depth: depth,
+      rawFields: Data("{}".utf8))
+  }
+
+  private var repository: URL {
+    URL(filePath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+  }
+}

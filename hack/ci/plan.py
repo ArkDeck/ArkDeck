@@ -34,10 +34,10 @@ RUST_CONTRACT_INPUT_PREFIXES = (
     "api/",
     "catalog/",
     "hack/catalog_gen/",
-    "Packages/ArkDeckKit/Contracts/",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/",
+    "apple/Packages/ArkDeckKit/Contracts/",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/",
 )
 # The machine-contract bundle the Rust export renders. Its test holds every
 # product to `rust/tests/fixtures/contracts-bundle/owned.json` or to the
@@ -53,19 +53,19 @@ RUST_BUNDLE_PREFIXES = ("api/contracts/",)
 # binaries that job builds. A change to them must run that lane, or it merges
 # unchecked (#2236 did: its fix to the check skipped the lane that runs it).
 RUST_PACKAGING_PREFIXES = (
-    "Packages/ArkDeckKit/Distribution/macOS/",
-    "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/",
+    "apple/Packages/ArkDeckKit/Distribution/macOS/",
+    "apple/Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/",
     # The release DMG entry and its fixture tests (TASK-XPA-017 S5) run in the
     # same job, driving build-helpers.sh from this directory.
     "hack/release/",
 )
 RUST_CONTRACT_SOURCE_PREFIXES = (
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/Control",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/Control",
 )
 RUST_CONTRACT_INPUT_FILES = frozenset({
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
-    "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
+    "apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py",
     "api/contracts/runtime-control-plane.schema.json",
     "api/contracts/cli-canonical-json-vectors.json",
     "api/contracts/cli-result.schema.json",
@@ -75,18 +75,18 @@ RUST_CONTRACT_INPUT_FILES = frozenset({
     "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
 })
 APP_PACKAGE_TARGET_PREFIXES = (
-    "Packages/ArkDeckKit/Sources/ArkDeckClientKit/",
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckClientKit/",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/",
 )
 # The interaction suite reads the prototype, audit and coverage inventory, plus
 # the designInputs listed by that inventory. Acceptance records under
 # docs/design/cross-platform and references do not affect those assertions.
-# PR #1606 merged all-green from ArkDeckApp/ alone while breaking two of them.
+# PR #1606 merged all-green from apple/ArkDeckApp/ alone while breaking two of them.
 DS_INTERACTION_INPUT_PREFIXES = (
-    "ArkDeckApp/",
-    "ArkDeckAppUITests/",
-    "Packages/",
+    "apple/ArkDeckApp/",
+    "apple/ArkDeckAppUITests/",
+    "apple/Packages/",
     "docs/design/arkdeck-ds/",
     ".design-sync/",
     "catalog/operations/",
@@ -111,7 +111,7 @@ DS_INTERACTION_INPUT_FILES = frozenset({
     "docs/design/viewer-ui-implementation-task.md",
     "docs/design/references/README.md",
     "docs/design/session-components.html",
-    "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+    "apple/ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
 })
 DS_PACKAGE_DIR = "docs/design/arkdeck-ds"
 # The Windows client (TASK-XPA-007): windows/** plus every input its generators
@@ -124,7 +124,7 @@ WINDOWS_SOLUTION = "windows/ArkDeck.Windows.slnx"
 WINDOWS_INPUT_PREFIXES = (
     "windows/",
     "api/control/methods/",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
+    "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
     # The shared UI semantics: bilingual strings and the UIA semantic snapshots.
     "api/ui-semantics/",
     # The App's tests read the recorded Trace inspections and the adoption oracle's
@@ -149,35 +149,35 @@ WINDOWS_INPUT_PREFIXES = (
     "rust/tests/fixtures/job-run-hilog/",
     "rust/tests/fixtures/hilog-summary-analyzer/",
     # The App's icon and MSIX assets are the macOS AppIcon (generate-app-icons.py).
-    "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
-    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckKeycapIcon.imageset/",
-    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/",
+    "apple/ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
+    "apple/ArkDeckApp/Resources/Assets.xcassets/ArkDeckKeycapIcon.imageset/",
+    "apple/ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/",
 )
 WINDOWS_INPUT_FILES = frozenset({
-    "Packages/ArkDeckKit/Contracts/control-protocol.json",
+    "apple/Packages/ArkDeckKit/Contracts/control-protocol.json",
     "api/baselines/swift-single-v1.json",
     "rust/crates/arkdeck-contract/src/schema_patterns.json",
     # The end-to-end ClientKit test signs its daemon copy with it.
     "rust/scripts/windows-dev-identity.ps1",
     # The App's shared strings are these macOS tables' values (generate-ui-strings.py).
-    "ArkDeckApp/Resources/Localizable.xcstrings",
-    "ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
-    "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
-    "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
-    "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
-    "ArkDeckApp/Resources/DebugLocalizable.xcstrings",
-    "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
-    "ArkDeckApp/Resources/TraceLocalizable.xcstrings",
-    "ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
-    "ArkDeckApp/Resources/UIDumpLocalizable.xcstrings",
-    "ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/Localizable.xcstrings",
+    "apple/ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/JobsLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/DebugLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/FlashLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/TraceLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings",
+    "apple/ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings",
     # The App's theme is generated from the design tokens (generate-xaml-tokens.py).
     "docs/design/arkdeck-ds/src/tokens.css",
     # The App's tests read the Job state classes and the CLI coverage commands.
     "api/recovery/job-state-preflight.json",
     "api/contracts/cli-feature-coverage.json",
     # The embedded Flash catalog review is checked against the one macOS compiles in.
-    "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
+    "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
     # The Diagnostics Artifact roles are checked against these operations' Catalog entries.
     "catalog/operations/capture.diagnostics.v1.json",
     "catalog/operations/analyzer.summarize-hilog.v1.json",
@@ -268,7 +268,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
             windows = True
 
         if (
-            path.startswith("Packages/ArkDeckKit/")
+            path.startswith("apple/Packages/ArkDeckKit/")
             or path.startswith("Package.")
             or path.startswith(RUST_BUNDLE_PREFIXES)
         ):
@@ -285,12 +285,12 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
             path.startswith(prefix) for prefix in APP_PACKAGE_TARGET_PREFIXES
         )
         if (
-            path.startswith("ArkDeckApp/")
-            or path.startswith("ArkDeckAppUITests/")
-            or path.startswith("ArkDeck.xcodeproj/")
+            path.startswith("apple/ArkDeckApp/")
+            or path.startswith("apple/ArkDeckAppUITests/")
+            or path.startswith("apple/ArkDeck.xcodeproj/")
             or package_source_affects_app
-            or path == "Packages/ArkDeckKit/Package.swift"
-            or path == "Packages/ArkDeckKit/Package.resolved"
+            or path == "apple/Packages/ArkDeckKit/Package.swift"
+            or path == "apple/Packages/ArkDeckKit/Package.resolved"
             or path.startswith("Package.")
         ):
             app = True
@@ -687,10 +687,10 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
     if plan.lanes.swift:
         commands.extend(
             [
-                (python, "Packages/ArkDeckKit/Scripts/generate-clientkit-models.py", "--check"),
-                (python, "Packages/ArkDeckKit/Scripts/test_generate_clientkit_models.py"),
-                (python, "Packages/ArkDeckKit/Scripts/test_run_swiftpm.py"),
-                ("sh", "Packages/ArkDeckKit/Scripts/run-test-lane.sh", "full"),
+                (python, "apple/Packages/ArkDeckKit/Scripts/generate-clientkit-models.py", "--check"),
+                (python, "apple/Packages/ArkDeckKit/Scripts/test_generate_clientkit_models.py"),
+                (python, "apple/Packages/ArkDeckKit/Scripts/test_run_swiftpm.py"),
+                ("sh", "apple/Packages/ArkDeckKit/Scripts/run-test-lane.sh", "full"),
             ]
         )
     if plan.lanes.app:

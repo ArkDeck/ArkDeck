@@ -419,7 +419,7 @@ fn swift_artifact_corpus(method: &str) -> Vec<Value> {
         .nth(3)
         .unwrap();
     std::fs::read_to_string(repo.join(format!(
-        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     )))
     .unwrap()
     .lines()

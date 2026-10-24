@@ -5,7 +5,7 @@
 //! the current contract").
 //!
 //! Each method is sent the requests the committed control-frame corpus
-//! records for it (`Packages/ArkDeckKit/Tests/ArkDeckContractTests/
+//! records for it (`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/
 //! Fixtures/ControlFrames`), in order, until one is not refused as malformed,
 //! as `rust/scripts/windows-method-census.py` sends them; every reply is
 //! checked. The two answers that did not conform before are asserted
@@ -170,7 +170,7 @@ fn request(pipe: &str, id: &str, method: &str, params: &Value) -> Value {
 /// once, in order; none when it records no request.
 fn recorded_params(method: &str) -> Vec<Value> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     ));
     let mut params: Vec<Value> = Vec::new();
     if let Ok(text) = std::fs::read_to_string(path) {
