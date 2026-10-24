@@ -11,6 +11,7 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`hack/` 下每个一级条目
 
 | 条目 | 职责 | 实例参数所在 |
 | --- | --- | --- |
+| `tests/` | 根目录契约套件(原 `scripts/test_*.py`):身份、SDD、运行时入口与 Agent PR workflow | 无(纯测试);各文件见下 |
 | `agent_pr_identity.py` | Agent PR workflow 的身份 helper:从分页 PR 列表选出唯一 open PR、按仓库/编号/base/head/OID/作者核验读回、从最终 commit subject 取 Task token 写进 PR 正文(只作追溯,不查 tasks.md)。原 `check_pr_paths.py` 路径护栏及其 `automation_config.json` 已由 CHG-2026-077 退役 | 期望值全部由 workflow 以参数传入;无实例数据文件 |
 | `tests/test_agent_pr_identity.py` | 上述 helper 的离线契约套件(pull-list/identity 矩阵、CLI 读回、commit-task、本 README 覆盖清点) | 无(纯测试) |
 | `check_sdd.py` | SDD 一致性检查器:specs/changes/locks/registry 的 fail-closed 校验 | openspec 布局常量在模块内硬编码(收口不在 DEC-001 范围,台账已记) |
