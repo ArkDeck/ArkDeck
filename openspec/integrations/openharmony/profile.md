@@ -104,7 +104,7 @@ implementation under CHG-2026-074/TASK-XPA-011.
 
 ## Golden fixture families（pack 1.0.0，registered by CHG-2026-005/TASK-I5-001）
 
-Fixture pack：`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/`
+Fixture pack：`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/`
 （registry：`registry.json`；逐 fixture ID/stream/exit/classification/lineage/SHA-256 与
 `INTEGRATION-PROFILES.lock.yaml`、`core-conformance.yaml` 三方一致登记）。观测来源：
 hdc client/server `Ver: 3.2.0d`（binary SHA-256
@@ -136,7 +136,7 @@ YAML 1.2；Swift contract tests 以 `JSONDecoder` 读取）：
 `openspec/integrations/openharmony/readonly-probes.yaml`
 （registry `OPENHARMONY-HDC-READONLY-PROBES@1.0.0`，SHA-256
 `b0ac1564109b8138c7a73cbb83684400967633f6e6b04701175a22d314d88da6`）。SwiftPM
-资源包：`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/`
+资源包：`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/`
 （manifest `resources.json`，SHA-256
 `e91e38dfa9a01132062865837844cf77494644488fba9527ce52c5a68c593bf6`）。registry、资源
 manifest、逐 receipt/control resource 与 `INTEGRATION-PROFILES-0.4.0` 形成 hash closure；

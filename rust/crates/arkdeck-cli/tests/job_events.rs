@@ -43,7 +43,7 @@ fn unary_events_argv_matches_current_swift_and_preserves_exclusive_cursor() {
 }
 #[test]
 fn native_event_pages_are_checked_before_emission() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.events.jsonl");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.events.jsonl");
     let mut checked = 0;
     for line in std::fs::read_to_string(path).unwrap().lines() {
         let row: Value = serde_json::from_str(line).unwrap();

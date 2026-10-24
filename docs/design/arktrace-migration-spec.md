@@ -44,7 +44,7 @@ executable path、capability 或 trusted facts。
 | Agent CLI JSON contract | ArkTrace-owned `arktrace` distribution | descriptor-bound 外部工具 | JSON contract 1.0、exit status、deadline、row/event/output budgets 兼容 |
 | Timeline geometry/palette/AppKit renderer | `ArkTraceRendering` | 固定 ArkTrace revision | CPU/thread state/slice/counter/frame lanes、zoom/pan/selection/search/flags/marks 可用 |
 | document controller/recent/view state | `ArkTraceAppSupport` | 固定 ArkTrace revision + ArkDeck config | 打开、reload、取消、cache/view state 与错误恢复可测试 |
-| ArkTrace standalone window chrome | `ArkDeckApp/Features/Trace` | 按 ArkDeck 工作区重组 | 不复制第二套 App shell、Settings 或设备控制面 |
+| ArkTrace standalone window chrome | `apple/ArkDeckApp/Features/Trace` | 按 ArkDeck 工作区重组 | 不复制第二套 App shell、Settings 或设备控制面 |
 | ArkTrace direct capture module | 不迁入生产依赖图 | 由 ArkDeck Runtime capture 替代 | CLI/analyzer/viewer 不获得直接 HDC route |
 
 “全量迁移”按能力等价与生产可达性判断，不要求保留与 ArkDeck 已有实现重复或违反其安全
@@ -327,10 +327,10 @@ Trace range 时 MAY 标记完成。
 | 产物 | 仓库 / App 位置 |
 |---|---|
 | Shared Swift targets | ArkTrace commit `9172c9525f954ec397e0555d7d03cd4367f3efcf` |
-| ArkDeck adapter | `Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter` |
+| ArkDeck adapter | `apple/Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter` |
 | CLI product | ArkTrace-owned `arktrace` distribution，ArkDeck 只消费 descriptor |
 | parser source lock / build scripts | pinned ArkTrace revision |
-| ArkDeck packaging snapshot | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/` |
+| ArkDeck packaging snapshot | `apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/` |
 | App parser | `ArkDeck.app/Contents/MacOS/trace_streamer` |
 | App manifest | `ArkDeck.app/Contents/Resources/TraceStreamer/manifest.json` |
 | App licenses | `ArkDeck.app/Contents/Resources/ArkTrace/` |

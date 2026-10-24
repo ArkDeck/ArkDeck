@@ -59,7 +59,7 @@ enum SwiftNumberBoundaries {
         }
         let output: [String: Any] = [
             "sourceCommit": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
-            "sourcePath": "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
+            "sourcePath": "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
             "sourceSHA256": SHA256.hash(data: source).map { String(format: "%02x", $0) }.joined(),
             "function": "PortableCanonicalJSON.serialize(Double)",
             "validationClass": "nativeSwiftPureEncoding",

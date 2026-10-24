@@ -236,10 +236,10 @@ mod runtime {
     fn recorded_swift_success_projections_pass_through_the_binary() {
         for corpus in [
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.list.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.list.jsonl"
             ),
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.show.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.show.jsonl"
             ),
         ] {
             for line in corpus.lines() {

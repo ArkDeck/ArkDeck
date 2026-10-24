@@ -7,16 +7,16 @@ parameters a caller may send), `$defs.result` (the Runtime's reply),
 attaches), plus `x-arkdeck-protocolVersion` and `x-arkdeck-contractIdentity`,
 which name the exact registry the schema was derived under. The method set,
 the version and the identity themselves are stated once, in
-`Packages/ArkDeckKit/Contracts/control-protocol.json`, and projected into
+`apple/Packages/ArkDeckKit/Contracts/control-protocol.json`, and projected into
 `api/contracts/runtime-control-plane.schema.json`, whose method table
 points at these files.
 
 The files are derived, not written: a debug build of the daemon records every
 dispatched request and response when `ARKDECK_CONTROL_FRAME_LOG=<directory>` is
 set (a release build never reads the variable), and
-`Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas <directory>`
+`apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas <directory>`
 rewrites the schemas and the committed corpus under
-`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/`.
+`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/`.
 Results and error details are closed to the fields the daemon emitted; request
 parameters are closed to the fields a contract test exercised. A member keyed
 by caller data (operation input names, Artifact fact names, provenance keys;

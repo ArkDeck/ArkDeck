@@ -579,7 +579,7 @@ impl WorkspaceProfile {
         if fs::metadata(&build_role).is_err() || fs::metadata(&test_role).is_err() {
             return Err("workspace.toolchainUnavailable: SwiftPM role links are absent".into());
         }
-        let package = format!("{root}/Packages/ArkDeckKit");
+        let package = format!("{root}/apple/Packages/ArkDeckKit");
         if fs::metadata(format!("{package}/Package.swift")).is_err() {
             return Err(
                 "workspace.projectProfileUnavailable: ArkDeck Package.swift is absent".into(),
@@ -608,7 +608,7 @@ impl WorkspaceProfile {
             "workspace-host@1",
             project_ref,
             &root,
-            &["Packages/ArkDeckKit/**", "catalog/**", "docs/**"],
+            &["apple/Packages/ArkDeckKit/**", "catalog/**", "docs/**"],
             grep,
             patch,
             ProfilePresets {

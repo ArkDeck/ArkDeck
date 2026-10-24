@@ -59,7 +59,7 @@ mod runtime {
     use serde_json::{Value, json};
 
     const FRAMES: &str = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.status.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.status.jsonl"
     );
 
     fn frames() -> Vec<Value> {

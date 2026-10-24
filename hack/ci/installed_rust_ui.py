@@ -117,7 +117,7 @@ def inspect(config):
     info, executable = existing.inspect_app(app)
     pinned_hash(executable, config["appSHA256"])
     entitlements = plistlib.loads(run("/usr/bin/codesign", "-d", "--entitlements", ":-", str(app)))
-    expected_entitlements = plistlib.loads((REPO / "ArkDeckApp/ArkDeckApp.entitlements").read_bytes())
+    expected_entitlements = plistlib.loads((REPO / "apple/ArkDeckApp/ArkDeckApp.entitlements").read_bytes())
     require(entitlements == expected_entitlements, "App entitlements differ from production source")
     version, build = info["CFBundleShortVersionString"], info["CFBundleVersion"]
     support = Path.home() / "Library/Application Support/ArkDeck"

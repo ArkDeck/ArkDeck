@@ -19,7 +19,7 @@ Sources, LaunchAgent templates, raw results and listener logs:
 
 | Criterion (design §J.3) | Result |
 | --- | --- |
-| The sandboxed App connects with the existing entitlements, none added | A client bundle signed with the App's Developer ID and the byte-identical `ArkDeckApp/ArkDeckApp.entitlements` ran in its App Sandbox container and completed 1,000 round trips with zero errors. The same bundle without the one `mach-lookup.global-name` exception never reached the listener (`XPC_ERROR_CONNECTION_INVALID` in 0.056 ms). The production `ArkDeck.app` (`com.arkdeck.desktop`, unmodified) connected too and passed the requirement. |
+| The sandboxed App connects with the existing entitlements, none added | A client bundle signed with the App's Developer ID and the byte-identical `apple/ArkDeckApp/ArkDeckApp.entitlements` ran in its App Sandbox container and completed 1,000 round trips with zero errors. The same bundle without the one `mach-lookup.global-name` exception never reached the listener (`XPC_ERROR_CONNECTION_INVALID` in 0.056 ms). The production `ArkDeck.app` (`com.arkdeck.desktop`, unmodified) connected too and passed the requirement. |
 | A wrongly signed peer is refused | An ad-hoc signed sandboxed bundle, a Developer ID bundle with another identifier and a bare unsandboxed tool were each refused by libxpc before their first frame reached the handler (`XPC_ERROR_PEER_CODE_SIGNING_REQUIREMENT`, description `Peer Forbidden`); the listener logged zero messages from them. |
 | 1,000 round trips p95 ≤ 8 ms | p50 0.011 ms, p95 0.013 ms, p99 0.015 ms, max 0.030 ms on a persistent connection (119-byte request, 112-byte reply). A second run on a second client identity: p95 0.017 ms. Even a 4 MiB reply stays at p95 2.6–4.8 ms. |
 
@@ -36,7 +36,7 @@ are reproduced without NSXPC.
 | Client | Swift 6.3.3 (`xcrun swiftc -O`), `import XPC`, raw `xpc_connection_*` C API; one binary packaged into six identities (table below) |
 | launchd | the production job `gui/501/com.arkdeck.agentd` booted out; a spike plist with the same `Label` and `MachServices` key bootstrapped in its place; production bootstrapped back from `~/Library/LaunchAgents/com.arkdeck.agentd.plist` |
 | Production App | `/Applications/ArkDeck.app`, `com.arkdeck.desktop` 0.1.0, Developer ID 8AQTYW5FKR, hardened runtime |
-| Entitlements under test | `ArkDeckApp/ArkDeckApp.entitlements` at blob `864bd123090f17889afd22ca6120d841f4b49712`, SHA-256 `9b6f01b786cb03bfd236d72bc8154663f4969149ee6ebd44df340bd75cbaadef`, copied byte for byte |
+| Entitlements under test | `apple/ArkDeckApp/ArkDeckApp.entitlements` at blob `864bd123090f17889afd22ca6120d841f4b49712`, SHA-256 `9b6f01b786cb03bfd236d72bc8154663f4969149ee6ebd44df340bd75cbaadef`, copied byte for byte |
 | Clock | `CLOCK_UPTIME_RAW`; percentiles by nearest rank, as SPK-1 |
 | Device | none |
 

@@ -18,7 +18,7 @@ mod runtime {
     /// is what the page contract judges.
     fn row(position: i64, revision: i64, id: &str) -> Value {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.events.jsonl",
+            "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.events.jsonl",
         );
         let recorded = std::fs::read_to_string(path)
             .unwrap()

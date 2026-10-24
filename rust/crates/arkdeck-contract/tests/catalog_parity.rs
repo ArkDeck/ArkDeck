@@ -68,6 +68,6 @@ fn all_current_operations_reproduce_the_input_catalog_digest() {
     )
     .unwrap();
     assert!(matrix.contains(&format!("Catalog digest: `{CATALOG_DIGEST}`")));
-    let registry = common::load_json("Packages/ArkDeckKit/Contracts/control-protocol.json");
+    let registry = common::load_json("apple/Packages/ArkDeckKit/Contracts/control-protocol.json");
     assert_eq!(registry["currentVersion"], inputs["protocolVersion"]);
 }

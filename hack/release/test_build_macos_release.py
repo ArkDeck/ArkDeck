@@ -823,12 +823,12 @@ class Versions(unittest.TestCase):
         self.assertEqual(release_version.drift(), [])
 
     def test_bump_build_rewrites_every_copy_and_nothing_else(self):
-        project = (self.repo / "ArkDeck.xcodeproj/project.pbxproj").read_text()
+        project = (self.repo / "apple/ArkDeck.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(release_version.main(["bump-build"], self.repo), 0)
         bumped = str(int(VERSIONS["build"]) + 1)
         self.assertEqual(release_version.load(self.repo), {"version": VERSIONS["version"], "build": bumped})
         self.assertEqual(release_version.drift(self.repo), [])
-        after = (self.repo / "ArkDeck.xcodeproj/project.pbxproj").read_text()
+        after = (self.repo / "apple/ArkDeck.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(after.replace(f"CURRENT_PROJECT_VERSION = {bumped};",
                                        f"CURRENT_PROJECT_VERSION = {VERSIONS['build']};"), project)
         for info in release_version.HELPER_INFOS:

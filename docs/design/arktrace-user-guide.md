@@ -113,12 +113,12 @@ swift build --package-path <ArkTrace-checkout> --show-bin-path
 
 ```bash
 /absolute/swiftpm/bin/path/arktrace \
-  --trace-streamer "$PWD/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
+  --trace-streamer "$PWD/apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
   inspect /absolute/path/to/trace.htrace
 
 /absolute/swiftpm/bin/path/arktrace \
   --json \
-  --trace-streamer "$PWD/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
+  --trace-streamer "$PWD/apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
   summary /absolute/path/to/trace.htrace
 ```
 

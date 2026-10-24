@@ -26,7 +26,7 @@ and digest. These results describe an earlier capture and never become current d
 Runtime evidence.
 
 The language-neutral machine contract is
-[`cli-ui-dump-offline.schema.json`](../../Packages/ArkDeckKit/Contracts/cli-ui-dump-offline.schema.json).
+[`cli-ui-dump-offline.schema.json`](../../apple/Packages/ArkDeckKit/Contracts/cli-ui-dump-offline.schema.json).
 Changing parser semantics, source roles, output fields, or bounds requires a version change and
 contract fixtures for the old and new forms.
 

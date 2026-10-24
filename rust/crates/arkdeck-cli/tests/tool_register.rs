@@ -80,7 +80,7 @@ fn supported() -> bool {
     available
 }
 fn recordings() -> Vec<Value> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.register.jsonl");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.register.jsonl");
     std::fs::read_to_string(path)
         .unwrap()
         .lines()

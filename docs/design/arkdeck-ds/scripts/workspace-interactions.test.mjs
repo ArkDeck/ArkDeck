@@ -16,7 +16,7 @@ const read = path => readFileSync(join(root, path), 'utf8');
 // module declares it rather than from a pinned directory.
 const readFacade = file => {
   for (const module of ['ArkDeckClientKit', 'ArkDeckWorkflows']) {
-    const path = `Packages/ArkDeckKit/Sources/${module}/${file}`;
+    const path = `apple/Packages/ArkDeckKit/Sources/${module}/${file}`;
     if (existsSync(join(root, path))) return read(path);
   }
   throw new Error(`${file} is in neither ArkDeckClientKit nor ArkDeckWorkflows`);
@@ -33,7 +33,7 @@ const files = dir => readdirSync(dir, {withFileTypes:true}).flatMap(entry => {
 let swiftSourceCache;
 function swiftSources() {
   if (swiftSourceCache === undefined) {
-    const roots = ['ArkDeckApp', 'ArkDeckAppUITests', 'Packages'].map(dir => join(root, dir));
+    const roots = ['ArkDeckApp', 'apple/ArkDeckAppUITests', 'Packages'].map(dir => join(root, dir));
     swiftSourceCache = roots
       .filter(dir => { try { readdirSync(dir); return true; } catch { return false; } })
       .flatMap(dir => files(dir))
@@ -255,14 +255,14 @@ test('History filters use exact identity, current attention facts and reported t
   // The presets the toolbar actually invokes; there is no second preset entry point.
   h.run("S.hf.query='stale';applyHistorySavedAction('attention')");assert.equal(h.run('S.hf.query'),'');assert.deepEqual(ids(),['b','f','d']);
   h.run("applyHistorySavedAction('failed')");assert.equal(h.run('S.hf.time'),'lastWeek');
-  const stateSource=readFileSync(join(root,'Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift'),'utf8');
+  const stateSource=readFileSync(join(root,'apple/Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift'),'utf8');
   const states=[...stateSource.split('public enum JobState:')[1].split('public var isTerminal')[0].matchAll(/^  case (\w+)$/gm)].map(match=>match[1]);
   const terminal=stateSource.match(/case (\.planned[^:]+):\s+true/)[1].split(',').map(value=>value.trim().slice(1));
   assert.deepEqual(JSON.parse(h.run('JSON.stringify(HISTORY_ACTIVE_STATES)')),states.filter(state=>!terminal.includes(state)));
 });
 
 test('Recovery banners keep each unresolved Job identity and the native guidance without replay', () => {
-  const catalog=JSON.parse(read('ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
+  const catalog=JSON.parse(read('apple/ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
   for(const lang of ['en','zh-Hans']) {
     const h=harness(`?page=debug&lang=${lang}`);
     h.run(`HIST.splice(0,HIST.length,
@@ -325,7 +325,7 @@ test('History query updates immediately while keeping selection and expanded fil
 });
 
 test('History compact activity picker mirrors every native category and the workspace-width boundary', () => {
-  const native=read('ArkDeckApp/Features/History/RuntimeHistoryView.swift');
+  const native=read('apple/ArkDeckApp/Features/History/RuntimeHistoryView.swift');
   // Match the threshold, not the container idiom around it: #1606 moved this
   // from `workspace.size.width >= 890` to onGeometryChange plus a stored
   // `workspaceWidth`, and a pattern tied to the old spelling broke while the
@@ -337,7 +337,7 @@ test('History compact activity picker mirrors every native category and the work
   h.run("setHistoryFilter('kind','device')");
   const picker=h.run('pHistory()').match(/<label class="history-compact-activity">[\s\S]*?<\/label>/)[0];
   const keys=[...picker.matchAll(/<option value="([^"]+)"/g)].map(m=>m[1]);
-  assert.deepEqual(keys.slice().sort(),enumCases('ArkDeckApp/Features/History/RuntimeHistoryView.swift','HistoryActivityFilter').sort());
+  assert.deepEqual(keys.slice().sort(),enumCases('apple/ArkDeckApp/Features/History/RuntimeHistoryView.swift','HistoryActivityFilter').sort());
   assert.match(picker,/<option value="device" selected>/);
 });
 
@@ -522,23 +522,23 @@ test('Flash result and activity retain the submitted demo Job identity', () => {
 });
 
 test('all actual navigation items and subtabs are audited', () => {
-  assert.deepEqual(enumCases('ArkDeckApp/App/ArkDeckApp.swift', 'ArkDeckNavigationItem'), coverage.navigation);
-  assert.deepEqual(enumCases('ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'DebugWorkspaceTab'), coverage.debugTabs);
-  assert.deepEqual(enumCases('ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift', 'ViewerInspectorTab'), coverage.viewerTabs);
-  const settings = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
+  assert.deepEqual(enumCases('apple/ArkDeckApp/App/ArkDeckApp.swift', 'ArkDeckNavigationItem'), coverage.navigation);
+  assert.deepEqual(enumCases('apple/ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'DebugWorkspaceTab'), coverage.debugTabs);
+  assert.deepEqual(enumCases('apple/ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift', 'ViewerInspectorTab'), coverage.viewerTabs);
+  const settings = read('apple/ArkDeckApp/Features/Settings/SettingsRootView.swift');
   // Same reason: #1606 replaced `Label(settingsText(...))` with SwiftUI's
   // `Tab(settingsText(...))`. Anchor on the localization call, which is the
   // fact under audit, rather than on whichever container wraps it.
   const tabs = [...settings.matchAll(/settingsText\("settings\.tab\.(\w+)"\)/g)].map(match => match[1]);
   assert.deepEqual(tabs, coverage.settingsTabs);
-  const settingsCopy = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
+  const settingsCopy = JSON.parse(read('apple/ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
   const draftTabs = JSON.parse(harness().run('JSON.stringify(SETTINGS_TABS)'));
   assert.deepEqual(draftTabs, coverage.settingsTabs.map(id => [
     id === 'remoteSources' ? 'servers' : id,
     settingsCopy[`settings.tab.${id}`].localizations['zh-Hans'].stringUnit.value,
     settingsCopy[`settings.tab.${id}`].localizations.en.stringUnit.value,
   ]));
-  const trace = read('ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift').split('struct TraceSettingsPane:')[1];
+  const trace = read('apple/ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift').split('struct TraceSettingsPane:')[1];
   const sections = [...trace.split('var id:')[0].matchAll(/case (\w+)/g)].map(match => match[1]);
   assert.deepEqual(sections, coverage.traceSettingsSections);
 });
@@ -785,7 +785,7 @@ test('HiLog summaries revisit exact History records across coverage and failure 
   for(const lang of ['en','zh-Hans']) {
     const h=harness(`?page=history&hilogSummary=complete&lang=${lang}`);
     const before=h.run('JSON.stringify(HIST)'),jobs=h.run('S.jobs.length');
-    const historyCopy=JSON.parse(read('ArkDeckApp/Resources/HistoryLocalizable.xcstrings')).strings;
+    const historyCopy=JSON.parse(read('apple/ArkDeckApp/Resources/HistoryLocalizable.xcstrings')).strings;
     assert.ok(h.run('pHistory()').includes(historyCopy['history.context.readOnly'].localizations[lang].stringUnit.value));
     assert.doesNotMatch(h.run('pHistory()'),/index \/ summary \/ markers/,'summary history must not promise capture-session validation');
     for(const state of ['complete','partial','unrecognized','empty','corrupt','complete']) {
@@ -818,7 +818,7 @@ test('HiLog summaries revisit exact History records across coverage and failure 
     assert.match(h.run('pDiagnostics()'),/diagnostics_unsupported_operation/);
     assert.doesNotMatch(h.run('pDiagnostics()'),/data-sync-id="diagnostics.hilog.summary"/);
     const copy=JSON.parse(h.run('JSON.stringify(DIAGNOSTICS_COPY)'));
-    const native=JSON.parse(read('ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings')).strings;
+    const native=JSON.parse(read('apple/ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings')).strings;
     for(const key of Object.keys(native).filter(key=>key.startsWith('diagnostics.hilog.'))) {
       assert.equal(copy[key][lang],native[key].localizations[lang].stringUnit.value,key);
     }
@@ -916,7 +916,7 @@ test('Trace help mirrors all pinned shortcut sections and bindings in both langu
   assert.deepEqual(sections.map(x=>x.title),['Timeline','Pointer, on the timeline','Search Results']);
   assert.equal(sections.flatMap(x=>x.shortcuts).length,19);
   assert.ok(sections.every(section=>section.titleZH&&section.shortcuts.every(x=>x.actionZH&&x.keysZH)));
-  const pin=JSON.parse(read('ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved')).pins.find(x=>x.identity==='arktrace').state.revision;
+  const pin=JSON.parse(read('apple/ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved')).pins.find(x=>x.identity==='arktrace').state.revision;
   assert.ok(html.includes(`Generated reference: ArkTrace ${pin}`),'refresh the mirror when the package pin changes');
   h.run('S.language="en"');
   assert.match(h.run('pTraceShortcuts()'),/Zoom in \/ out about the pointer/);
@@ -1150,7 +1150,7 @@ test('device detail reaches every candidate state the App renders, in both langu
   };
   // Every string above is copied from Localizable.xcstrings device.trust.* / device.state.*,
   // so a rename on either side breaks this instead of drifting silently.
-  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/Localizable.xcstrings')).strings;
   const appValue = (key, language) =>
     app[key].localizations[language].stringUnit.value;
   for (const [state, [zh, en]] of Object.entries(notices)) {
@@ -1211,7 +1211,7 @@ test('shell chrome and demo job timelines are bilingual', () => {
 });
 
 test('Viewer accessibility names and the node footer follow the App locale', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
   for (const language of ['zh-Hans', 'en']) {
     const h = harness(`?page=dump&viewerState=captured&lang=${language}`);
     // Match navigation only renders while a query is active, so set one.
@@ -1230,7 +1230,7 @@ test('Viewer accessibility names and the node footer follow the App locale', () 
 });
 
 test('Overview reaches every device, build-source and record state the App renders', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/Localizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   for (const language of ['zh-Hans', 'en']) {
     // Device scope: one bound target, a picker for several, and an honest empty.
@@ -1285,7 +1285,7 @@ test('Overview reaches every device, build-source and record state the App rende
 });
 
 test('Flash reaches checking, missing device, image import and a failed result', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/FlashLocalizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/FlashLocalizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   const enabledRun = markup => /<button(?![^>]*disabled)[^>]*onclick="runFlash\(\)"/.test(markup);
   for (const language of ['zh-Hans', 'en']) {
@@ -1326,7 +1326,7 @@ test('Flash reaches checking, missing device, image import and a failed result',
 });
 
 test('Trace separates availability, capture outcome and the viewable artifact', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/TraceLocalizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/TraceLocalizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   for (const language of ['zh-Hans', 'en']) {
     const checking = harness(`?page=trace&lang=${language}&traceState=checking`);
@@ -1363,7 +1363,7 @@ test('Trace separates availability, capture outcome and the viewable artifact', 
 });
 
 test('Settings panes expose the shared loading, error and success rows', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   const tabs = ['general', 'toolchains', 'servers', 'storage', 'trace', 'updates', 'diagnostics'];
   for (const language of ['zh-Hans', 'en']) {
@@ -1429,7 +1429,7 @@ test('Settings panes expose the shared loading, error and success rows', () => {
 });
 
 test('the Job inspector separates an unreachable Runtime from an empty archive', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   for (const language of ['zh-Hans', 'en']) {
     const loading = harness(`?page=overview&lang=${language}&inspectorState=loading`);
@@ -1491,7 +1491,7 @@ test('the Job inspector separates an unreachable Runtime from an empty archive',
 });
 
 test('Viewer refuses to map a screenshot it cannot place, and says when nothing was measured', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   for (const language of ['zh-Hans', 'en']) {
     // Empty has three different explanations; a failure is shown, not hidden.
@@ -1536,7 +1536,7 @@ test('Viewer refuses to map a screenshot it cannot place, and says when nothing 
 });
 
 test('Overview environment keeps the App five groups and its capability matrix states', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/Localizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   for (const language of ['zh-Hans', 'en']) {
     const h = harness(`?page=overview&lang=${language}`);
@@ -1616,7 +1616,7 @@ test('the Diagnostics concept pages read in both languages', () => {
 });
 
 test('the trust page shows the same Runtime facts column and every wait answer', () => {
-  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const app = JSON.parse(read('apple/ArkDeckApp/Resources/Localizable.xcstrings')).strings;
   const value = (key, language) => app[key].localizations[language].stringUnit.value;
   for (const language of ['zh-Hans', 'en']) {
     const idle = harness(`?page=auth&lang=${language}`);
@@ -1665,12 +1665,12 @@ test('the shared workspace chrome has no App-side copies', () => {
   // F52 item 4: five workspaces had written their own notice, page, header and
   // key/value list beside the shared ones. The row now carries what those
   // copies added, so the next caller extends it instead of writing a sixth.
-  const chrome = read('ArkDeckApp/DesignSystem/WorkspaceChrome.swift');
+  const chrome = read('apple/ArkDeckApp/DesignSystem/WorkspaceChrome.swift');
   for (const option of ['usesTabularDigits', 'usesMonospacedName', 'isSelectable', 'elidedValue']) {
     assert.match(chrome, new RegExp(`var ${option}`), `WorkspaceFactRow must carry ${option}`);
   }
 
-  const device = read('ArkDeckApp/Features/Devices/DeviceWorkspace.swift');
+  const device = read('apple/ArkDeckApp/Features/Devices/DeviceWorkspace.swift');
   assert.doesNotMatch(device, /func deviceNotice\(/, 'device detail must not define a second notice');
   assert.equal(
     (device.match(/WorkspaceNotice\(/g) ?? []).length, 8,
@@ -1685,7 +1685,7 @@ test('the shared workspace chrome has no App-side copies', () => {
       `${identifier} must stay addressable after the convergence`);
   }
 
-  const settings = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
+  const settings = read('apple/ArkDeckApp/Features/Settings/SettingsRootView.swift');
   for (const copy of [
     'SettingsPaneContainer', 'SettingsPaneHeader', 'SettingsValueGrid', 'SettingsValueRow',
     'SettingsErrorBanner', 'SettingsSuccessBanner',
@@ -1700,13 +1700,13 @@ test('the shared workspace chrome has no App-side copies', () => {
   // A component two features already render is shared vocabulary, not the
   // private detail of whichever workspace happened to need it first.
   assert.match(
-    read('ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift'),
+    read('apple/ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift'),
     /struct RuntimeExecutionModeBadge: View/);
   assert.doesNotMatch(
-    read('ArkDeckApp/Features/History/RuntimeHistoryView.swift'),
+    read('apple/ArkDeckApp/Features/History/RuntimeHistoryView.swift'),
     /struct RuntimeExecutionModeBadge/);
   assert.ok(
-    read('ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift').includes('RuntimeExecutionModeBadge('),
+    read('apple/ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift').includes('RuntimeExecutionModeBadge('),
     'the job inspector still renders the shared badge');
 });
 
@@ -1717,13 +1717,13 @@ test('every key/value list in the App is the shared fact grid', () => {
   // list.
   const rawGrid = /(?<!Workspace(?:Fact)?)\bGrid\(/;
   const exempt = new Map([
-    ['ArkDeckApp/Features/Settings/SettingsRootView.swift', 'three columns of editable'],
-    ['ArkDeckApp/Features/Flash/FlashWorkspaceView.swift', 'three-column table with its own header row'],
-    ['ArkDeckApp/Features/HDC/HDCStatusView.swift', 'three-column matrix with a header row'],
+    ['apple/ArkDeckApp/Features/Settings/SettingsRootView.swift', 'three columns of editable'],
+    ['apple/ArkDeckApp/Features/Flash/FlashWorkspaceView.swift', 'three-column table with its own header row'],
+    ['apple/ArkDeckApp/Features/HDC/HDCStatusView.swift', 'three-column matrix with a header row'],
   ]);
   const offenders = [];
   for (const path of coverage.appViewFiles) {
-    if (path.startsWith('ArkDeckApp/DesignSystem/')) continue;
+    if (path.startsWith('apple/ArkDeckApp/DesignSystem/')) continue;
     const source = read(path);
     const lines = source.split('\n');
     lines.forEach((line, index) => {
@@ -1742,14 +1742,14 @@ test('every key/value list in the App is the shared fact grid', () => {
 
   // The rows the workspaces used to hand-roll now come from the shared row.
   for (const [path, symbol] of [
-    ['ArkDeckApp/Features/History/RuntimeHistoryView.swift', 'private func row('],
-    ['ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift', 'private func factRow('],
-    ['ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift', 'private func factRow('],
-    ['ArkDeckApp/Features/Flash/FlashWorkspaceView.swift', 'private func summaryRow('],
-    ['ArkDeckApp/Features/HDC/HDCStatusView.swift', 'private func field('],
-    ['ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'private func planFact('],
-    ['ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift', 'private func hilogCount('],
-    ['ArkDeckApp/Features/Devices/DeviceWorkspace.swift', 'private func deviceFact('],
+    ['apple/ArkDeckApp/Features/History/RuntimeHistoryView.swift', 'private func row('],
+    ['apple/ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift', 'private func factRow('],
+    ['apple/ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift', 'private func factRow('],
+    ['apple/ArkDeckApp/Features/Flash/FlashWorkspaceView.swift', 'private func summaryRow('],
+    ['apple/ArkDeckApp/Features/HDC/HDCStatusView.swift', 'private func field('],
+    ['apple/ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'private func planFact('],
+    ['apple/ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift', 'private func hilogCount('],
+    ['apple/ArkDeckApp/Features/Devices/DeviceWorkspace.swift', 'private func deviceFact('],
   ]) {
     const source = read(path);
     const start = source.indexOf(symbol);
@@ -1760,7 +1760,7 @@ test('every key/value list in the App is the shared fact grid', () => {
 
   // HDC's diagnostics fields stay unselectable on purpose: selection changes
   // the accessibility representation UI automation reads.
-  const hdc = read('ArkDeckApp/Features/HDC/HDCStatusView.swift');
+  const hdc = read('apple/ArkDeckApp/Features/HDC/HDCStatusView.swift');
   assert.match(hdc, /isSelectable` and `elidedValue` at their defaults/);
   assert.doesNotMatch(hdc, /struct FieldTextStyle/, 'the local font modifier is now the row option');
 });
@@ -1812,7 +1812,7 @@ test('App type sizes that have a shared role use it', () => {
   assert.equal(tiers.get('10') ?? 0, 18, 'the retained 10pt tier changed size');
 
   assert.match(
-    read('ArkDeckApp/DesignSystem/WorkspaceChrome.swift'),
+    read('apple/ArkDeckApp/DesignSystem/WorkspaceChrome.swift'),
     /There is deliberately no 10pt role/,
     'the shared table must record why 10pt stays off the scale');
 });
@@ -1833,7 +1833,7 @@ test('localization catalogs carry no keys for paths the App no longer renders', 
     return parts[0] + parts.slice(1).map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join('');
   };
   const unreferenced = name => {
-    const keys = Object.keys(JSON.parse(read(`ArkDeckApp/Resources/${name}.xcstrings`)).strings);
+    const keys = Object.keys(JSON.parse(read(`apple/ArkDeckApp/Resources/${name}.xcstrings`)).strings);
     return keys.filter(key =>
       !literals.has(key)
       && !identifiers.has(camel(key))
@@ -1904,8 +1904,8 @@ test('the prototype mirrors the surfaces #1606 added to the App', () => {
   // #1606 (SwiftUI modernization) added three strings; accessibility
   // identifiers were added and removed symmetrically, so those three are the
   // only new presentation. All three were missing from the prototype = P-DRIFT.
-  const viewerCopy = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
-  const deviceCopy = JSON.parse(read('ArkDeckApp/Resources/DeviceLocalizable.xcstrings')).strings;
+  const viewerCopy = JSON.parse(read('apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const deviceCopy = JSON.parse(read('apple/ArkDeckApp/Resources/DeviceLocalizable.xcstrings')).strings;
   const native = (catalog, key, lang) => catalog[key].localizations[lang].stringUnit.value;
 
   for (const language of ['zh', 'en']) {
@@ -1949,7 +1949,7 @@ test('the prototype reaches the Viewer states the App renders', () => {
   // F65 wired six Viewer strings into the catalog but left the prototype's
   // mirror to a batch of its own: three were states the prototype could not
   // reach at all, three were accessibility names it never carried.
-  const catalog = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const catalog = JSON.parse(read('apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
   const native = (key, lang) => catalog[key].localizations[lang].stringUnit.value;
 
   for (const language of ['zh', 'en']) {
@@ -2001,9 +2001,9 @@ test('the prototype reaches the Viewer states the App renders', () => {
 // pane summary the App has ever rendered was missing, and the new
 // unaccounted-Sessions warning had no state at all. Both are P-DRIFT.
 test('every Settings pane summary and the unaccounted warning are mirrored', () => {
-  const settingsCopy = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
+  const settingsCopy = JSON.parse(read('apple/ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
   const value = (key, lang) => settingsCopy[key].localizations[lang].stringUnit.value;
-  const view = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
+  const view = read('apple/ArkDeckApp/Features/Settings/SettingsRootView.swift');
 
   // The pane list is derived from the App, not hard-coded here: a new pane
   // with a summary must be mirrored, and this fails until it is.
@@ -2059,7 +2059,7 @@ test('every Settings pane summary and the unaccounted warning are mirrored', () 
 test('every WorkspaceHeaderBar summary in the App is mirrored and anchored', () => {
   const catalogues = Object.fromEntries(
     ['Settings', 'Flash', 'Trace', 'Debug'].map(name =>
-      [name, JSON.parse(read(`ArkDeckApp/Resources/${name}Localizable.xcstrings`)).strings]));
+      [name, JSON.parse(read(`apple/ArkDeckApp/Resources/${name}Localizable.xcstrings`)).strings]));
   const lookup = key => {
     for (const strings of Object.values(catalogues)) if (strings[key]) return strings[key];
     throw new Error(`${key} is in no catalogue`);
@@ -2067,10 +2067,10 @@ test('every WorkspaceHeaderBar summary in the App is mirrored and anchored', () 
   const prototype = read('docs/design/prototype.html');
 
   const views = [
-    'ArkDeckApp/Features/Settings/SettingsRootView.swift',
-    'ArkDeckApp/Features/Flash/FlashWorkspaceView.swift',
-    'ArkDeckApp/Features/Trace/TraceWorkspaceView.swift',
-    'ArkDeckApp/Features/Debug/DebugWorkspaceView.swift',
+    'apple/ArkDeckApp/Features/Settings/SettingsRootView.swift',
+    'apple/ArkDeckApp/Features/Flash/FlashWorkspaceView.swift',
+    'apple/ArkDeckApp/Features/Trace/TraceWorkspaceView.swift',
+    'apple/ArkDeckApp/Features/Debug/DebugWorkspaceView.swift',
   ];
   const summaries = views.flatMap(path => [...read(path).matchAll(
     /WorkspaceHeaderBar\(\s*summary: Text\([A-Za-z0-9_.]+\("([^"]+)"\)\)(?:,\s*summaryIdentifier: "([^"]+)")?/g
@@ -2122,7 +2122,7 @@ test('recovery controls keep unknown work parked and bind only the exact Flash t
   assert.match(h.run('inspectorRecoveryHTML(inspectorJobs()[0])'),/jobRecovery.action.result/);
   for(const language of ['en','zh']){
     h.run(`S.language='${language}'`);
-    const catalog=JSON.parse(read('ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
+    const catalog=JSON.parse(read('apple/ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
     const lang=language==='en'?'en':'zh-Hans';
     for(const key of ['reconcile','reconcile.detail','unconfirmed'])
       assert.ok(h.run('inspectorRecoveryHTML(inspectorJobs()[0])').includes(catalog['jobRecovery.action.'+key].localizations[lang].stringUnit.value));

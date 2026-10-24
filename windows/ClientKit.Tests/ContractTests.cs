@@ -35,7 +35,7 @@ public sealed class GeneratorTests
     public void ContractIdentityIsTheDigestOfTheSortedRegistry()
     {
         // Independent of the generator: this client's canonical writer over the registry.
-        var registry = StrictJson.Parse(File.ReadAllBytes(RepoPaths.At("Packages", "ArkDeckKit", "Contracts", "control-protocol.json")));
+        var registry = StrictJson.Parse(File.ReadAllBytes(RepoPaths.At("apple", "Packages", "ArkDeckKit", "Contracts", "control-protocol.json")));
         Assert.AreEqual(ControlContract.ContractIdentity, Convert.ToHexStringLower(SHA256.HashData(CanonicalJson.Encode(registry))));
         Assert.AreEqual(ControlContract.ProtocolVersion, ((JsonString)registry["currentVersion"]).Value);
         CollectionAssert.AreEqual(((JsonArray)registry["methods"]).Items.Cast<JsonString>().Select(s => s.Value).ToArray(), ControlContract.Methods.ToArray());

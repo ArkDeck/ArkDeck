@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC")
+        .join("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC")
 }
 
 fn json(path: impl AsRef<Path>) -> Value {

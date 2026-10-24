@@ -3,7 +3,7 @@
 //! ArkForge is the device-neutral flash mechanism: `arkforged` owns the USB
 //! transport and the firmware formats, and ArkDeck stays the only authority
 //! that may permit a write. This crate talks to it through ArkForge's own
-//! Rust client crates, taken at the revision `Packages/ArkDeckKit/Package.swift`
+//! Rust client crates, taken at the revision `apple/Packages/ArkDeckKit/Package.swift`
 //! pins for the Swift SDK, so both lanes speak one protocol revision.
 //!
 //! It composes the lane — one owned, paired `arkforged` generation — and reads

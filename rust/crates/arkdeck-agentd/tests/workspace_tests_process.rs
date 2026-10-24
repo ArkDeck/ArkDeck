@@ -172,9 +172,9 @@ final class WorkspaceProbeTests: XCTestCase {
 
 fn seed(root: &Path, test: &str) -> String {
     let files = [
-        ("Packages/ArkDeckKit/Package.swift", MANIFEST),
+        ("apple/Packages/ArkDeckKit/Package.swift", MANIFEST),
         (
-            "Packages/ArkDeckKit/Tests/WorkspaceProbeTests/Probe.swift",
+            "apple/Packages/ArkDeckKit/Tests/WorkspaceProbeTests/Probe.swift",
             test,
         ),
     ];
@@ -239,7 +239,7 @@ fn exercise(expected: &str, test_source: &str) {
     assert_eq!(primary["ok"], false, "{primary}");
     assert_eq!(primary["error"]["code"], "admissionDenied");
     assert_eq!(primary["error"]["details"]["newDispatchCount"], 0);
-    assert!(!source.join("Packages/ArkDeckKit/.build").exists());
+    assert!(!source.join("apple/Packages/ArkDeckKit/.build").exists());
 
     let (copy_job, copied) = submit_run(
         &home,
@@ -248,7 +248,7 @@ fn exercise(expected: &str, test_source: &str) {
             "workspace.prepare-isolated-copy",
             json!({"projectRef": project,
             "expectedWorkspaceRevision": revision,
-            "allowedFileGlobs": ["Packages/ArkDeckKit/**"]}),
+            "allowedFileGlobs": ["apple/Packages/ArkDeckKit/**"]}),
             None,
         ),
     );
@@ -299,7 +299,7 @@ fn exercise(expected: &str, test_source: &str) {
         "{}",
         String::from_utf8_lossy(&output)
     );
-    assert!(!source.join("Packages/ArkDeckKit/.build").exists());
+    assert!(!source.join("apple/Packages/ArkDeckKit/.build").exists());
     daemon.stop();
 
     let daemon = Daemon::start(&home);

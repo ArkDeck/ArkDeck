@@ -644,7 +644,7 @@ CHANGE_PATH_LITERAL = "openspec/changes/"
 # thought to enumerate.
 REGISTRY_SURFACE_ROOTS = (
     Path("openspec") / "integrations",
-    Path("Packages") / "ArkDeckKit" / "Tests" / "ArkDeckContractTests" / "Fixtures",
+    Path("apple") / "Packages" / "ArkDeckKit" / "Tests" / "ArkDeckContractTests" / "Fixtures",
 )
 
 _READONLY_PIN = (
@@ -656,7 +656,7 @@ _TRACE_PIN = (
     "frozen OPENHARMONY-TRACE-PROBES@1.0.0 registry bytes the Rust TraceProbe "
     "(arkdeck-provider-hdc) follows; migrating needs a change owning that registry"
 )
-_FIXTURES = "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0"
+_FIXTURES = "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0"
 
 # Files still allowed to name a whole in-repo change path, with the exact
 # number of occurrences each may keep and why. Such a path breaks the moment

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the Windows App's icon and MSIX visual assets from the macOS AppIcon.
 
-Source of truth: ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset (the macOS App's
+Source of truth: apple/ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset (the macOS App's
 icon; Contents.json maps each PNG to its point size and scale, so each file's pixel size is
 size x scale, 16 to 1024 px). Outputs, in windows/App/Assets:
 
@@ -41,14 +41,14 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-ICONSET = REPO / "ArkDeckApp" / "Resources" / "Assets.xcassets" / "AppIcon.appiconset"
+ICONSET = REPO / "apple" / "ArkDeckApp" / "Resources" / "Assets.xcassets" / "AppIcon.appiconset"
 ASSETS = REPO / "windows" / "App" / "Assets"
 
 # INPUTS: what the generated assets depend on (the CI planner's windows lane selects on them).
 INPUTS = (
-    "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
-    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckKeycapIcon.imageset/",
-    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/",
+    "apple/ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
+    "apple/ArkDeckApp/Resources/Assets.xcassets/ArkDeckKeycapIcon.imageset/",
+    "apple/ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/",
 )
 CHOICES = {"Keycap": "ArkDeckKeycapIcon", "Waveform": "ArkDeckWaveformIcon"}
 

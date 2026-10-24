@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="./ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/icon_1024x1024.png" width="152" alt="ArkDeck waveform app icon">
+  <img src="./apple/ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/icon_1024x1024.png" width="152" alt="ArkDeck waveform app icon">
 </p>
 
 <h1 align="center">ArkDeck</h1>
@@ -97,7 +97,7 @@ Module boundaries are documented in [Architecture Rules](./docs/ArchitectureRule
 ## Building from source
 
 The runtime, CLI, and providers live in the Rust workspace (`rust/`). SwiftPM
-builds only the app-side libraries in `Packages/ArkDeckKit`. The Swift Runtime
+builds only the app-side libraries in `apple/Packages/ArkDeckKit`. The Swift Runtime
 was removed (CHG-2026-074, TASK-XPA-017); Swift carries no runtime semantics,
 and ArkForge is pinned only as a commit revision in `rust/Cargo.toml`.
 
@@ -128,8 +128,8 @@ access; CI uses the read-only deploy key inside `hack/ci/arkforge-cargo-fetch.sh
 Build and test the Swift app-side package (not the runtime):
 
 ```bash
-sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
-sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
+sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
+sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 ```
 
 Repository contributors can run the same path-aware plan used by GitHub CI.
@@ -220,7 +220,7 @@ the Xcode lane; CLI, Agent, LaunchAgent, fixture, and Package-test-only changes
 stay on the Swift lane. App and UI-test changes use `build-for-testing`; this
 does not launch a simulator or claim device acceptance.
 
-For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. This is enough for app development and host-side tests. Installing the background runtime is a separate signed-helper flow; flashing a DAYU200 also requires the signed `arkforged` daemon from the sibling [ArkForge repository](https://github.com/ArkDeck/ArkForge) — the flash path is native RockUSB inside that daemon, with no vendor flashing tool on the product path.
+For the desktop app, open `apple/ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. This is enough for app development and host-side tests. Installing the background runtime is a separate signed-helper flow; flashing a DAYU200 also requires the signed `arkforged` daemon from the sibling [ArkForge repository](https://github.com/ArkDeck/ArkForge) — the flash path is native RockUSB inside that daemon, with no vendor flashing tool on the product path.
 
 ### Installing the runtime
 
@@ -229,7 +229,7 @@ The production daemon is the Rust `arkdeck-agentd`, packaged as a signed
 `runtime service install` accepts only that helper when it has the expected
 Developer ID, hardened runtime, embedded provisioning profile, and shared
 Keychain entitlement. Build it with team-authorized signing and notarization
-inputs as described in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md),
+inputs as described in the [headless runtime guide](./apple/Packages/ArkDeckKit/LaunchAgents/README.md),
 or use a signed project release package when one is available.
 
 From a signed `ArkDeckCLI.app`, install the per-user daemon by naming the
@@ -257,10 +257,10 @@ Then check that everything is wired up:
 
 ## Repository map
 
-- [`ArkDeck.xcodeproj/`](./ArkDeck.xcodeproj/) — shared Xcode project and schemes
-- [`ArkDeckApp/`](./ArkDeckApp/) — the SwiftUI macOS app
-- [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — XCUITest bundle for the macOS app
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package for the app-side libraries (ClientKit, Core, Trace adapter). The runtime and CLI are in `rust/`
+- [`apple/ArkDeck.xcodeproj/`](./apple/ArkDeck.xcodeproj/) — shared Xcode project and schemes
+- [`apple/ArkDeckApp/`](./apple/ArkDeckApp/) — the SwiftUI macOS app
+- [`apple/ArkDeckAppUITests/`](./apple/ArkDeckAppUITests/) — XCUITest bundle for the macOS app
+- [`apple/Packages/ArkDeckKit/`](./apple/Packages/ArkDeckKit/) — Swift package for the app-side libraries (ClientKit, Core, Trace adapter). The runtime and CLI are in `rust/`
 - [`rust/`](./rust/) — shared Rust workspace, 13 crates: `arkdeck-agentd`, `arkdeck-bootstrap`, `arkdeck-cli`, `arkdeck-client`, `arkdeck-contract`, `arkdeck-control`, `arkdeck-hoststore`, `arkdeck-platform`, `arkdeck-provider-arkforge`, `arkdeck-provider-hdc`, `arkdeck-provider-workspace`, `arkdeck-rockchip-binding`, `arkdeck-soak`. The short [rust/README.md](./rust/README.md) points at [docs/rust/development-log.md](./docs/rust/development-log.md)
 - [`windows/`](./windows/) — Windows 11 x64 WinUI 3 client, ArkDeck.ClientKit, and its tests (in development). The old SPK-4 spike lives in [`tools/experiments/windows-spikes/`](./tools/experiments/windows-spikes/)
 - [`catalog/`](./catalog/) — published operations, profiles, and schemas
@@ -269,7 +269,7 @@ Then check that everything is wired up:
 - [`docs/`](./docs/) — architecture notes, ADRs, and product design
 - [`hack/`](./hack/) — repository checks, CI, and tooling
 - [`tools/experiments/`](./tools/experiments/) — `host_loop` and `gj_record`, which CI still runs, plus the archived Windows spike
-- [`tests/`](./tests/) — host-side product demos, including WaterFlowTraceDemo
+- [`test/fixtures/`](./test/fixtures/) — host-side product demos, including WaterFlowTraceDemo
 - [`docs/archive/`](./docs/archive/) — historical product loop, plan, reviews, and run notes
 - [`.design-sync/`](./.design-sync/) — design-sync notes for the `@arkdeck/ds` token work. The CI planner and the Windows component map still read this directory, so it stays on `main`
 - [`.github/`](./.github/) — GitHub Actions workflows and CODEOWNERS

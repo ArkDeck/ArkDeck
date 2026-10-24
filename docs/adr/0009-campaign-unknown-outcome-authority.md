@@ -1,7 +1,7 @@
 # ADR-0009: `outcomeUnknown` 的两个写入者,与和解读回的适用面
 
 > **本 ADR 论证所依据的多个符号已不存在(2026-08-20 复核)。** CHG-2026-065/066
-> 移除 campaign 执行栈后,正文点名的这四个在 `Packages/ArkDeckKit/Sources/`
+> 移除 campaign 执行栈后,正文点名的这四个在 `apple/Packages/ArkDeckKit/Sources/`
 > 全仓零命中:`settlesUnknownLoaderTransition`、`recordCampaignOutcome`、
 > `reconcileUnresolved`、`closeAttempt`。同族仍在的是 `finishReconcile`(1 个
 > 文件)、`AgentAuthorityUsageTerminal` 与 `confirmedNotExecutedIntentEventIDs`

@@ -71,7 +71,7 @@ fn every_state_swift_projected_is_a_select_result() {
 #[test]
 fn the_recorded_answer_conforms_and_the_result_stays_closed() {
     let frames: Vec<Value> = std::fs::read_to_string(repository(
-        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.select.jsonl",
+        "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.select.jsonl",
     ))
     .unwrap()
     .lines()

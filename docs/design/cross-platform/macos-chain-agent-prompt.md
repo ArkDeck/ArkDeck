@@ -97,7 +97,7 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
    `api/contracts/cli-command-registry.yaml`、`cli-feature-coverage.json`（256 条 entry，
    `implementationStatusByPlatform` 是 parity 台账）。
 7. `rust/README.md`（构建、检查、每个已迁移 owner 的用法与 `rust/scripts/check-*.py` 进程 harness）、
-   `rust/supply-chain/README.md`；Swift 侧要移植的模块：`Packages/ArkDeckKit/Sources/{ArkDeckStorage,
+   `rust/supply-chain/README.md`；Swift 侧要移植的模块：`apple/Packages/ArkDeckKit/Sources/{ArkDeckStorage,
    ArkDeckWorkflows,ArkDeckAgentDaemon,ArkDeckAgentDaemonMain,ArkDeckProcess,ArkDeckOpenHarmony,
    ArkDeckBootstrap,ArkDeckRuntime,ArkDeckCore}`。关键落点：`RuntimeJobEngine.swift`（10.9k 行）、
    `RuntimeRecoveryService.swift`、`AgentExecutionCoordinator.swift`、Workflows 下 `ArkForge*.swift`、
@@ -127,7 +127,7 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
    全绿、façade 对仍能服务现有 App/CLI。
 3. **contract manifest 语义（#1866/#1878）**：`api/baselines/swift-single-v1.json` 描述「它所在的
    checkout」（schema `arkdeck.swift-development-baseline/2`，无 commit 字段）。改了任何被消费的输入
-   （`Packages/ArkDeckKit/Contracts/control-protocol.json`、`api/control/methods/**`、ControlFrames
+   （`apple/Packages/ArkDeckKit/Contracts/control-protocol.json`、`api/control/methods/**`、ControlFrames
    语料、CLI argv 语料…）就在**同一个 change 里**跑 `python rust/scripts/generate-contract.py --write`，
    `--check` 必须零 diff；`--baseline-revision` 已删除；published 视图 = `git merge-base origin/main HEAD`，
    别人合入不再让你的分支变 stale，**不再需要 re-pin PR**。
@@ -241,7 +241,7 @@ Rust（025）。SPK-6/9/10 全过 ⇒ sidecar 永不建。
 |---|---|---|
 | A 引擎/设备路径 | SPK-7 → M1 → M2 → M4（014 剩余 + 013 剩余 + recovery（裁决后）） | `arkdeck-hoststore`、`arkdeck-agentd`、`arkdeck-provider-hdc` 的 operation 部分 |
 | B 平台执行器 | SPK-6 → 016 全量，按 M1/M2/M4 需要的 provider 族顺序供货 | `arkdeck-platform`、`arkdeck-provider-hdc` 的 process/observation 部分 |
-| C 客户端 | SPK-8 → 019 十三个 facade；018 剩余 leaf 逐个 | `ArkDeckClientKit`（新 target）、`ArkDeckApp/**`、`ArkDeckAppUITests/**`、`arkdeck-cli`；**独占 UI 测试跑道** |
+| C 客户端 | SPK-8 → 019 十三个 facade；018 剩余 leaf 逐个 | `ArkDeckClientKit`（新 target）、`apple/ArkDeckApp/**`、`apple/ArkDeckAppUITests/**`、`arkdeck-cli`；**独占 UI 测试跑道** |
 | D 供应者与性能 | SPK-9/10/11 → 015 workspace/analyzer、017 的 ArkForge lane、025 | `arkdeck-provider-workspace/analyzer/arkforge`（新 crate）、`hack/bench`、`rust-perf.yml` |
 
 共享文件（`Package.swift`、`project.pbxproj`、`Cargo.toml`/`Cargo.lock`、`control-protocol.json`、
@@ -337,7 +337,7 @@ bullet/标题；重挂用 `hack/rebase-union.sh [--onto <base> <old>]`。
 
 - 持续项：每个新 Rust owner 落地时同 PR 补它的 CLI leaf（这已是 09-11 起的做法）。
 - 收口项：以 `cli-feature-coverage.json` 256 条 entry 为台账逐条对账 Rust CLI（`arkdeck commands
-  --output json` 两边比对）；argv fixture（当前 `Packages/ArkDeckKit/Tests` 下 210 个）与 envelope/page/
+  --output json` 两边比对）；argv fixture（当前 `apple/Packages/ArkDeckKit/Tests` 下 210 个）与 envelope/page/
   nextAction 样本字节相等；`maintainer contracts export` 由 Rust 生成且与已发布 bundle 零漂移；所有
   leaf 由 Rust daemon 服务或按 CLI 规格 §12 tombstone（含 macOS 进程内兼容 leaf 如 `--socket`）；
   `implementationStatusByPlatform.macos` 全部 `implemented`，Windows 列如实 `notImplemented`/`deferred`
@@ -426,7 +426,7 @@ typed 方法）+ Swift 侧 producer fixture 与严格 readback 测试 + `rust/sc
 既有一节里的就地更新（不逐刀加节）。规模对齐先例（一两千行），不做半成品 PR。
 
 新方法/新错误码的 schema 来自真实录帧：`ARKDECK_CONTROL_FRAME_LOG=<dir>` 跑相关 Swift 契约测试 →
-`Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas <dir>` → 用生成器的
+`apple/Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas <dir>` → 用生成器的
 `signature()` 剪掉只有 ID 不同的语料重写 → `python rust/scripts/generate-contract.py --write`。schema 只能
 发布语料里出现过的形状：新 owner 的每种拒绝都要有一条录到的帧，否则门不会红也不会保护你。
 
@@ -503,7 +503,7 @@ python3 hack/ci/plan.py --repo-root . --base-revision origin/main --head-revisio
 ### 5.5 真机与记录
 
 - 每次安装态操作前 `arkdeck runtime service status --output json` 读清当前安装的是哪一对 helper，记进
-  run.md，不假设。helper 构建：`bash Packages/ArkDeckKit/Distribution/macOS/build-local-helpers.sh`
+  run.md，不假设。helper 构建：`bash apple/Packages/ArkDeckKit/Distribution/macOS/build-local-helpers.sh`
   （`ARKDECK_CLI_PROVISIONING_PROFILE`、`ARKDECK_DAEMON_PROVISIONING_PROFILE` 在
   `~/Library/Application Support/ArkDeck/Signing/macOS/`，`ARKDECK_LOCAL_HELPER_OUTPUT` 自定；脚本内部
   调 `rust/scripts/package-macos-facade.sh debug` 构建 Rust daemon 并作为 `arkdeck-facade` 装进

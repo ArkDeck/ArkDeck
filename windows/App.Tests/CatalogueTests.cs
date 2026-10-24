@@ -58,7 +58,7 @@ public sealed class CatalogueTests
             }
             shared++;
             var table = entry.GetProperty("table").GetString()!;
-            using var catalog = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("ArkDeckApp", "Resources", table + ".xcstrings")));
+            using var catalog = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("apple", "ArkDeckApp", "Resources", table + ".xcstrings")));
             var localizations = catalog.RootElement.GetProperty("strings").GetProperty(entry.GetProperty("key").GetString()!).GetProperty("localizations");
             foreach (var language in new[] { "en", "zh-Hans" })
             {

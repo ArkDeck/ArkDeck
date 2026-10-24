@@ -65,7 +65,7 @@ def exercise(args, run):
     source = args.source_file
     check(source.is_absolute() and source.is_file(), "an existing absolute native source file is required")
     daemon, cli = [(args.bin_dir / name).resolve(strict=True) for name in ["arkdeck-agentd", "arkdeck"]]
-    contract = json.loads((ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
+    contract = json.loads((ROOT / "apple/Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
     identity = hashlib.sha256(canonical(contract)).hexdigest()
     installed = Path.home() / "Library/Application Support/ArkDeck/Bootstrap/v1"
     before_source = source_fingerprint(source)

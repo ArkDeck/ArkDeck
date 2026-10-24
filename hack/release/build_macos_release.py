@@ -21,7 +21,7 @@ release   (Developer ID identity, provisioning profiles, notary credentials:
           component from a clean checkout, the three at once (they share no
           input; the first failure stops the others and names its component):
           1. the Rust helper pair through
-             Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh, which
+             apple/Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh, which
              signs, notarizes, staples and assesses the pair itself;
           2. ArkForge.bundle through the ArkForge checkout's
              packaging/macos/package-arkforge.sh, only when that checkout is
@@ -103,11 +103,11 @@ REPO = RELEASE.parents[1]
 sys.path.insert(0, str(RELEASE))
 import release_version  # noqa: E402
 
-DISTRIBUTION = REPO / "Packages/ArkDeckKit/Distribution/macOS"
+DISTRIBUTION = REPO / "apple/Packages/ArkDeckKit/Distribution/macOS"
 HELPER_BUILDER = DISTRIBUTION / "build-helpers.sh"
 EXPORT_OPTIONS = RELEASE / "ExportOptions.plist"
 INSTALL_GUIDE = REPO / "docs/release/macos-install.md"
-PROJECT = REPO / "ArkDeck.xcodeproj"
+PROJECT = REPO / "apple/ArkDeck.xcodeproj"
 CARGO_MANIFEST = REPO / "rust/Cargo.toml"
 
 TEAM = "8AQTYW5FKR"

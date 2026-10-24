@@ -14,7 +14,7 @@
 | Binary architecture | Mach-O `arm64` |
 | Unsigned binary SHA-256 | `0665e04e4abf2c2b60e173f6c666cb91844557c85d45386a03962e56804fa55a` |
 | Source lock | ArkTrace `9172c9525f954ec397e0555d7d03cd4367f3efcf` 的 `ThirdParty/TraceStreamer/source-lock.json` |
-| ArkDeck packaging manifest | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
+| ArkDeck packaging manifest | `apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
 
 ArkTrace 的 `source-lock.json` 同时锁定 13 个源依赖和 GN/Ninja 两个构建工具的 URL、
 byte count 与 SHA-256。`manifest.json` 是运行时许可：二进制、upstream revision、
@@ -66,10 +66,10 @@ plugin。保守的 source-closure inventory 仍保留 build-only / disabled 依�
 
 权威资源：
 
-- `Packages/ArkDeckKit/THIRD_PARTY_NOTICES.md`；
-- `Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json`；
-- `Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/` 下 18 份 exact license / notice 文本；
-- `Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE` 中 ArkTrace dependency 的 MIT 许可。
+- `apple/Packages/ArkDeckKit/THIRD_PARTY_NOTICES.md`；
+- `apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json`；
+- `apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/` 下 18 份 exact license / notice 文本；
+- `apple/Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE` 中 ArkTrace dependency 的 MIT 许可。
 
 ## 4. 构建所有权与打包快照
 
@@ -86,8 +86,8 @@ ArkDeck `macx/` 目录只是 App 构建输入，不是第二个构建信任根�
 revision 的同一审阅中，才可把 ArkTrace 已验证的 exact binary/manifest 更新到：
 
 ```text
-Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer
-Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json
+apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer
+apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json
 ```
 
 两者的 binary SHA、build recipe、upstream revision 必须与该 ArkTrace revision 完全一致；
@@ -100,7 +100,7 @@ Xcode 使用三段明确 phase 构造嵌套 helper：
 
 1. `Prepare Trace Streamer Helper` 从仓库 canonical binary 复制到 build-products staging，
    使用 identifier `com.arkdeck.desktop.trace-streamer`、hardened runtime 与
-   `ArkDeckApp/TraceStreamerHelper.entitlements` 预签名；entitlements 只能包含
+   `apple/ArkDeckApp/TraceStreamerHelper.entitlements` 预签名；entitlements 只能包含
    `com.apple.security.app-sandbox=true` 与 `com.apple.security.inherit=true`；
 2. `Embed Trace Streamer Helper` 是 Executables destination 的 Copy Files phase，并启用
    `CodeSignOnCopy`，把嵌套代码放入 `Contents/MacOS`；
@@ -118,7 +118,7 @@ ArkDeck.app/Contents/Resources/ArkTrace/THIRD_PARTY_NOTICES.md
 ArkDeck.app/Contents/Resources/ArkTrace/Licenses/*
 ```
 
-`ArkDeckApp/TraceRuntimeResources.xcfilelist` 声明资源 phase 的 exact canonical inputs；
+`apple/ArkDeckApp/TraceRuntimeResources.xcfilelist` 声明资源 phase 的 exact canonical inputs；
 Copy Files phase 单独拥有 helper，避免同一嵌套代码被两个 phase 覆盖。App 只从上述
 bundle-relative 路径解析，不搜索 `PATH`。Sandbox input/output list、实际 bundle inventory、
 最终 manifest、helper bytes 与 nested-code validation 之间的任何差异都是发布失败。

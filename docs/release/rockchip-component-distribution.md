@@ -67,9 +67,9 @@ helper、download、copy、PATH 或 Homebrew fallback。
     `cef2cbe1190e05b591c13396e7ef5daf9fb90ef4`
   - `docs/release/macos-auto-update.md`：
     `ecc8d8a02dbe37d66ca1716aeeafa1491f3a7af8`
-  - `ArkDeck.xcodeproj/project.pbxproj`：
+  - `apple/ArkDeck.xcodeproj/project.pbxproj`：
     `e7943096688728a22f4b940e536a32f3b8eaaf98`
-  - `Packages/ArkDeckKit/Package.swift`：
+  - `apple/Packages/ArkDeckKit/Package.swift`：
     `292135a2c80c63ddf7182f58e2f81ff7c7d6104d`
   - `UpdateFeed.swift`：
     `9df02e20e6b4f824db2fc27318affbc9956fcbaf`

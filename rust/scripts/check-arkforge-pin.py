@@ -3,7 +3,7 @@
 
 ArkDeck consumes ArkForge only through its Rust crates, pinned in
 `rust/Cargo.toml`. The Swift lane linked ArkForge's Swift SDK through
-`Packages/ArkDeckKit/Package.swift` until the Swift Runtime was deleted
+`apple/Packages/ArkDeckKit/Package.swift` until the Swift Runtime was deleted
 (CHG-2026-074, TASK-XPA-017); that pin is gone, and this check now holds the
 Rust pin alone. It refuses, read-only:
 
@@ -11,7 +11,7 @@ Rust pin alone. It refuses, read-only:
   at one exact revision (no branch, no tag), or at more than one;
 - a crate that names an ArkForge crate other than through the workspace;
 - a locked ArkForge package from any other source or revision;
-- an ArkForge package reference returning to `Packages/ArkDeckKit/Package.swift`.
+- an ArkForge package reference returning to `apple/Packages/ArkDeckKit/Package.swift`.
 
 With `--run-vectors` it also reruns, at that revision and from the checkout
 cargo fetched for the lockfile, ArkForge's own `swift_sdk_vectors` (its wire
@@ -82,7 +82,7 @@ def workspace_pin(declared: dict) -> str:
 
 
 def check(root: Path) -> tuple[str, list[str]]:
-    package_swift = (root / "Packages/ArkDeckKit/Package.swift").read_text(encoding="utf-8")
+    package_swift = (root / "apple/Packages/ArkDeckKit/Package.swift").read_text(encoding="utf-8")
     if "ArkDeck/ArkForge" in package_swift:
         fail("Package.swift references ArkForge; the Swift SDK was deleted with the Swift Runtime")
     workspace = tomllib.loads((root / "rust/Cargo.toml").read_text(encoding="utf-8"))

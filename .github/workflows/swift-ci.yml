@@ -196,11 +196,11 @@ jobs:
 
       - name: ClientKit generated wire model checks
         run: |
-          python3 Packages/ArkDeckKit/Scripts/generate-clientkit-models.py --check
-          python3 Packages/ArkDeckKit/Scripts/test_generate_clientkit_models.py
+          python3 apple/Packages/ArkDeckKit/Scripts/generate-clientkit-models.py --check
+          python3 apple/Packages/ArkDeckKit/Scripts/test_generate_clientkit_models.py
 
       - name: SwiftPM stable-workspace contract tests
-        run: python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py
+        run: python3 apple/Packages/ArkDeckKit/Scripts/test_run_swiftpm.py
 
       # llbuild re-runs a C compile when any discovered input changed identity,
       # and the SDK modulemaps and headers every C file includes differ between
@@ -239,10 +239,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
-            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
-            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
 
@@ -250,7 +250,7 @@ jobs:
         env:
           ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: >-
-          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh
+          sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh
           test
           --parallel
           --num-workers 8
@@ -264,7 +264,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('apple/Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
 
   app-build:
     needs: plan
@@ -313,10 +313,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('apple/ArkDeck.xcodeproj/project.pbxproj', 'apple/Packages/ArkDeckKit/Package.swift', 'apple/Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
           restore-keys: |
-            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
-            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
+            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('apple/ArkDeck.xcodeproj/project.pbxproj', 'apple/Packages/ArkDeckKit/Package.swift', 'apple/Packages/ArkDeckKit/Package.resolved') }}-
+            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('apple/ArkDeck.xcodeproj/project.pbxproj', 'apple/Packages/ArkDeckKit/Package.swift', 'apple/Packages/ArkDeckKit/Package.resolved') }}-
             arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
 
       - name: Build ArkDeck app and UI-test bundle
@@ -333,7 +333,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('apple/ArkDeck.xcodeproj/project.pbxproj', 'apple/Packages/ArkDeckKit/Package.swift', 'apple/Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
 
   rust-checks:
     needs: plan

@@ -30,7 +30,7 @@
 
 | 任务 | 入口 |
 | --- | --- |
-| 产品能力与优先级 | [PRODUCT-LOOP.md](docs/archive/PRODUCT-LOOP.md) 对应 Golden Journey；`Packages/ArkDeckKit/Sources/`、`ArkDeckApp/` |
+| 产品能力与优先级 | [PRODUCT-LOOP.md](docs/archive/PRODUCT-LOOP.md) 对应 Golden Journey；`apple/Packages/ArkDeckKit/Sources/`、`apple/ArkDeckApp/` |
 | Operation、Runtime、Provider、Artifact | 对应 `openspec/specs/`、`api/contracts/`、`catalog/` 与 integration/platform profile |
 | 身份、副作用准入、恢复、隐私 | [Constitution](openspec/constitution.md) 对应 Safety invariant / `POL-*`，再读相关 contract |
 | 新 operation 或已发布 operation 的破坏性修改、新 provider、新 integration/device profile、destructive 准入安全策略变化 | 同车 OpenSpec change + 维护者 PR review；读取 [enforcement](openspec/governance/enforcement.md)、[verification policy](openspec/verification/policy.md) 与所属 change |
@@ -96,7 +96,7 @@ push 前本地只跑针对性检查（目标 10 分钟内；不拿门锁，不�
 - 改了契约输入（`control-protocol.json`、`api/control/methods/**`、ControlFrames、CLI argv 语料）才跑
   `python rust/scripts/generate-contract.py --check`；改了 `openspec/**`、`docs/**`、`AGENTS.md` 才跑
   `sh hack/check-sdd.sh`；
-- Swift 只跑受影响的测试类：`sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <类>`；App 改动
+- Swift 只跑受影响的测试类：`sh apple/Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <类>`；App 改动
   只对受影响 scheme 做 build-for-testing（`hack/ci/run-xcodebuild.sh`）。
 
 统一门是 PR 上的 GitHub CI：push 到 `agent/**` 自动开 PR，CI 里的 `hack/ci/plan.py` 按完整 diff

@@ -5,7 +5,7 @@
 //!
 //! No Swift oracle records the archive (Swift retired before #2468), so the
 //! reference is the macOS Rust Runtime's answers
-//! (`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/
+//! (`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/
 //! job.archive.jsonl` and `job.archive.preview.jsonl`, recorded by
 //! `arkdeck-hoststore`'s `job_archive` tests over the same Job). The Job is
 //! that Job: the `job-reconcile-analyzer` record, its journal written as
@@ -115,7 +115,9 @@ fn seed(root: &Path) {
 /// The macOS Runtime's recorded frames of `method`, in order.
 fn frames(method: &str) -> Vec<Value> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames")
+        .join(
+            "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames",
+        )
         .join(format!("{method}.jsonl"));
     std::fs::read_to_string(path)
         .unwrap()

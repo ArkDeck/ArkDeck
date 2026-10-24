@@ -19,6 +19,10 @@ GitHub Releases. History before this file is the git log on `main`.
 
 ### Changed
 
+- Moved the Apple projects under `apple/`: `ArkDeck.xcodeproj`, `ArkDeckApp`,
+  `ArkDeckAppUITests`, and `Packages`. Repository-root files, Rust, Windows,
+  `api/`, `catalog/`, `hack/`, and `openspec/` stay at the root.
+
 - Renamed non-code trees: `scripts/` to `hack/` (root contract tests in
   `hack/tests/`), `spec/` and `openspec/contracts/` to `api/`, `Catalog/` to
   `catalog/`, and `tests/waterflow-demo/` to `test/fixtures/waterflow-demo/`.

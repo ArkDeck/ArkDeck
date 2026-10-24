@@ -181,7 +181,7 @@ exec env \
   CLANG_MODULE_CACHE_PATH="$module_cache" \
   SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
   "$xcodebuild_executable" \
-  -project "$workspace_path/ArkDeck.xcodeproj" \
+  -project "$workspace_path/apple/ArkDeck.xcodeproj" \
   -scheme ArkDeck \
   -configuration "$configuration" \
   -destination platform=macOS,arch=arm64 \

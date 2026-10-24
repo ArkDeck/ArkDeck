@@ -23,7 +23,7 @@ mod runtime {
     /// Runtime published it.
     fn descriptor() -> Value {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl",
+            "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl",
         );
         std::fs::read_to_string(path)
             .unwrap()

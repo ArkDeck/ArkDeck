@@ -92,7 +92,7 @@ impl Drop for Root {
 
 fn corpus(method: &str) -> Vec<Value> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     ));
     fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("{path:?}: {error}"))

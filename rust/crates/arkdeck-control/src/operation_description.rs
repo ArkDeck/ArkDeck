@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn matches_actual_swift_descriptor_recordings_and_never_infers_availability() {
         let mut matched = std::collections::BTreeSet::new();
-        for line in include_str!("../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl").lines() {
+        for line in include_str!("../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl").lines() {
             let row:Value=serde_json::from_str(line).unwrap();
             if row["ok"]!=true {continue;}
             let expected=native_descriptor_expectation(&row["result"], arkdeck_contract::CATALOG_DIGEST).unwrap();let reference=expected["reference"].as_str().unwrap();
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn native_descriptor_delta_preserves_every_historical_field_and_declaration() {
         let frames = include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl"
+            "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl"
         );
         let native: Vec<Value> = frames
             .lines()

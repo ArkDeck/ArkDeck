@@ -116,12 +116,12 @@ Pass the pinned parser by absolute path when using a bare SwiftPM executable:
 
 ```bash
 /absolute/swiftpm/bin/path/arktrace \
-  --trace-streamer "$PWD/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
+  --trace-streamer "$PWD/apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
   inspect /absolute/path/to/trace.htrace
 
 /absolute/swiftpm/bin/path/arktrace \
   --json \
-  --trace-streamer "$PWD/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
+  --trace-streamer "$PWD/apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer" \
   summary /absolute/path/to/trace.htrace
 ```
 

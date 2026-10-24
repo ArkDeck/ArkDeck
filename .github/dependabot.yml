@@ -12,13 +12,13 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: swift
-    directory: /Packages/ArkDeckKit
+    directory: /apple/Packages/ArkDeckKit
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
   - package-ecosystem: swift
-    directory: /ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+    directory: /apple/ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

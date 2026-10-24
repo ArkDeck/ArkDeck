@@ -359,7 +359,7 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
     // isolated contract view keeps only `rust/`, so its absence is not a
     // failure.
     let bundled = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../Packages/ArkDeckKit/Resources")
+        .join("../../../apple/Packages/ArkDeckKit/Resources")
         .join("OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable");
     // The Job owner is this composition's; the first Control holds it
     // until it goes.

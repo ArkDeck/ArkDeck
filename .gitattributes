@@ -13,7 +13,7 @@ rust/README.md merge=union
 # `git lfs pull` after checkout (the same step as actions/checkout `lfs: true`).
 *.systrace filter=lfs diff=lfs merge=lfs -text
 *.htrace filter=lfs diff=lfs merge=lfs -text
-Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer filter=lfs diff=lfs merge=lfs -text
+apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer filter=lfs diff=lfs merge=lfs -text
 rust/tests/fixtures/device-mutation-reconcile-native-published-c6-v4/oracle.json filter=lfs diff=lfs merge=lfs -text
 rust/tests/fixtures/device-mutation-reconcile-native-published-c6-v4/raw-oracle.json filter=lfs diff=lfs merge=lfs -text
 

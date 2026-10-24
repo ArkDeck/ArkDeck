@@ -47,7 +47,7 @@ def exercise(args, root):
     """The checks in one fresh run directory, which outlives only a failed run."""
     daemon = (args.bin_dir/'arkdeck-agentd').resolve()
     cli = (args.cli_path or args.bin_dir/'arkdeck').resolve()
-    registry = json.loads((ROOT/'Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
+    registry = json.loads((ROOT/'apple/Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
     assert METHOD in registry['methods'], 'Tool retirement requires the current candidate contract'
     identity = hashlib.sha256(json.dumps(registry, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     endpoint = root/'a.sock'

@@ -117,7 +117,7 @@ fn an_unsafe_native_library_name_is_swift_s_plain_usage_failure() {
     // The adopted Target the oracle named `$targetId`, as Swift's daemon
     // shows it.
     let shown = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/target.show.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/target.show.jsonl"
     )
     .lines()
     .map(|line| serde_json::from_str::<Value>(line).unwrap())

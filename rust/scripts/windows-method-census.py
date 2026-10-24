@@ -7,7 +7,7 @@ isolated development root below the temporary directory, with every
 or written, and no HDC, device or ArkTrace distribution is involved. Each
 method is sent on its own pipe connection with the parameters of each request
 the committed control-frame corpus records for it
-(`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames`), in
+(`apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames`), in
 order, until one is not refused as malformed (`invalidParams`); a method the
 corpus records no request for is sent with none. The last reply is
 classified:
@@ -42,8 +42,8 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
-CORPUS = ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
+CONTRACT = ROOT / "apple/Packages/ArkDeckKit/Contracts/control-protocol.json"
+CORPUS = ROOT / "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
 
 # The control layer's and the host's answers for a method whose owner is not
 # composed: "... not configured", the read-only foundation's refusal, and the

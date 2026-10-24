@@ -38,11 +38,11 @@ Catalog digest 的 GJ-1..5 和原验收通过；本次未完成这些迁移。Sw
 ## 建议工程边界
 
 ```text
-ArkDeckApp/
+apple/ArkDeckApp/
   App/
   Features/Devices Flash Debug Dump Trace History
   Resources/Localizable.xcstrings
-Packages/ArkDeckKit/
+apple/Packages/ArkDeckKit/
   ArkDeckCore
   ArkDeckProcess
   ArkDeckRuntime

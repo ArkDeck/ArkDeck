@@ -20,7 +20,7 @@ impl HostServices for Host {
     fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
         let data = include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/device.observations.jsonl"
+            "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/device.observations.jsonl"
         );
         let result = data
             .lines()
@@ -55,13 +55,13 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
         (
             "operation.list",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.list.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.list.jsonl"
             ),
         ),
         (
             "doctor",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/doctor.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/doctor.jsonl"
             ),
         ),
     ] {
@@ -1275,7 +1275,7 @@ fn every_recorded_commit_refusal_reaches_the_caller_as_the_import_owner_answered
     let control = Control::new(ImportOwner(Arc::clone(&answer))).unwrap();
     let mut recorded_codes = std::collections::BTreeSet::new();
     for line in include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl"
     )
     .lines()
     {
@@ -1345,14 +1345,14 @@ fn every_recorded_inspection_and_release_refusal_reaches_the_caller_as_the_impor
         (
             "artifact.import.inspection",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl"
             ),
             &["resourceNotFound", "inputTooLarge"][..],
         ),
         (
             "artifact.import.release",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.release.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.release.jsonl"
             ),
             &["resourceNotFound"][..],
         ),
@@ -1438,31 +1438,31 @@ fn every_recorded_recovery_epoch_answer_reaches_the_caller_as_the_job_owner_answ
         (
             "job.status",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
             ),
         ),
         (
             "job.run",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl"
             ),
         ),
         (
             "job.result",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.result.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.result.jsonl"
             ),
         ),
         (
             "job.evidence",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.evidence.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.evidence.jsonl"
             ),
         ),
         (
             "job.submit",
             include_str!(
-                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.submit.jsonl"
+                "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.submit.jsonl"
             ),
         ),
     ] {
@@ -1802,7 +1802,7 @@ fn trace_probe_answers_its_owner_s_portrait_within_the_contract() {
         }
     }
     let corpus = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
     );
     let recorded = corpus
         .lines()

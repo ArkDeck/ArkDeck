@@ -10,7 +10,7 @@ fn invocation(verb: &str, job: &str, artifact: &str, options: &[&str]) -> arkdec
     parse(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).unwrap()
 }
 fn corpus(method: &str) -> Vec<Value> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"));
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"));
     std::fs::read_to_string(path)
         .unwrap()
         .lines()

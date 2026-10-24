@@ -31,9 +31,9 @@ admission 或设备命令 lowering。
 2026-08-27 全页扫描补记：当前 Inspector 为 `Properties / Layout / Accessibility / Raw dump / Advanced Dump` 五标签，已接入惰性 `componentDetail` 读取、搜索与失败态；下文历史四标签描述不代表当前功能全集。见[全页差异记录](implementation-audit-2026-08-27.md) F18。
 
 - 当前 App 入口（产品表面事实源）：
-  `ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`
+  `apple/ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`
 - 当前本地化与 accessibility identifiers（用户可见文案和同步锚点）：
-  `ArkDeckApp/Resources/UIDumpLocalizable.xcstrings`
+  `apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings`
 - 可交互设计镜像：[`prototype.html?page=dump`](prototype.html?page=dump)，已抓取态使用
   [`prototype.html?page=dump&viewerState=captured`](prototype.html?page=dump&viewerState=captured)
 - 交互规范：[`macos-ux-interaction-spec.md` §5.3](macos-ux-interaction-spec.md#53-viewer)
@@ -43,11 +43,11 @@ admission 或设备命令 lowering。
   `ViewerWorkspace`、`ViewerScreenshot`、`ViewerInspectorStack`、
   `ComponentTree` 与 `DumpInspector`
 - 当前生产 facade：
-  `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift`
+  `apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift`
 - 当前发布 Operation：
   `catalog/operations/capture.diagnostics.v1.json` 的 `capture.diagnostics@1`
 - 可复用 Artifact 读取实现：
-  `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
+  `apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
 
 SwiftUI 与本地化描述当前产品表面，视觉稿镜像它；Catalog、contracts、Runtime 返回事实和
 仓库安全不变量决定生产行为。两者不一致时先把设计镜像同步到实现，不得在 App 中伪造能力，
@@ -237,17 +237,17 @@ Production provider 禁止 fixture fallback。Preview 和 UI test fixture 必须
 
 实现 AI 应优先在以下已由 `TASK-AIN-021` 授权的路径内完成一个垂直 PR：
 
-- `ArkDeckApp/App/ArkDeckApp.swift`：导航/页面用户可见名与依赖注入；
-- `ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`：替换为 Viewer 工作区；如重命名文件，
-  同步 `ArkDeck.xcodeproj/project.pbxproj`，不要保留两个生产入口；
-- `ArkDeckApp/Resources/UIDumpLocalizable.xcstrings`：Viewer 文案和状态；
-- `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift`：typed submit/run、
+- `apple/ArkDeckApp/App/ArkDeckApp.swift`：导航/页面用户可见名与依赖注入；
+- `apple/ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`：替换为 Viewer 工作区；如重命名文件，
+  同步 `apple/ArkDeck.xcodeproj/project.pbxproj`，不要保留两个生产入口；
+- `apple/ArkDeckApp/Resources/UIDumpLocalizable.xcstrings`：Viewer 文案和状态；
+- `apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift`：typed submit/run、
   polling、Artifact list/read/校验与 presentation；
-- `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/` 下新增必要的 parser/model 文件；
-- `Packages/ArkDeckKit/Tests/ArkDeckContractTests/UIDumpApplicationFacadeContractTests.swift`：
+- `apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/` 下新增必要的 parser/model 文件；
+- `apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/UIDumpApplicationFacadeContractTests.swift`：
   production XPC、fail-closed 和零 fixture fallback；
-- `Packages/ArkDeckKit/Tests/`：tree/raw/bounds parser 单元测试；
-- `ArkDeckAppUITests/AppShell/AppShellUITests.swift` 或独立 Viewer UI test：交互和 accessibility。
+- `apple/Packages/ArkDeckKit/Tests/`：tree/raw/bounds parser 单元测试；
+- `apple/ArkDeckAppUITests/AppShell/AppShellUITests.swift` 或独立 Viewer UI test：交互和 accessibility。
 
 若实际资源文件名与上面不同，先用项目引用确认真实路径再修改。不要修改 Catalog、Provider、
 contracts、Safety policy、历史 OpenSpec Task 状态或无关页面；发现发布 Operation 本身缺能力时，

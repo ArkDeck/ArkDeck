@@ -36,7 +36,7 @@ fn answer(method: &str, selection: &Value) -> Value {
         return selection.clone();
     }
     let mut page = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.list.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/control-action.list.jsonl"
     )
     .lines()
     .map(|line| serde_json::from_str::<Value>(line).unwrap())
@@ -97,7 +97,7 @@ fn swift_selection_projections_conform_on_every_action_surface_and_remain_closed
         .find(|projection| projection["state"] == "awaitingImpactApproval")
         .unwrap();
     let mut challenge = include_str!(
-        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.resume.jsonl"
+        "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.resume.jsonl"
     )
     .lines()
     .map(|line| serde_json::from_str::<Value>(line).unwrap())

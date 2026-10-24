@@ -25,16 +25,16 @@ const DIRECTORIES: [&str; 7] = [
     "resources/licenses/LICENSES-windows",
 ];
 const PARSER: &[u8] = include_bytes!(
-    "../../../../Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-x86_64/manifest.json"
+    "../../../../apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-x86_64/manifest.json"
 );
 const INVENTORY: &[u8] = include_bytes!(
-    "../../../../Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json"
+    "../../../../apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json"
 );
 const WINDOWS_INVENTORY: &[u8] = include_bytes!(
-    "../../../../Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-license-inventory.json"
+    "../../../../apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/windows-license-inventory.json"
 );
 const RUST_INVENTORY: &[u8] = include_bytes!(
-    "../../../../Packages/ArkDeckKit/ThirdParty/ArkTraceRust/dependency-licenses.json"
+    "../../../../apple/Packages/ArkDeckKit/ThirdParty/ArkTraceRust/dependency-licenses.json"
 );
 const SELF_TEST: &str = "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe";
 

@@ -108,7 +108,7 @@ mod windows {
     /// re-positioned, as `job_watch.rs` serves it.
     fn row(position: i64, id: &str) -> Value {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.events.jsonl",
+            "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.events.jsonl",
         );
         let mut row = std::fs::read_to_string(path)
             .unwrap()

@@ -55,7 +55,7 @@ mod runtime {
     /// Swift's daemon's recorded probe answer and the target it answered for.
     fn recorded() -> (String, Value) {
         let frame: Value = include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
+            "../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
         )
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())

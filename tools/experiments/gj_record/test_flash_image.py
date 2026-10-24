@@ -30,7 +30,7 @@ def fixture():
                   if x["method"] == "job.result" and x["answer"].get("ok") is True)
     _, import_id, artifact = result["evidence"]["parameters"]["artifactLease"].split(":")
     archive = (STORY / "files/artifacts" / import_id / artifact).read_bytes()
-    frames = ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl"
+    frames = ROOT / "apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl"
     inspection = next(x["result"] for x in map(json.loads, frames.read_text(encoding="utf-8").splitlines())
                       if x.get("ok") is True and x["result"]["import"]["metadata"]["kind"] == "flash-bundle")
     imported = inspection["import"]

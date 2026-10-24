@@ -30,13 +30,13 @@ def main():
     args = parser.parse_args()
     # Isolated contract views copy the Rust test inputs. In the source checkout,
     # also prove these bytes remain the exact Swift capture fixtures.
-    captured = ROOT/'Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage'
+    captured = ROOT/'apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage'
     if captured.is_dir():
         for fixture in sorted((ROOT/'rust/tests/fixtures/session-export').glob('*.json')):
             assert fixture.read_bytes() == (captured/fixture.name).read_bytes(), fixture.name
     daemon = (args.bin_dir/'arkdeck-agentd').resolve()
     cli = (args.cli_path or args.bin_dir/'arkdeck').resolve()
-    registry = json.loads((ROOT/'Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
+    registry = json.loads((ROOT/'apple/Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
     identity = hashlib.sha256(json.dumps(registry,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     rows=[]
     children=[]

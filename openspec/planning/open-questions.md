@@ -418,7 +418,7 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     001G evidence),却**未**对 CHG-2026-025 作任何表述——可读作「未纳入考虑」而非
     「已纳入并覆盖」;
   - `TASK-BRC-004` 的 Forbidden paths 逐字包含
-    `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`,即该任务自身不触 CLI 面。
+    `apple/Packages/ArkDeckKit/Sources/ArkDeckCLI/**`,即该任务自身不触 CLI 面。
 - 裁决无论落哪一侧都需同时给出的两项（历史要求;2026-07-28 均已由本裁决给出）：
   1. `RockchipFlashExecutionHost` 由 chg-025(agent CLI 面)与 chg-036(App 面)
      共用,BRC-004 的交付物会移除 chg-025 现行路径所依赖的输入。**两 change 对同一

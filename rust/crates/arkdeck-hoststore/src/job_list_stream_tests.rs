@@ -427,7 +427,7 @@ fn a_new_job_list_holds_each_row_encoded_and_not_as_a_value() {
 /// at `line` of `method`'s recording.
 fn recorded_error(method: &str, line: usize) -> Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        "../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
     ));
     let text = std::fs::read_to_string(path).unwrap();
     let frame: Value = serde_json::from_str(text.lines().nth(line - 1).unwrap()).unwrap();

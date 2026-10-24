@@ -45,4 +45,4 @@ remain owned by the existing Artifact export contract. Export does not alter
 the source Job or Artifact and does not turn a host copy into device evidence.
 
 The language-neutral result schemas are published in
-`Packages/ArkDeckKit/Contracts/cli-diagnostics-offline.schema.json`.
+`apple/Packages/ArkDeckKit/Contracts/cli-diagnostics-offline.schema.json`.

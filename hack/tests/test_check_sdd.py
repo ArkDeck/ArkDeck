@@ -1210,7 +1210,7 @@ class OperationCatalogFamilyTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            for entry in ("api", "catalog", "hack", "openspec", "Packages"):
+            for entry in ("api", "catalog", "hack", "openspec", "apple"):
                 shutil.copytree(
                     check_sdd.REPO / entry,
                     root / entry,

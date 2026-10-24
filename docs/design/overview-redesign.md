@@ -149,13 +149,13 @@ ownership/health、key strategy、授权、设备能力与 channel protection ev
 ## 7. 数据与落地边界
 
 运行、证据、产物和关联字段来自
-[`RuntimeHistoryApplicationFacade`](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift)；
+[`RuntimeHistoryApplicationFacade`](../../apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift)；
 能力来自 `OverviewCapabilityApplicationFacade`；效果等级来自 Catalog。
 
 Viewer 是唯一的界面检查产品工作区；UI dump 只作为 Viewer 内部的 typed input / Artifact，
 不在 Overview 或侧栏中形成独立入口。
 
-[`RemoteBuildSourcePresentation`](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RemoteBuildSource/RemoteBuildSourceApplicationFacade.swift)
+[`RemoteBuildSourcePresentation`](../../apple/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RemoteBuildSource/RemoteBuildSourceApplicationFacade.swift)
 已经提供服务器名称、SSH endpoint 与最后验证时间；当前 `RemoteBuildSourceBindingApplicationFacade`
 已持久化并校验 `device target → remote source` 显式关联，`OverviewRemoteServerViewModel` 已消费。
 未绑定、stale 与 unavailable 分别显示；不得改为列表第一项、最近使用项或默认值。交互稿数据仍是演示。

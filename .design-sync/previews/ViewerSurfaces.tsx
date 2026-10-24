@@ -13,7 +13,7 @@ import type { ComponentTreeNode, ViewerRegion } from "@arkdeck/ds";
  * shape they exist in: `ViewerWorkspace` frames a `ViewerScreenshot` beside a
  * `ViewerInspectorStack` whose two halves are `ComponentTree` and
  * `DumpInspector`. The App's counterpart is
- * `ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`.
+ * `apple/ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`.
  *
  * Everything below is a declared design sample. There is no capture, no Job,
  * no device: the "screenshot" is an inline drawing, and the fields are made-up

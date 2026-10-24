@@ -23,7 +23,7 @@ import uuid
 
 from . import clocks, windows_host
 
-_REGISTRY_PATH = Path(__file__).resolve().parents[2] / "Packages/ArkDeckKit/Contracts/control-protocol.json"
+_REGISTRY_PATH = Path(__file__).resolve().parents[2] / "apple/Packages/ArkDeckKit/Contracts/control-protocol.json"
 _REGISTRY = json.loads(_REGISTRY_PATH.read_text())
 CURRENT_VERSION = _REGISTRY["currentVersion"]
 CONTRACT_IDENTITY = hashlib.sha256(json.dumps(_REGISTRY, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

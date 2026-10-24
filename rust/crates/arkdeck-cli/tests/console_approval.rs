@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use std::io::Cursor;
 
 fn frames() -> Vec<Value> {
-    include_str!("../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.resume.jsonl")
+    include_str!("../../../../apple/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.resume.jsonl")
         .lines().map(|line| serde_json::from_str(line).unwrap()).collect()
 }
 fn challenge() -> Value {

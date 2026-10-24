@@ -59,10 +59,10 @@
   },
   "schemaVersion": "arkdeck.job-state-preflight/1",
   "sources": {
-    "agentExecutionStates": "Packages/ArkDeckKit/Sources/ArkDeckCore/AgentExecutionContract.swift AgentExecutionState",
-    "capabilityUseOutcomes": "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeCapabilityStore.swift RuntimeCapabilityUseOutcome",
+    "agentExecutionStates": "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/AgentExecutionContract.swift AgentExecutionState",
+    "capabilityUseOutcomes": "apple/Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeCapabilityStore.swift RuntimeCapabilityUseOutcome",
     "cutover": "docs/design/cross-platform/rust-core-cross-platform-architecture.md §G.4",
-    "jobStates": "Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift JobState",
+    "jobStates": "apple/Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift JobState",
     "restart": "rust/crates/arkdeck-contract/src/job_state_preflight.rs classify_restart_with_archive_previews; CHG-2026-085",
     "ruling": "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md, Ruling"
   },

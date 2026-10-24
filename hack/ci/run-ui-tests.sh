@@ -111,8 +111,8 @@ done
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null) ||
   fail 'not inside a Git checkout'
-[ -d "$repo_root/ArkDeck.xcodeproj" ] ||
-  fail "no ArkDeck.xcodeproj under $repo_root"
+[ -d "$repo_root/apple/ArkDeck.xcodeproj" ] ||
+  fail "no apple/ArkDeck.xcodeproj under $repo_root"
 
 # Own the host keyboard before any cleanup, including when another invocation
 # uses this same DerivedData. The helper serializes test runs and re-enters
@@ -190,7 +190,7 @@ printf 'ArkDeck UI tests: DerivedData %s\n' "$derived_data" >&2
 printf 'ArkDeck UI tests: these drive the real App and are not a merge gate\n' >&2
 
 set -- "$xcodebuild_executable" \
-  -project "$repo_root/ArkDeck.xcodeproj" \
+  -project "$repo_root/apple/ArkDeck.xcodeproj" \
   -scheme ArkDeck \
   -configuration Debug \
   -destination platform=macOS,arch=arm64 \

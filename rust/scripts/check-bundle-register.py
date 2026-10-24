@@ -50,7 +50,7 @@ def exercise(args, run):
     """The registration checks in one fresh run directory, which outlives only a failed run."""
     import fcntl
     daemon, cli = [(args.bin_dir / name).resolve(strict=True) for name in ["arkdeck-agentd", "arkdeck"]]
-    registry = json.loads((ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
+    registry = json.loads((ROOT / "apple/Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
     require(METHOD in registry["methods"], "candidate Bundle registration contract is required")
     identity = hashlib.sha256(encoded(registry)).hexdigest()
     source = run / "Unsigned.app"

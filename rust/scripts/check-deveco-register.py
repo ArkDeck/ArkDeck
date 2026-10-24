@@ -149,7 +149,7 @@ def exercise(args, run_root):
     register_cli = (args.cli_path or inspect_cli).resolve(strict=True)
     source = args.source_root
     installed = Path.home() / "Library/Application Support/ArkDeck/Bootstrap/v1"
-    registry = json.loads((ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
+    registry = json.loads((ROOT / "apple/Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
     identity = hashlib.sha256(canonical(registry)).hexdigest()
     state = run_root / "state"
     state.mkdir(mode=0o700)
