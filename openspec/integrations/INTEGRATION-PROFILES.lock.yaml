@@ -12,13 +12,13 @@ profiles:
 catalogs:
   - id: arkui-ui-dump
     version: 1.0.0
-    path: openspec/contracts/catalogs/dump-recipes.yaml
+    path: api/contracts/catalogs/dump-recipes.yaml
   - id: trace-presets
     version: 1.0.0
-    path: openspec/contracts/catalogs/trace-presets.yaml
+    path: api/contracts/catalogs/trace-presets.yaml
   - id: attachment-debug-profile
     version: 1.0.0
-    path: openspec/contracts/catalogs/debug-parameters.yaml
+    path: api/contracts/catalogs/debug-parameters.yaml
 
 fixtures:
   - id: hdc-golden-failure-unauthorized

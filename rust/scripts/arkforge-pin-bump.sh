@@ -11,7 +11,7 @@ root=$(CDPATH= cd -- "$here/../.." && pwd)
 : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
 : "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
-auth="$root/scripts/ci/arkforge-package-auth.sh"
+auth="$root/hack/ci/arkforge-package-auth.sh"
 transport="${RUNNER_TEMP}/arkforge-pin-bump-transport.env"
 clone="${RUNNER_TEMP}/arkforge-pin-bump.git"
 status_file="${RUNNER_TEMP}/arkforge-pin-bump-status"

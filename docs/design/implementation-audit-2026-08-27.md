@@ -370,10 +370,10 @@ npm --prefix docs/design/arkdeck-ds test
 npm --prefix docs/design/arkdeck-ds run build
 npm --prefix docs/design/arkdeck-ds run build:review
 
-python3 scripts/ci/plan.py --repo-root . --base-revision origin/main \
+python3 hack/ci/plan.py --repo-root . --base-revision origin/main \
   --head-revision HEAD --merge-base --include-worktree --run-local
 
-sh scripts/ci/run-ui-tests.sh \
+sh hack/ci/run-ui-tests.sh \
   -only-testing:ArkDeckHDCUITests/AppShellUITests \
   -only-testing:ArkDeckHDCUITests/OverviewRecordUITests
 ```
@@ -548,7 +548,7 @@ operation 选择 Apps / Artifacts / Logs / Network。Inspector 复用同一 Job 
 类型、unknown、identity、时间与 Journal，不创建新的默认 Diagnostics 记录。
 
 详情补齐 Session、三个时间字段、身份匹配的 Correlation 与同 Session 筛选、Evidence 的
-Provider/Catalog/binding/authority/观测/终态/mode/effect/首条证据/step/blocker，及 Artifact
+Provider/catalog/binding/authority/观测/终态/mode/effect/首条证据/step/blocker，及 Artifact
 来源操作、媒体类型、状态原因。未报告清单与明确空/plan-only 清单分开，缺失恢复标志
 不默认为无需恢复。只有显式样本字段参与展示，不造 hash、authority 或固件事实。
 设计仍不读取历史文件，来源信息明确说明工作区示例不是该 Job 的真实 Artifact。
@@ -1321,7 +1321,7 @@ main 上现有的 `XCTWaiter` 5 秒 settled-state 等待保留不动。
 
 ### 本批实测到的跑道运维事实（登记，脚本不在本 Task 的 Allowed paths 内，不改）
 
-- **`scripts/ci/run-ui-tests.sh` 默认 DerivedData 是全机固定路径**，跨 checkout / worktree 共用一个
+- **`hack/ci/run-ui-tests.sh` 默认 DerivedData 是全机固定路径**，跨 checkout / worktree 共用一个
   `build.db`，并发即 `database is locked`。本批改用 `ARKDECK_UI_TEST_DERIVED_DATA` 独立路径。
 - **该脚本开头的两行 `pkill` 按进程名全局杀**，任何会话调用都会打死其他会话在飞的 runner；
   受害方看到的是 `Test crashed with signal term while preparing to run tests`，很容易被误读成

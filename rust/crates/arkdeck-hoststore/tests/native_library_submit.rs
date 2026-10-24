@@ -2,7 +2,7 @@
 //! request from the frozen Swift native-library oracle, through the Rust
 //! planner and admitter with the Runtime's own `MutationAuthority` at the
 //! fixed root. The old input bytes remain unchanged; the current oracle
-//! records the required observation prefix and current Catalog/authority.
+//! records the required observation prefix and current catalog/authority.
 //! Nothing runs, so the replay covers what admission alone decides:
 //! - every plan and all five submissions, compared in full to the current oracle;
 //! - the one capability, installed exactly as the current owner issued it. It is named by

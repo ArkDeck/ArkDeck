@@ -22,7 +22,7 @@ arkdeck-provider-workspace = { path = "crates/arkdeck-provider-workspace" }
 arkdeck-client = { path = "crates/arkdeck-client" }
 arkdeck-provider-arkforge = { path = "crates/arkdeck-provider-arkforge" }
 # One reviewed ArkForge revision for the Rust lane, asserted by
-# `scripts/check-arkforge-pin.py`. PR #46 introduced consumer contract 1.0.0.
+# `rust/scripts/check-arkforge-pin.py`. PR #46 introduced consumer contract 1.0.0.
 # Development uses a commit, never a tag/release. Upgrade every rev together,
 # regenerate Cargo.lock and run the upstream consumer contracts and lane tests.
 arkforge-arkdeck-adapter = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }

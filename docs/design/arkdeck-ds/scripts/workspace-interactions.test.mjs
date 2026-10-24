@@ -469,7 +469,7 @@ test('Inspector record navigation preserves exact unknown facts rather than manu
 
 test('explicit History samples use current Catalog fields and Artifact descriptors', () => {
   const h=harness('?page=history&lang=en');
-  const operations=new Map(files(join(root,'Catalog/operations')).filter(path=>path.endsWith('.json')).map(path=>{
+  const operations=new Map(files(join(root,'catalog/operations')).filter(path=>path.endsWith('.json')).map(path=>{
     const operation=JSON.parse(readFileSync(path,'utf8'));
     return [`${operation.id}@${operation.version}`,operation];
   }));
@@ -579,7 +579,7 @@ test('Flash device access distinguishes an empty observation from a failed probe
 });
 
 test('Flash stage summaries never lower the published maximum effect', () => {
-  const steps=JSON.parse(read('Catalog/operations/flash.full-restore.v1.json')).steps;
+  const steps=JSON.parse(read('catalog/operations/flash.full-restore.v1.json')).steps;
   const ranks=['hostOnly','readOnly','deviceMutation','destructive'];
   const groups=[steps.slice(0,3),steps.slice(3,7),steps.slice(7,8),steps.slice(8)];
   for (const lang of ['en','zh-Hans']) {
@@ -659,7 +659,7 @@ test('Advanced Dump search and refusal states stay bound to the selected compone
 
 test('HAP mirrors published steps and validates the draft without creating a Job', () => {
   const h = harness('?page=debug&debugTab=apps');
-  const operation = JSON.parse(read('Catalog/operations/debug.hap.v1.json'));
+  const operation = JSON.parse(read('catalog/operations/debug.hap.v1.json'));
   assert.deepEqual(JSON.parse(h.run('JSON.stringify(DEBUG_HAP_STEPS)')),
     operation.steps.map(step=>[step.stepID,step.kind,step.effect]));
   assert.doesNotMatch(h.run('pDebug()'), /providerLoweringMissing/);
@@ -995,7 +995,7 @@ test('Native Debug plan and all five typed log fields match their published shap
   assert.match(h.run('pDebug()'),/No live stream is attached/);
   assert.match(h.run('pDebug()'),/512 MiB/);
   assert.doesNotMatch(h.run('pDebug()'),/quota 1GB|64MB host shards/);
-  const operation=JSON.parse(read('Catalog/operations/deploy.native-library.app-owned.v1.json'));
+  const operation=JSON.parse(read('catalog/operations/deploy.native-library.app-owned.v1.json'));
   assert.deepEqual(JSON.parse(h.run('JSON.stringify(DEBUG_PLAN_STEPS)')),operation.steps.map(x=>[x.stepID,x.kind,x.effect]));
   assert.equal(h.run('debugLibValid("lib.so")'),false);
   assert.equal(h.run('debugLibValid("lib"+"a".repeat(124)+".so")'),false);

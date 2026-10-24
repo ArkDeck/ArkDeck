@@ -37,7 +37,7 @@ the app, verify loading again and leave zero outstanding residue on each host.
 record.py selects only the new exact ghost digest. Assembly has no digest override.
 Old hashes remain in historical records and the manifest. After maintainer review
 and publication, local GJ-2/GJ-3 consumers select this manifest's HAP pin. The old
-forward hash remains comparison metadata. Catalog/contracts/authority/recovery
+forward hash remains comparison metadata. catalog/contracts/authority/recovery
 and accepted loader/publish/rollback predicates are unchanged.
 
 Matching profile/certificate/Java/JAR digests and SDK signatures do not waive

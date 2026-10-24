@@ -3,7 +3,7 @@
 
 `rust/crates/arkdeck-cli/src/app_capability_registry.json` is the App's
 capability table (Swift `AppProductCapabilityRegistry`): the `capabilities` of
-the published `openspec/contracts/app-product-capability-registry.yaml`, in the
+the published `api/contracts/app-product-capability-registry.yaml`, in the
 App's order, with its schema version. The Rust export renders that registry
 and the feature coverage's App entries from it, and its test holds the
 rendered registry to the published one (`owned.json`), which Swift's own
@@ -23,7 +23,7 @@ import sys
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-PUBLISHED = ROOT / "openspec/contracts/app-product-capability-registry.yaml"
+PUBLISHED = ROOT / "api/contracts/app-product-capability-registry.yaml"
 COPY = ROOT / "rust/crates/arkdeck-cli/src/app_capability_registry.json"
 
 

@@ -229,7 +229,7 @@ producer 与 consumer 各自有测试但从未在同一真实路径上跑过；�
   是 blocked 记录，未升级为 passing evidence。
 - **Fact.** TASK-RKFUI-001 `run.md`（CHG-2026-026 `evidence/runs/TASK-RKFUI-001/run.md`，blob `0f24bb2424e43edb34de0fffaa0eee3c4e5cbec3`）
   记录同一 E0 面存在 Swift 与 Python 两侧实现并各自跑通契约套件
-  （`RockchipDeviceDiscoveryContractTests` 与 `scripts/rockchip_e0_probe/test_probe.py`），
+  （`RockchipDeviceDiscoveryContractTests` 与 `hack/rockchip_e0_probe/test_probe.py`），
   且明确记载该次 sanitized receipt 由人手从原始信封转录、其 schema 与本 commit 中
   `probe.py` 的直接输出对齐、下次 E0 窗口将直接由 `probe.py` 生成。
 - **Inference.** 从未端到端跑过的双端契约，其"两侧都绿"不构成对齐证据。该判断

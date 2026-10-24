@@ -123,7 +123,7 @@ python3 rust/scripts/check-arkforge-pin.py
 `check-arkforge-pin.py` accepts only a full commit revision, shared by every
 `arkforge-*` crate. Add `--run-vectors` to rerun ArkForge's wire and StepPermit
 vectors at that revision. Fetching the private ArkForge crates needs read
-access; CI uses the read-only deploy key inside `scripts/ci/arkforge-cargo-fetch.sh`.
+access; CI uses the read-only deploy key inside `hack/ci/arkforge-cargo-fetch.sh`.
 
 Build and test the Swift app-side package (not the runtime):
 
@@ -138,7 +138,7 @@ affected by the branch plus current worktree. Missing comparison facts select
 all lanes rather than silently skipping validation:
 
 ```bash
-python3 scripts/ci/plan.py \
+python3 hack/ci/plan.py \
   --repo-root . \
   --base-revision origin/main \
   --head-revision HEAD \
@@ -183,13 +183,13 @@ when switching worktrees; only changed targets/files are recompiled. To run the
 App/UI-test build directly:
 
 ```bash
-sh scripts/ci/run-xcodebuild.sh
+sh hack/ci/run-xcodebuild.sh
 ```
 
 For a locally signed, optimized Release app (without installing it):
 
 ```bash
-sh scripts/ci/run-xcodebuild.sh --release
+sh hack/ci/run-xcodebuild.sh --release
 ```
 
 The app is built at
@@ -206,7 +206,7 @@ To bound parallel build tasks on a memory-constrained host, set
 `ARKDECK_XCODE_JOBS` (1–64), for example:
 
 ```bash
-ARKDECK_XCODE_JOBS=4 sh scripts/ci/run-xcodebuild.sh --release
+ARKDECK_XCODE_JOBS=4 sh hack/ci/run-xcodebuild.sh --release
 ```
 
 This limits build-system tasks, not Swift's internal compiler threads. Keep the
@@ -263,11 +263,11 @@ Then check that everything is wired up:
 - [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package for the app-side libraries (ClientKit, Core, Trace adapter). The runtime and CLI are in `rust/`
 - [`rust/`](./rust/) — shared Rust workspace, 13 crates: `arkdeck-agentd`, `arkdeck-bootstrap`, `arkdeck-cli`, `arkdeck-client`, `arkdeck-contract`, `arkdeck-control`, `arkdeck-hoststore`, `arkdeck-platform`, `arkdeck-provider-arkforge`, `arkdeck-provider-hdc`, `arkdeck-provider-workspace`, `arkdeck-rockchip-binding`, `arkdeck-soak`. The short [rust/README.md](./rust/README.md) points at [docs/rust/development-log.md](./docs/rust/development-log.md)
 - [`windows/`](./windows/) — Windows 11 x64 WinUI 3 client, ArkDeck.ClientKit, and its tests (in development). The old SPK-4 spike lives in [`tools/experiments/windows-spikes/`](./tools/experiments/windows-spikes/)
-- [`Catalog/`](./Catalog/) — published operations, profiles, and schemas
-- [`spec/`](./spec/) — language-neutral control and recovery contracts read by the Rust and Windows implementations
+- [`catalog/`](./catalog/) — published operations, profiles, and schemas
+- [`api/`](./api/) — language-neutral control and recovery contracts read by the Rust and Windows implementations
 - [`openspec/`](./openspec/) — product contracts, safety invariants, and change history
 - [`docs/`](./docs/) — architecture notes, ADRs, and product design
-- [`scripts/`](./scripts/) — repository checks, CI, and tooling
+- [`hack/`](./hack/) — repository checks, CI, and tooling
 - [`tools/experiments/`](./tools/experiments/) — `host_loop` and `gj_record`, which CI still runs, plus the archived Windows spike
 - [`tests/`](./tests/) — host-side product demos, including WaterFlowTraceDemo
 - [`docs/archive/`](./docs/archive/) — historical product loop, plan, reviews, and run notes

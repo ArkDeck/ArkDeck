@@ -3,7 +3,7 @@
 
 `cargo test --workspace` includes `corpus_parity`, whose cases assert that every
 Swift contract input in the checkout is byte-identical to the committed manifest
-`spec/baselines/swift-single-v1.json`. That manifest describes the checkout it
+`api/baselines/swift-single-v1.json`. That manifest describes the checkout it
 is committed in, so the assertion is false only when a change edited an input
 without regenerating. This wrapper names that case, with the regenerate command,
 before the tests run, and otherwise runs them unchanged.

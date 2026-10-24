@@ -2,7 +2,7 @@
 
 Task: TASK-AIN-026 (product spec §14, §15.1, §18)
 
-`openspec/contracts/cli-*`, `app-product-capability-registry.yaml`,
+`api/contracts/cli-*`, `app-product-capability-registry.yaml`,
 `runtime-control-plane.schema.json` and
 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**` are generated
 from the build that publishes them. Nothing in the bundle is restated by hand:
@@ -14,11 +14,11 @@ hand fails the same test.
 ## Entry point
 
 ```bash
-arkdeck maintainer contracts export --contracts-directory openspec/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI
+arkdeck maintainer contracts export --contracts-directory api/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI
 ```
 
 ```bash
-arkdeck maintainer contracts check --contracts-directory openspec/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI --output json
+arkdeck maintainer contracts check --contracts-directory api/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI --output json
 ```
 
 `export` writes every product and removes stale fixture files; `check` compares
@@ -43,17 +43,17 @@ tooling and are macOS-only until a Windows profile is ratified.
 | `cli-page.schema.json` | §7.3 | `pageKind` conditionals: event pages fix `order` and always carry a cursor; exhausted snapshots carry `null` |
 | `cli-event.schema.json` | `CLIEventEnvelope` | terminal frame vs Runtime event frame |
 | `cli-next-action.schema.json` | §7.3 union | one closed branch per `kind`; resource kind mirrors owner kind where the spec says so |
-| `runtime-control-plane.schema.json` | `AgentWireProtocol`, `ArkDeckControlProtocol` | request/response frames; `method` enum is the exact current classified method set, with version and identity constants; every row of the method table names its typed schema under `spec/control/methods/` (`x-arkdeck-methodSchemaDirectory`) |
+| `runtime-control-plane.schema.json` | `AgentWireProtocol`, `ArkDeckControlProtocol` | request/response frames; `method` enum is the exact current classified method set, with version and identity constants; every row of the method table names its typed schema under `api/control/methods/` (`x-arkdeck-methodSchemaDirectory`) |
 
 `--version --output json` reports `pageSchemaVersion` and
 `nextActionSchemaVersion` as `arkdeck.cli.page/1` and
 `arkdeck.cli.next-action/1`; both constants live in `CLIMachineContracts` and
 are the titles of the corresponding schema files.
 
-## Per-method typed schemas (`spec/control/methods/`)
+## Per-method typed schemas (`api/control/methods/`)
 
 `TASK-XPA-001` publishes one typed contract per method of the single current
-control protocol: `spec/control/methods/<method>.json` carries `$defs.request`
+control protocol: `api/control/methods/<method>.json` carries `$defs.request`
 (the parameters a caller may send), `$defs.result` (the Runtime's reply),
 `$defs.errorCode` and `$defs.errorDetails` (the structured evidence a refusal
 attaches), plus `x-arkdeck-protocolVersion` and `x-arkdeck-contractIdentity`,
@@ -199,9 +199,9 @@ text changed, so no design mirror is touched.
   for `app.overview.main`) and `testPublishedBundleMatchesThisBuild`
   (`cli-feature-coverage.json` and `app-product-capability-registry.yaml`
   drifted); the registry was restored and both tests passed again.
-- Full local gate (`scripts/ci/plan.py … --run-local`): Swift full-parallel
+- Full local gate (`hack/ci/plan.py … --run-local`): Swift full-parallel
   lane 2366 tests green, the serialized lanes green, App build green;
-  `scripts/check-sdd.sh` 0 errors.
+  `hack/check-sdd.sh` 0 errors.
 - No device, HDC/RockUSB dispatch, real Artifact or hardware evidence is
   involved; the verification covers machine contracts against the
   protected-`main` fact sources only and produces no `REAL_DEVICE_PASS`.

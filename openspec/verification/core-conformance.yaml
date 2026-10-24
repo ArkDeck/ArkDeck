@@ -69,26 +69,26 @@ shared_inputs:
       version: 1.0.0
       path: openspec/integrations/openharmony/readonly-probes.yaml
   catalogs:
-    - path: openspec/contracts/catalogs/remote-operations.yaml
+    - path: api/contracts/catalogs/remote-operations.yaml
       version: 1.0.0
-    - path: openspec/contracts/catalogs/dump-recipes.yaml
+    - path: api/contracts/catalogs/dump-recipes.yaml
       version: 1.0.0
-    - path: openspec/contracts/catalogs/trace-presets.yaml
+    - path: api/contracts/catalogs/trace-presets.yaml
       version: 1.0.0
-    - path: openspec/contracts/catalogs/debug-parameters.yaml
+    - path: api/contracts/catalogs/debug-parameters.yaml
       version: 1.0.0
   contracts:
-    - path: openspec/contracts/provider-contracts.md
+    - path: api/contracts/provider-contracts.md
       version: 3.0.0
-    - path: openspec/contracts/workflow-step.schema.json
+    - path: api/contracts/workflow-step.schema.json
       version: 1.0.0
-    - path: openspec/contracts/hardware-evidence.schema.json
+    - path: api/contracts/hardware-evidence.schema.json
       version: 6.0.0
-    - path: openspec/contracts/workflow-step-registry.yaml
+    - path: api/contracts/workflow-step-registry.yaml
       version: 1.0.0
-    - path: openspec/contracts/manifest.schema.json
+    - path: api/contracts/manifest.schema.json
       version: 1.0.0
-    - path: openspec/contracts/journal-event.schema.json
+    - path: api/contracts/journal-event.schema.json
       version: 1.0.0
   fixtures:
     - id: hdc-golden-failure-unauthorized

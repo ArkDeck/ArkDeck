@@ -32,7 +32,7 @@ pub const EVENT_SCHEMA_VERSION: &str = "arkdeck.cli.event/1";
 pub const CONTROL_PLANE_SCHEMA_VERSION: &str = "arkdeck.runtime-control-plane/1";
 /// Where the per-method typed schemas the control-plane method table points
 /// at live, relative to the repository.
-pub const CONTROL_METHOD_SCHEMA_DIRECTORY: &str = "spec/control/methods";
+pub const CONTROL_METHOD_SCHEMA_DIRECTORY: &str = "api/control/methods";
 
 const DRAFT: &str = "https://json-schema.org/draft/2020-12/schema";
 const COMMAND_PATTERN: &str = "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$";
@@ -56,7 +56,7 @@ impl Product {
     }
 }
 
-/// The products this CLI owns under `openspec/contracts/`.
+/// The products this CLI owns under `api/contracts/`.
 pub fn contract_products() -> Vec<Product> {
     vec![
         Product {

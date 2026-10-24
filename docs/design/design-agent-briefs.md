@@ -326,7 +326,7 @@ before → desired diff、`应用参数并开始抓取(…)`、raw / filtered Ar
 
 - 单 HAP 文件选择；bundle 与 Ability 有可见标签和 typed 校验。
 - 安装策略当前固定 `installOrReplace`；清理策略仅 `uninstall / retain`；结束状态 `stopped / running`；diagnostics 可选，1–300 秒。全新安装与恢复之前版本未发布，不提供可选项。
-- 输入摘要放在折叠 request 内；计划必须使用 `Catalog/operations/debug.hap.v1.json` 的完整 14 个 step ID/kind/effect，不另造六阶段流程。
+- 输入摘要放在折叠 request 内；计划必须使用 `catalog/operations/debug.hap.v1.json` 的完整 14 个 step ID/kind/effect，不另造六阶段流程。
 - missing file/identity、unavailable、submitting/active/cancel/terminal/failed 各有呈现；运行按钮由实际条件决定。HTML demo 的提交只展示参数，明确不会导入文件、创建 Job 或操作设备。
 - 包库存的独立启动/停止/卸载仍禁用：它们不是已发布 HAP workflow 的别名。不要把这些行按钮画成已实现。
 

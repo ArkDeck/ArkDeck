@@ -608,7 +608,7 @@ impl WorkspaceProfile {
             "workspace-host@1",
             project_ref,
             &root,
-            &["Packages/ArkDeckKit/**", "Catalog/**", "docs/**"],
+            &["Packages/ArkDeckKit/**", "catalog/**", "docs/**"],
             grep,
             patch,
             ProfilePresets {

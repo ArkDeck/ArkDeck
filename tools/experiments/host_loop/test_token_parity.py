@@ -3,7 +3,7 @@
 # Guards the seam that produced the divergence: pr_envelope carried its own
 # narrower copy of the task token, so 14 of 46 active task headers rendered
 # unusable while MECH-004 accepted them. The MECH-004 grammar now lives in
-# scripts/agent_pr_identity.py (CHG-2026-077 retired the path guard and kept
+# hack/agent_pr_identity.py (CHG-2026-077 retired the path guard and kept
 # its identity half). These tests fail if the two definitions ever drift
 # apart again.
 
@@ -24,7 +24,7 @@ _PARITY_MODULE_NAME = "_agent_pr_identity_for_parity"
 
 
 def _load_agent_pr_identity():
-    """Load scripts/agent_pr_identity.py as a module without importing scripts/ as a package.
+    """Load hack/agent_pr_identity.py as a module without importing hack/ as a package.
 
     The module must be registered in sys.modules *before* exec_module: dataclass
     field introspection resolves the defining module by name, and a module that
@@ -32,7 +32,7 @@ def _load_agent_pr_identity():
     """
     if _PARITY_MODULE_NAME in sys.modules:
         return sys.modules[_PARITY_MODULE_NAME]
-    path = pathlib.Path(__file__).resolve().parents[3] / "scripts" / "agent_pr_identity.py"
+    path = pathlib.Path(__file__).resolve().parents[3] / "hack" / "agent_pr_identity.py"
     spec = importlib.util.spec_from_file_location(_PARITY_MODULE_NAME, path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[_PARITY_MODULE_NAME] = module

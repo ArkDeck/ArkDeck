@@ -3,7 +3,7 @@
 
 `rust/crates/arkdeck-cli/src/command_registry.json` is Swift's projection of
 its whole registry: the `commands` of the published
-`openspec/contracts/cli-command-registry.yaml`, with its schema version. The
+`api/contracts/cli-command-registry.yaml`, with its schema version. The
 Rust CLI serves `commands`, `help` and `completion` from it and renders the
 registry YAML from it; `CLIRustCommandRegistryCopyContractTests` holds it to
 Swift's projection.
@@ -22,7 +22,7 @@ import sys
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-PUBLISHED = ROOT / "openspec/contracts/cli-command-registry.yaml"
+PUBLISHED = ROOT / "api/contracts/cli-command-registry.yaml"
 COPY = ROOT / "rust/crates/arkdeck-cli/src/command_registry.json"
 
 

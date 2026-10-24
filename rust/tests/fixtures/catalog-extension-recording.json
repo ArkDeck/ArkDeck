@@ -1,7 +1,7 @@
 {
   "scope": "Synthetic provider fixtures only; no hardware acceptance or usable Runtime authority.",
   "sourceCommit": "2f75ae8e51b1f16bc293186683c2e592abd97e89",
-  "sourceChange": "Catalog/, RuntimeOperationCatalogGenerated.swift and the shared WorkflowStep.swift contract are overlaid from combined CHG-2026-079 and CHG-2026-080. The historical HostStoreStepShadowFixtures switch adds a fail-fast branch for the new keyboard case solely to compile; this test is not recorded. All Runtime, Provider and selected producer test implementations are unchanged.",
+  "sourceChange": "catalog/, RuntimeOperationCatalogGenerated.swift and the shared WorkflowStep.swift contract are overlaid from combined CHG-2026-079 and CHG-2026-080. The historical HostStoreStepShadowFixtures switch adds a fail-fast branch for the new keyboard case solely to compile; this test is not recorded. All Runtime, Provider and selected producer test implementations are unchanged.",
   "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "recordedOn": "2026-10-04",
   "producerTestsPassed": 40,

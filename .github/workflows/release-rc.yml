@@ -1,7 +1,7 @@
 name: Release candidate
 
 # Builds the Developer ID signed, notarized and stapled macOS release
-# candidate (TASK-XPA-017) with scripts/release/build_macos_release.py, the
+# candidate (TASK-XPA-017) with hack/release/build_macos_release.py, the
 # same entry a maintainer runs locally, and keeps its DMG, release receipt and
 # notary logs as the workflow artifact arkdeck-rc-<version>-<build>.
 #
@@ -14,7 +14,7 @@ name: Release candidate
 # directory in RUNNER_TEMP; the last step removes both whatever happened
 # before it.
 #
-# An RC is produced when a change to scripts/release/release-version.json
+# An RC is produced when a change to hack/release/release-version.json
 # (`release_version.py bump-build` or `set`) merges into main, or on demand
 # from main. A version and build that already have an artifact or a release
 # asset are not built again.
@@ -22,7 +22,7 @@ on:
   push:
     branches: [main]
     paths:
-      - scripts/release/release-version.json
+      - hack/release/release-version.json
   workflow_dispatch:
 
 permissions:
@@ -81,8 +81,8 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          python3 scripts/release/release_version.py check
-          release=$(python3 scripts/release/release_version.py print)
+          python3 hack/release/release_version.py check
+          release=$(python3 hack/release/release_version.py print)
           version=$(printf '%s' "$release" | python3 -c 'import json, sys; print(json.load(sys.stdin)["version"])')
           build=$(printf '%s' "$release" | python3 -c 'import json, sys; print(json.load(sys.stdin)["build"])')
           {
@@ -108,7 +108,7 @@ jobs:
             --jq '[.artifacts[] | select(.expired | not)] | length')
           assets=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].assets[].name')
           if [ "$artifacts" != 0 ] || printf '%s\n' "$assets" | grep -Fxq "$DMG"; then
-            echo "::notice title=Release candidate already exists::$ARTIFACT (artifact or release asset $DMG); bump the build with scripts/release/release_version.py bump-build to produce another"
+            echo "::notice title=Release candidate already exists::$ARTIFACT (artifact or release asset $DMG); bump the build with hack/release/release_version.py bump-build to produce another"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -158,7 +158,7 @@ jobs:
             echo "::warning::ImageVersion is unset; the release build caches key on 'unknown'"
           fi
           rustc_id=$(cd rust && rustc -vV | shasum -a 256 | cut -c1-16)
-          pin=$(PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys; sys.path.insert(0, "scripts/release"); import build_macos_release; print(build_macos_release.arkforge_pin())')
+          pin=$(PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys; sys.path.insert(0, "hack/release"); import build_macos_release; print(build_macos_release.arkforge_pin())')
           {
             echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}"
             echo "rustc=$rustc_id"
@@ -204,7 +204,7 @@ jobs:
         if: steps.existing.outputs.exists == 'false'
         run: |
           set -euo pipefail
-          pin=$(PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys; sys.path.insert(0, "scripts/release"); import build_macos_release; print(build_macos_release.arkforge_pin())')
+          pin=$(PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys; sys.path.insert(0, "hack/release"); import build_macos_release; print(build_macos_release.arkforge_pin())')
           checkout="$RUNNER_TEMP/ArkForge"
           git init "$checkout"
           git -C "$checkout" remote add origin https://github.com/ArkDeck/ArkForge.git
@@ -305,7 +305,7 @@ jobs:
           ARKDECK_NOTARY_API_ISSUER_ID: ${{ secrets.ARKDECK_NOTARY_API_ISSUER_ID }}
           ARKDECK_XCODE_SOURCE_PACKAGES: ${{ runner.temp }}/arkdeck-swiftpm/SourcePackages
         run: >-
-          python3 scripts/release/build_macos_release.py release
+          python3 hack/release/build_macos_release.py release
           --output "$RUNNER_TEMP/rc"
           --arkforge-checkout "$ARKDECK_ARKFORGE_CHECKOUT"
 

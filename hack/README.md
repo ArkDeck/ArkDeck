@@ -1,0 +1,50 @@
+# hack/ 边界地图(framework vs 产品工具)
+
+TASK-DEC-001(chg-2026-040)交付的一页索引:`hack/` 下每个一级条目
+属于**自动化框架**(治理/守卫/循环,与 ArkDeck 产品语义无关)还是
+**产品工具**(为某个 change 的设备/取证工作而生),以及各自的实例参数
+落在哪里。新增一级条目时同步更新本文件——
+`tests/test_agent_pr_identity.py::ScriptsBoundaryMapTests` 以 `git ls-tree` 清点
+对照,遗漏即红。
+
+## 自动化框架(framework)
+
+| 条目 | 职责 | 实例参数所在 |
+| --- | --- | --- |
+| `agent_pr_identity.py` | Agent PR workflow 的身份 helper:从分页 PR 列表选出唯一 open PR、按仓库/编号/base/head/OID/作者核验读回、从最终 commit subject 取 Task token 写进 PR 正文(只作追溯,不查 tasks.md)。原 `check_pr_paths.py` 路径护栏及其 `automation_config.json` 已由 CHG-2026-077 退役 | 期望值全部由 workflow 以参数传入;无实例数据文件 |
+| `tests/test_agent_pr_identity.py` | 上述 helper 的离线契约套件(pull-list/identity 矩阵、CLI 读回、commit-task、本 README 覆盖清点) | 无(纯测试) |
+| `check_sdd.py` | SDD 一致性检查器:specs/changes/locks/registry 的 fail-closed 校验 | openspec 布局常量在模块内硬编码(收口不在 DEC-001 范围,台账已记) |
+| `tests/test_check_sdd.py` | 检查器契约套件(TASK-DEC-003 起接入 CI) | 无(纯测试) |
+| `check_union_merge.py` | `.gitattributes` 以 `merge=union` 合并的只追加记录(`openspec/changes/*/tasks.md`、`rust/README.md`)的守卫:重复的记录 bullet/`##` 标题或残留冲突标记即红;`check-sdd.sh` 在 checker 前调用;`--self-test` 自检 | 文件清单在模块内硬编码 |
+| `rebase-union.sh` | 把当前 `agent/**` 分支重挂到 `origin/main`(或 `--onto <base> <old>` 剥离已 squash 合入的前序),并集驱动自动保两边,随后跑上述守卫并打印带旧 SHA 的 `--force-with-lease` 推送命令;不推送 | 无 |
+| `check-sdd.sh` | check-sdd 只读入口:解释器解析(ARKDECK_PYTHON → 本 checkout venv → 主 checkout 共享 venv → PATH),preflight 失败即 fail closed | 解释器覆盖 = `ARKDECK_PYTHON` |
+| `bootstrap-sdd.sh` | 共享 `.venv-sdd` 的一次性人工初始化(check-sdd.sh 永不调用它) | base 解释器覆盖 = `ARKDECK_BOOTSTRAP_PYTHON` |
+| `requirements-sdd.txt` | SDD venv 的依赖 pin(仅 guard job 安装;Agent PR job 零安装,故 `agent_pr_identity.py` 只用 stdlib) | 本文件即 pin |
+| `tests/test_sdd_runtime_entry.py` | TASK-SDR-001 契约套件:共享运行时发现矩阵 | 无(纯测试) |
+| `agent-guides/` | 根 `AGENTS.md` 按任务引用的验收、提交与指令维护指南 | 无；仅拆分读取入口，沿用根文件边界 |
+| `ci/` | 本地与 GitHub 共用的变更分类器、Xcode 稳定镜像入口与手动 UI 测试入口(`run-ui-tests.sh`;不在任何门里):以可信 base/head diff 和 App 实际 target 依赖选择 ArkDeckKit Swift / ArkDeck App 编译车道；`run-xcodebuild.sh` 让不同 worktree 复用同一增量图；base 不可得时 fail closed 跑全部 | 分类、稳定缓存同步规则与契约测试均封闭在目录内；GitHub 消费侧为 `swift-ci.yml` |
+| `release/` | macOS 发布候选版入口(TASK-XPA-017 S5):`build_macos_release.py` 的 `release`(维护者签名、公证、staple 的 DMG)与 `unsigned`(无凭据结构检查);`release_version.py` 维护单一版本源;夹具测试在 Rust CI 的 macOS job 跑 | 版本正本 = `release/release-version.json`;安装说明 = `docs/release/macos-install.md` |
+| `tests/test_agent_pr_workflow.py` | `.github/workflows/` Agent PR 命名空间分区的封闭契约(禁能力扫描) | 无(纯测试) |
+| `catalog_gen/` | Operation Catalog 校验/生成器(CHG-2026-046 T04):校验 `catalog/` 文档、生成 `RuntimeOperationCatalogGenerated.swift` 与 effect/authorization matrix;check_sdd family 11 调用其零写 drift 检查 | catalog 数据正本 = 仓库顶层 `catalog/`;生成物路径常量在模块内 |
+| `README.md` | 本文件 | — |
+
+框架的消费侧在 `.github/workflows/agent-pr.yml` 与 `sdd-guard.yml`
+(不在 `hack/` 下):前者的 open-pr job 直跑
+`agent_pr_identity.py`,后者的 guard job 跑 check-sdd、检查器与 helper 套件,以及 `tools/experiments/host_loop` 与 `tools/experiments/gj_record`。
+
+## 产品工具(product,一 change 一目录)
+
+| 条目 | 职责(出处 change) |
+| --- | --- |
+| `ui_dump_redaction/` | UI Dump 派生 golden 脱敏器(host-only 隐私边界) |
+| `bench/` | Runtime 性能基线与回归比对 harness(CHG-2026-074 SPK-1/TASK-XPA-023);自起隔离 daemon 于私有 state 目录测量,不碰设备、不碰已安装 Runtime |
+
+产品工具的实例参数(设备身份、镜像 pins、fixtures、脱敏词表)一律钉在
+**各自目录内**(README + 数据文件),不进框架面;守卫与循环对它们零
+依赖。`__pycache__/` 是未跟踪的 Python 字节码缓存,不属于任何一类。
+
+无 workflow 或产品代码引用、已删除的一次性目录：`m0b_capture`、`ud_capture`、
+`archive_characterization`、`ui_dump_diagnosis`、`partition_decode`、
+`trace_capture`。`host_loop`、`gj_record` 与 `manual_ui_flash` 在
+`tools/experiments/`：前两个仍由 SDD Guard discover，后者由
+`ManualUIFlashDriverContractTests` 解释执行。

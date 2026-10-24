@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import catalog_test_views as views
 
-GENERATOR_PATH = Path(__file__).resolve().parents[2] / 'scripts/catalog_gen/generate.py'
+GENERATOR_PATH = Path(__file__).resolve().parents[2] / 'hack/catalog_gen/generate.py'
 GENERATOR_SPEC = importlib.util.spec_from_file_location('catalog_view_guard_generator', GENERATOR_PATH)
 GENERATOR = importlib.util.module_from_spec(GENERATOR_SPEC)
 GENERATOR_SPEC.loader.exec_module(GENERATOR)
@@ -193,7 +193,7 @@ class CoverageReceipts(unittest.TestCase):
 class ClosedSources(unittest.TestCase):
     def test_recommission_catalog_adds_one_operation_to_maintenance_and_rejects_drift(self):
         rust = Path(__file__).resolve().parents[1]
-        rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'Catalog/operations').glob('*.json'))]
+        rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'catalog/operations').glob('*.json'))]
         self.assertEqual(views.catalog_table_digest(rust, rows), views.BOOT_CONTEXT)
         _, baseline = views.catalogs(rust)
         rows = [copy.deepcopy(baseline['observe.device@1']) if row['id'] == 'observe.device' else row for row in rows]
@@ -246,7 +246,7 @@ class ClosedSources(unittest.TestCase):
 
     def test_boot_context_catalog_rejects_descriptor_or_destructive_policy_drift(self):
         rust = Path(__file__).resolve().parents[1]
-        rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'Catalog/operations').glob('*.json'))]
+        rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'catalog/operations').glob('*.json'))]
         self.assertEqual(views.catalog_table_digest(rust, rows), views.BOOT_CONTEXT)
         for operation, field, value in [('observe.device', 'timeoutSeconds', 120),
                                         ('flash.restore-boot-loop', 'defaultPolicyIssuance', 'disabled')]:
@@ -376,7 +376,7 @@ class ClosedSources(unittest.TestCase):
 
     def catalog_view(self, digest, table, generated=None):
         for row in table.values():
-            self.write('Catalog/operations/' + row['id'] + '.json', json.dumps(row).encode())
+            self.write('catalog/operations/' + row['id'] + '.json', json.dumps(row).encode())
         self.write('rust/crates/arkdeck-contract/src/catalog_generated.rs',
                    (generated or self.generated(digest, table)).encode())
         with patch.object(views, 'catalogs', return_value=self.tables()):

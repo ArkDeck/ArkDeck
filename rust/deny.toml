@@ -103,6 +103,6 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # ArkForge, the first-party flash mechanism, is not published to a registry.
 # Its crates are taken at one exact revision (`rev` in Cargo.toml), the one
-# `Packages/ArkDeckKit/Package.swift` pins; `scripts/check-arkforge-pin.py`
+# `Packages/ArkDeckKit/Package.swift` pins; `rust/scripts/check-arkforge-pin.py`
 # refuses any other.
 allow-git = ["https://github.com/ArkDeck/ArkForge.git"]

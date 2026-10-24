@@ -795,7 +795,7 @@ class TaskFieldColonParityTests(unittest.TestCase):
             self._candidates(
                 "- Depends on：none\n",
                 "- Allowed paths：\n"
-                "  注：`scripts/rejected/**` 只是散文\n",
+                "  注：`hack/rejected/**` 只是散文\n",
             ),
             [],
         )

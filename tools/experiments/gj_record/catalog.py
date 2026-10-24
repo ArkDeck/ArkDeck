@@ -1,8 +1,8 @@
 """The published Catalog a record is judged against.
 
 The digest and the canonical operation set come from the generated Rust
-constants (`scripts/catalog_gen/generate.py` writes them and CI holds them in
-lockstep with `Catalog/`), read from a git revision rather than the working
+constants (`hack/catalog_gen/generate.py` writes them and CI holds them in
+lockstep with `catalog/`), read from a git revision rather than the working
 tree, so an uncommitted Catalog edit can never become the expected digest.
 The digest is recomputed from the canonical JSON as the generator computes it.
 """

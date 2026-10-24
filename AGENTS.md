@@ -17,7 +17,7 @@
 - 同一工作流连续产出的 PR 默认使用 stacked PR：首层以最新 `main` 为 base，后续层从相邻
   下层分支继续，并以该分支为 base；每层只提交一个可独立审阅的增量。下层更新后由底向上
   同步整条依赖链，避免多个依赖 PR 各自从旧 `main` 分叉。具体建栈、同步与合入规则见
-  [提交指南](scripts/agent-guides/contributing.md#连续-pr-使用-stacked-pr)。
+  [提交指南](hack/agent-guides/contributing.md#连续-pr-使用-stacked-pr)。
 - 多个 Agent 需要修改同一份共享字符串、契约、生成器或生成物时，先确定一个集成层及负责的
   Agent，其余实现依赖该层；共享源与生成物在该层一起更新，不在平行分支重复生成。
 - 当前请求还有未完成的工作时继续推进，不在这些地方停下：总结末尾预告下一步却不执行；询问
@@ -31,12 +31,12 @@
 | 任务 | 入口 |
 | --- | --- |
 | 产品能力与优先级 | [PRODUCT-LOOP.md](docs/archive/PRODUCT-LOOP.md) 对应 Golden Journey；`Packages/ArkDeckKit/Sources/`、`ArkDeckApp/` |
-| Operation、Runtime、Provider、Artifact | 对应 `openspec/specs/`、`openspec/contracts/`、`Catalog/` 与 integration/platform profile |
+| Operation、Runtime、Provider、Artifact | 对应 `openspec/specs/`、`api/contracts/`、`catalog/` 与 integration/platform profile |
 | 身份、副作用准入、恢复、隐私 | [Constitution](openspec/constitution.md) 对应 Safety invariant / `POL-*`，再读相关 contract |
 | 新 operation 或已发布 operation 的破坏性修改、新 provider、新 integration/device profile、destructive 准入安全策略变化 | 同车 OpenSpec change + 维护者 PR review；读取 [enforcement](openspec/governance/enforcement.md)、[verification policy](openspec/verification/policy.md) 与所属 change |
-| 真机验收已发布 operation，或验收 App 呈现 | [验收指南](scripts/agent-guides/acceptance.md) |
-| 准备 commit、push、创建或更新 PR，包括连续 PR 建栈与冲突同步 | [提交指南](scripts/agent-guides/contributing.md)；提交前读取 |
-| 维护 AGENTS.md、项目 skill 或排查指令冲突 | [指令维护](scripts/agent-guides/instructions.md) |
+| 真机验收已发布 operation，或验收 App 呈现 | [验收指南](hack/agent-guides/acceptance.md) |
+| 准备 commit、push、创建或更新 PR，包括连续 PR 建栈与冲突同步 | [提交指南](hack/agent-guides/contributing.md)；提交前读取 |
+| 维护 AGENTS.md、项目 skill 或排查指令冲突 | [指令维护](hack/agent-guides/instructions.md) |
 
 表中操作指南仅在命中对应任务时读取，是本文件的按需说明；无需预先加载全部链接。
 仓内资料冲突时：Constitution Safety invariants / `POL-*` > `docs/archive/PRODUCT-LOOP.md` > 本文件及其操作指南 >
@@ -75,14 +75,14 @@ Golden Journey 风险最小的解释并说明。旧 E0/E1/E2 或确认流程不�
   时标记 blocked/nonConformant 或不发布，不创建平台豁免。
 - candidate/repairer 是 Runtime 隔离角色：candidate 仅在 task-owned isolation build/test；
   repairer 不接触 source workspace；两者不接触 transport、Runtime、raw shell 或 capability
-  admin。`scripts/host_loop` 只领取 `Hardware required:no` 的 D0 Repo 任务，不执行设备 job。
+  admin。`tools/experiments/host_loop` 只领取 `Hardware required:no` 的 D0 Repo 任务，不执行设备 job。
 - Raw Artifact 不原地修改，派生处理保留来源；默认本地保存，导出由用户发起，secret 不写入
   日志或 evidence。fake、fixture、simulation、plan-only 不能充当真机验收；
   `REAL_DEVICE_PASS` 只用于当前 Catalog digest 上的真实设备结果。
 
 ## 验证与完成
 
-开发时用针对性检查验证可观察行为与关键失败路径。修改 `Catalog/**`、`openspec/contracts/**`
+开发时用针对性检查验证可观察行为与关键失败路径。修改 `catalog/**`、`api/contracts/**`
 或生成物时保持 schema、generator vocabulary/pins、Swift validator 与 contract tests 一致。
 
 push 前本地只跑针对性检查（目标 10 分钟内；不拿门锁，不等别的门）：
@@ -93,13 +93,13 @@ push 前本地只跑针对性检查（目标 10 分钟内；不拿门锁，不�
   `ARKDECK_CARGO_OWNER`（默认 `CODEX_THREAD_ID`，普通终端为 `local`）隔离会话；三个会话各自
   复用固定镜像与 target，换任务、分支、工作树或源码快照时不新建缓存。同一会话共用锁。
   `ARKDECK_CARGO_CACHE_ROOT` 只用于指定该会话固定的仓库外可写根，不按任务/快照生成新路径；
-- 改了契约输入（`control-protocol.json`、`spec/control/methods/**`、ControlFrames、CLI argv 语料）才跑
+- 改了契约输入（`control-protocol.json`、`api/control/methods/**`、ControlFrames、CLI argv 语料）才跑
   `python rust/scripts/generate-contract.py --check`；改了 `openspec/**`、`docs/**`、`AGENTS.md` 才跑
-  `sh scripts/check-sdd.sh`；
+  `sh hack/check-sdd.sh`；
 - Swift 只跑受影响的测试类：`sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <类>`；App 改动
-  只对受影响 scheme 做 build-for-testing（`scripts/ci/run-xcodebuild.sh`）。
+  只对受影响 scheme 做 build-for-testing（`hack/ci/run-xcodebuild.sh`）。
 
-统一门是 PR 上的 GitHub CI：push 到 `agent/**` 自动开 PR，CI 里的 `scripts/ci/plan.py` 按完整 diff
+统一门是 PR 上的 GitHub CI：push 到 `agent/**` 自动开 PR，CI 里的 `hack/ci/plan.py` 按完整 diff
 选择 Swift、App build-for-testing、design-system、Rust 车道（可信 base 不可得时选择全部车道），与本地
 `--run-local` 是同一套逻辑。
 

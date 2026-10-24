@@ -17,7 +17,7 @@
 1. **权威执行层整体迁入 Rust 进程 `arkdeck-agentd`**（保留现有 launchd label `com.arkdeck.agentd` 与二进制名，避免安装面变化）。admission、Job/journal/recovery、capability、artifact、provider lowering、进程执行全部只在这一个进程内，单实例、单写者。它是现有 Swift `arkdeck-agentd` 的逐店铺（store-by-store）替换，不是重写。
 2. **macOS 保留 SwiftUI App**，通过 launchd Mach service（XPC C API）访问 daemon；**Windows 用 WinUI 3 / Windows App SDK 2.x**，通过 user-private Named Pipe 访问同一 Rust daemon；CLI 改为单一 Rust 实现，两端同一二进制源码。
 3. **FFI 只允许一个 crate `arkdeck-contract-ffi`**，内容限定为确定性纯计算：canonical JSON/CBOR、digest、schema/文档校验、离线 journal/artifact index 解码、（按需）Viewer 大树索引。它没有任何 authority、I/O 或副作用；panic 在边界捕获并返回错误码。它是可选优化，不是架构依赖。
-4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 SVC 完成后的最新 Swift 单 v1 字节为 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
+4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `api/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 SVC 完成后的最新 Swift 单 v1 字节为 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
 5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。r10 按未发布产品在隔离开发根建设最终 Rust 链；不要求每一步可发布或切回 Swift，当前契约与安全边界保持，必要格式调整随实现 review。（r11：进度单位改为隔离 Rust daemon 上的 Golden Journey 里程碑 M1～M5，安装态逐 store 组合撤回，唯一一次 cutover 在 M5；见 §G.1 r11）
 6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。（r8：Windows 阶段在 macOS 侧完成、GJ-1～5 在纯 Rust daemon 上 PASS（§J.5 G5）之后才开始。r12：Swift runtime 已删、Rust 是唯一实现，Windows 阶段现在打开，与 macOS 阶段 A 真机验收并行；G5 仍是 macOS 的门，见 §L.1 第 18 条。）
 
@@ -40,7 +40,7 @@
 | 1 | 权威顺序 | Constitution Safety invariants/POL-* > `PRODUCT-LOOP.md` > `AGENTS.md` > specs/contracts > profile > enforcement/policy > 代码 | F | `AGENTS.md:22-24`；`PRODUCT-LOOP.md:1075-1076` |
 | 2 | 阶段 | 产品闭环优先阶段自 2026-07-30 生效；治理框架冻结；一个问题 = 一个垂直任务 = 一个 PR | F | `PRODUCT-LOOP.md:3,25-49,187-224` |
 | 3 | GJ 状态 | GJ-1～GJ-5 于 2026-09-02 在 digest `508783ac…` 上 headless `REAL_DEVICE_PASS`；29 个 canonical operation 真机覆盖 29/29（2026-09-03 补跑） | F | `docs/design/references/v1.6-goal/real-device-validation.md:209-227,217-218,260-262`；`docs/design/references/v1.6-goal/gj-headless-rerun-2026-09-02.json:3-10,834`；`docs/design/arkdeck-cli-product-spec.md:1573` |
-| 4 | 当前 digest 与 GJ digest 一致 | 生成物、registry、coverage 三处同一 digest；Catalog 30 个 descriptor（29 canonical + `flash.dayu200` alias） | F | `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift:7`；`Catalog/generated/effect-authorization-matrix.md:6`；`openspec/contracts/cli-command-registry.yaml:3`；`openspec/contracts/cli-feature-coverage.json:4` |
+| 4 | 当前 digest 与 GJ digest 一致 | 生成物、registry、coverage 三处同一 digest；Catalog 30 个 descriptor（29 canonical + `flash.dayu200` alias） | F | `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift:7`；`catalog/generated/effect-authorization-matrix.md:6`；`api/contracts/cli-command-registry.yaml:3`；`api/contracts/cli-feature-coverage.json:4` |
 | 5 | 冻结解除条件已满足 | §20 冻结「新平台支持/大规模 Package 重构」直到 GJ-1/GJ-2 PASS；现已 PASS。但 §12「结构性改动必须和一个 GJ 同车」仍然有效 | F | `PRODUCT-LOOP.md:1004-1029,702-725` |
 | 6 | 四类 Repo 审批 | 新 operation/破坏性修改、新 provider、新 integration/device profile、E2 策略变化必须 change + 维护者 review | F | `AGENTS.md:37-40`；`PRODUCT-LOOP.md:1081-1083` |
 | 7 | Core 可移植性现行决策 | 「language-neutral contracts + 各平台 native 实现」；三份 Profile 固定策略值 `native-conforming-shared-contract-vector-suite`；引入共享 Rust/C++/WASM library 须先走 architecture/platform change 并同步更新受影响 Profile | F | `openspec/architecture/core-portability.md:9,11,30,34` |
@@ -50,8 +50,8 @@
 | 11 | Windows 实现语言的现行假设 | 规格设想 C#/.NET 或 C++ 独立实现、共享 fixtures 而非 Swift 源码；「Windows 复刻可以只阅读 language-neutral registry/schema/fixtures」 | F | `arkdeck-cli-product-spec.md:1325-1327,2141-2142`；`openspec/platforms/windows/profile.md:15-21` |
 | 12 | Windows Slice D 未开始 | 不阻断 macOS-only claim，阻断跨平台 claim | F | `arkdeck-cli-product-spec.md:1584-1586,1874-1882` |
 | 13 | 单 v1 控制面 | LF JSON；请求 `{protocolVersion,contractIdentity,id,method,params?}`；固定 `1.0.0` 与 contract identity；请求上限 4 MiB、响应上限 8 MiB；客户端在同一连接上先验证 `health` 再发送业务帧；一请求恰一响应，重连重验、丢失响应不 replay | F | `Sources/ArkDeckCore/ControlProtocolGenerated.swift:5-9`；`Sources/ArkDeckCore/ControlProtocolContract.swift:12-27,53-64`；`Sources/ArkDeckAgentClient/AgentClient.swift:40-56,195-209` |
-| 14 | 当前方法集 | registry、Swift 生成物、逐方法 schema 均为 96 个方法；无 `protocol.negotiate` 或 target/legacy 分流。CLI `device candidates` 实际请求 `device.observations`；当前 HDC 状态方法为 `runtime.hdc.status` | F | `Packages/ArkDeckKit/Contracts/control-protocol.json`；`Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift:1519-1524`；`openspec/contracts/runtime-control-plane.schema.json` |
-| 15 | 逐 method schema 已交付 | `spec/control/methods/` 下 96 份 schema，含 request/result/errorCode/errorDetails；`Fixtures/ControlFrames/` 有 96 份录制 corpus。schema 由测试实际记录推导；corpus 只覆盖已录制路径，不证明错误分支穷尽 | F | `spec/control/README.md`；`Tests/ArkDeckContractTests/ControlMethodSchemaContractTests.swift`；SVC-005 `single-v1-baseline.md` |
+| 14 | 当前方法集 | registry、Swift 生成物、逐方法 schema 均为 96 个方法；无 `protocol.negotiate` 或 target/legacy 分流。CLI `device candidates` 实际请求 `device.observations`；当前 HDC 状态方法为 `runtime.hdc.status` | F | `Packages/ArkDeckKit/Contracts/control-protocol.json`；`Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift:1519-1524`；`api/contracts/runtime-control-plane.schema.json` |
+| 15 | 逐 method schema 已交付 | `api/control/methods/` 下 96 份 schema，含 request/result/errorCode/errorDetails；`Fixtures/ControlFrames/` 有 96 份录制 corpus。schema 由测试实际记录推导；corpus 只覆盖已录制路径，不证明错误分支穷尽 | F | `api/control/README.md`；`Tests/ArkDeckContractTests/ControlMethodSchemaContractTests.swift`；SVC-005 `single-v1-baseline.md` |
 | 16 | 事件流 | 只有 pull：`job.events` 游标分页（pageSize 默认 100、上限 1000，AEAD 封装 cursor）；CLI 250 ms 轮询；无 server push | F | `AgentDaemon.swift:1155-1187`；`Sources/ArkDeckStorage/JournalEventPages.swift:12,121-135`；`Sources/ArkDeckCLI/CLIJobEvents.swift:83-165,164` |
 | 17 | 对端身份 | UDS 检查 `getpeereid`，但 UID 不符**仍处理请求**，只影响 console 资格；ADR-0005 明言「本用户可达即授权边界（MVP）」 | F | `AgentDaemon.swift:5144-5194`；`docs/adr/0005-agentd-uds-control-plane.md:12-14` |
 | 18 | App 到 daemon 的路径 | 沙箱 App 无法 `connect()` AF_UNIX（实测 EPERM），唯一通道是 launchd Mach service `com.arkdeck.agentd`（`NSXPCListener`，`shouldAcceptNewConnection` 接受一切，按帧白名单准入）；App 不 import `ArkDeckAgentClient` | F | `ArkDeckApp/ArkDeckApp.entitlements:26-41`；`AgentXPCListener.swift:26,44-51,159-222`；`Sources/ArkDeckWorkflows/XPCConnectionBox.swift:26-98`；`Packages/ArkDeckKit/LaunchAgents/com.arkdeck.agentd.plist`（注释）|
@@ -59,29 +59,29 @@
 | 20 | App 的组合方式 | App 22,612 行 Swift/33 文件；`@main` 组合根构造 14 个 `*ApplicationFacade.make()`；facade 与 `*Presentation` 类型位于 `ArkDeckWorkflows`（引擎模块）；App 无单元测试 target，59 个 UI test 方法 | H | `ArkDeckApp/App/ArkDeckApp.swift:88-157,100-135`；`ArkDeck.xcodeproj/project.pbxproj:468,490`；`Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift:26,143,295` |
 | 21 | 部署目标冲突 | Package 与 Xcode 工程要求 macOS 26；Profile/ADR-0002 写 macOS 14/arm64 | F（冲突） | `Packages/ArkDeckKit/Package.swift:7`；`ArkDeck.xcodeproj/project.pbxproj:691,710,739,777`；`openspec/platforms/macos/profile.md:9`；`docs/adr/0002-macos-v1-sandboxed-distribution.md:18` |
 | 22 | 代码规模（本次实测，HEAD 238a2fb2） | Packages Sources 157,432 行/267 文件；App 22,612 行；ContractTests 101,656 行/193 文件；UI tests 5,963 行。用户线索「约 15 万行」偏低 | H | `find … -name '*.swift' \| xargs wc -l`；模块明细见 §E |
-| 23 | 尚无生产 Rust/Windows 工程 | 无生产 `rust/` workspace、`windows/`、C# 工程或 `spec/ui-semantics/`；已有 SPK-2 的 Rust `listener/Cargo.toml` 与源码，属于隔离实验。生产 App/daemon 仍经 `NSXPCConnection`/`NSXPCListener`，实验通过不等于 XPA-003 已迁移 | F | `git ls-files`；CHG-074 `evidence/runs/TASK-XPA-003/spk-2/listener/`；`Sources/ArkDeckWorkflows/XPCConnectionBox.swift:5-11`；`Sources/ArkDeckAgentDaemon/AgentXPCListener.swift:26-44` |
-| 24 | **ArkForge 已是 Rust daemon 先例** | 15 crate workspace、76,377 行 Rust、零第三方运行时依赖、Rust 1.98/edition 2024、`panic="abort"`；UDS（0700/0600）与 Windows Named Pipe（logon SID DACL、`PIPE_REJECT_REMOTE_CLIENTS`、`FILE_FLAG_FIRST_PIPE_INSTANCE`、client SQOS identification）；length-prefixed Protobuf，16 MiB 帧、深度 16；Swift SDK 3,524 行以内联 hex 向量维持字节一致；`spec/` 为语言无关正本，Rust 为 oracle 生成 conformance fixtures | H（外部仓库） | `ArkForge/Cargo.toml:1-36`；`ArkForge/docs/architecture.md:338-400,1508-1584`；`ArkForge/crates/arkforge-ipc/src/wire.rs:1-22`；`ArkForge/crates/arkforge-platform/src/lib.rs:1-5,246-259`；`ArkForge/crates/arkforge-platform/src/platform.rs:34-45,474,513`；`ArkForge/docs/decisions/AFD-0005-language-neutral-spec.md:1-39`；`ArkForge/crates/arkforge-ipc/tests/swift_sdk_vectors.rs:20-37` |
+| 23 | 尚无生产 Rust/Windows 工程 | 无生产 `rust/` workspace、`windows/`、C# 工程或 `api/ui-semantics/`；已有 SPK-2 的 Rust `listener/Cargo.toml` 与源码，属于隔离实验。生产 App/daemon 仍经 `NSXPCConnection`/`NSXPCListener`，实验通过不等于 XPA-003 已迁移 | F | `git ls-files`；CHG-074 `evidence/runs/TASK-XPA-003/spk-2/listener/`；`Sources/ArkDeckWorkflows/XPCConnectionBox.swift:5-11`；`Sources/ArkDeckAgentDaemon/AgentXPCListener.swift:26-44` |
+| 24 | **ArkForge 已是 Rust daemon 先例** | 15 crate workspace、76,377 行 Rust、零第三方运行时依赖、Rust 1.98/edition 2024、`panic="abort"`；UDS（0700/0600）与 Windows Named Pipe（logon SID DACL、`PIPE_REJECT_REMOTE_CLIENTS`、`FILE_FLAG_FIRST_PIPE_INSTANCE`、client SQOS identification）；length-prefixed Protobuf，16 MiB 帧、深度 16；Swift SDK 3,524 行以内联 hex 向量维持字节一致；`api/` 为语言无关正本，Rust 为 oracle 生成 conformance fixtures | H（外部仓库） | `ArkForge/Cargo.toml:1-36`；`ArkForge/docs/architecture.md:338-400,1508-1584`；`ArkForge/crates/arkforge-ipc/src/wire.rs:1-22`；`ArkForge/crates/arkforge-platform/src/lib.rs:1-5,246-259`；`ArkForge/crates/arkforge-platform/src/platform.rs:34-45,474,513`；`ArkForge/docs/decisions/AFD-0005-language-neutral-spec.md:1-39`；`ArkForge/crates/arkforge-ipc/tests/swift_sdk_vectors.rs:20-37` |
 | 25 | ArkDeck 如何用 ArkForge | `arkdeck-agentd` spawn `arkforged`（nested code，无第二个 LaunchAgent，pairing secret 走 stdin，空 entitlements）；Swift 侧 `ArkForgeLaneHost` 经 UDS + length-prefixed frames；`adapters/arkforge-arkdeck-adapter` 是 ArkForge 仓内已存在的 Rust authority-side adapter，ArkDeck 当前未用 | F | `ArkForge/docs/decisions/AFD-0003-arkforged-signing-packaging.md:50-64,66-92`；`Sources/ArkDeckWorkflows/ArkForgeLaneHost.swift:88,97-106,426-431`；`Sources/ArkDeckAgentDaemonMain/main.swift:666-691,1147-1228`；`ArkForge/docs/architecture.md:309-311,388` |
 | 26 | ArkForge Windows 状态 | AF-W1 Named Pipe/ACL/WinUSB/签名脚本已落地并通过 MSVC 交叉检查，**尚未在合格 Windows x64 runner 真实跑绿** | H（外部） | `ArkForge/TASKS.md:17`；`ArkForge/README.en.md:34-36` |
 | 27 | 持久化布局 | 根 `~/Library/Application Support/ArkDeck/Agentd`：`jobs/<id>/journal.jsonl` + `job-record.json` + `manifest.json`；`artifacts/<id>/index.json`；`capabilities/`（doc 1.0.0 + JSONL ledger，128 事件 checkpoint）；`targets/`；`runtime-jobs.sqlite3`（schema v1、WAL、`synchronous=FULL`、`BEGIN IMMEDIATE`）；`instance.lock`；session-storage 等 | F | `Sources/ArkDeckCore/AgentXPCContract.swift:17-31`；`Sources/ArkDeckWorkflows/RuntimeJobRecord.swift:139`；`Sources/ArkDeckStorage/RuntimeJobRepository.swift:63-64,87-96,539-581,738`；`Sources/ArkDeckStorage/RuntimeCapabilityStore.swift:146-148,222-234`；`Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift:316-320,2084-2086` |
 | 28 | Journal 耐久语义 | 每事件 `write`+`fsync`+`F_FULLFSYNC`+目录 `fsync`；`O_APPEND\|O_NOFOLLOW` 0600；无 hash 链，靠 tail cursor（末记录 SHA-256 + stat）；torn tail 用 `ftruncate` 修复；每 job `.manifest.lock` `flock(LOCK_EX)` 并重验 dev/ino/uid/nlink | F | `Sources/ArkDeckStorage/DurableFiles.swift:88-133,144-216,284-298,318-319,334-335,368-378,628-673`；`Sources/ArkDeckStorage/JournalReplay.swift:142-157,602-604` |
-| 29 | Journal 单一世代 | CHG-2026-075 TASK-SVC-002 合入后 Swift 只接受 `1.0.0`（`isSupportedSchemaVersion` 是精确相等），与契约 `journal-event.schema.json` 的 `const "1.0.0"` 一致；扫描时的五代并存与该冲突已消解 | F | `Sources/ArkDeckStorage/JournalEvent.swift:39-42,76-78`；`openspec/contracts/journal-event.schema.json:3,19` |
+| 29 | Journal 单一世代 | CHG-2026-075 TASK-SVC-002 合入后 Swift 只接受 `1.0.0`（`isSupportedSchemaVersion` 是精确相等），与契约 `journal-event.schema.json` 的 `const "1.0.0"` 一致；扫描时的五代并存与该冲突已消解 | F | `Sources/ArkDeckStorage/JournalEvent.swift:39-42,76-78`；`api/contracts/journal-event.schema.json:3,19` |
 | 30 | 状态机是代码 | `JobState` 20 态/6 终态、`allowedDestinations(from:mode:)` 是 `switch`；规格里是 ASCII 图；`simulated` 不是引擎 mode，只是 manifest/展示词汇 | F | `Sources/ArkDeckCore/JobStateMachine.swift:1-4,6-9,36-38,488-493,558-620`；`openspec/specs/workflow-journal-recovery/spec.md:82-112`；`Sources/ArkDeckStorage/SessionManifest.swift:905,983,1057-1060` |
-| 31 | Canonical 形态 | JCS（UTF-16 code unit 键序、ECMAScript 数字、不转义 `/`）+ 10 向量 5 拒绝；deterministic CBOR 只用于 StepPermit 并与 Rust 交叉验证；digest 全部 SHA-256 小写 hex；Catalog digest 由 Python 生成器算（Profiles 不入 digest） | F | `Sources/ArkDeckCore/PortableCanonicalJSON.swift:16-41,85,97-183`；`openspec/contracts/cli-canonical-json-vectors.json`；`Sources/ArkDeckCore/CanonicalCBOR.swift:24`；`scripts/catalog_gen/generate.py:741-748` |
+| 31 | Canonical 形态 | JCS（UTF-16 code unit 键序、ECMAScript 数字、不转义 `/`）+ 10 向量 5 拒绝；deterministic CBOR 只用于 StepPermit 并与 Rust 交叉验证；digest 全部 SHA-256 小写 hex；Catalog digest 由 Python 生成器算（Profiles 不入 digest） | F | `Sources/ArkDeckCore/PortableCanonicalJSON.swift:16-41,85,97-183`；`api/contracts/cli-canonical-json-vectors.json`；`Sources/ArkDeckCore/CanonicalCBOR.swift:24`；`hack/catalog_gen/generate.py:741-748` |
 | 32 | 机器契约的事实源是 Swift | `arkdeck maintainer contracts export/check` 从 Swift 导出机器契约；当前 CLI corpus 为 209 个 argv fixture，index 共列 224 个 fixture 文件，不能与 96 个控制面录制文件混计 | F | `Sources/ArkDeckCLI/CLIMachineContracts.swift`；`Tests/ArkDeckContractTests/Fixtures/CLI/index.json`；`Tests/ArkDeckContractTests/CLIMachineContractTests.swift` |
 | 33 | Darwin 绑定密度 | ArkDeckCore 与 TraceAdapter 无 Darwin import；Process 5/5 文件、Storage 17、Workflows 32 处 `import Darwin`，另有 `Security/LocalAuthentication/IOKit/os/AVFoundation/CoreGraphics` | H | 逐模块统计见 §E.1（engine 盘点） |
 | 34 | 进程执行器 | `posix_spawn`，argv[0] 用 `/.vol/<dev>/<ino>` inode 路径，执行前后双重 revalidate；25 ms `poll` 抽取；无 kqueue | F | `Sources/ArkDeckProcess/VerifiedRegularFileDescriptor.swift:130-142,180-219`；`Sources/ArkDeckProcess/ArkDeckProcess.swift:6-9,1030`；`Sources/ArkDeckProcess/IdentityBoundDaemonLauncher.swift:20-23,165` |
 | 35 | HDC supervisor 观测 | `proc_listallpids/proc_pidpath/proc_pidinfo/sysctl KERN_PROCARGS2`、socket 归属解码，全部 libproc | F | `Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift:310-401`；`Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift:655-740` |
 | 36 | 引擎单文件 | `RuntimeJobEngine.swift` 10,252 行 actor；admission 各阶段可定位 | H | `Sources/ArkDeckWorkflows/RuntimeJobEngine.swift:813,1251,1556-1610,7084-7131,7370-7498,7623-7680,8120-8177` |
-| 37 | 性能采集与比对已落地 | `scripts/bench` 有 capture/compare、固定数据规模、独立冷 idle 进程及 RSS plateau/steady 两电平；最新提交 SPK-1 JSON 含 9 个产品指标与 1 个校准指标。它测量 Swift daemon，不是 Rust 或 Windows 结果 | F/H | `scripts/bench/metrics.py:278-365`；`scripts/bench/compare.py`；`scripts/bench/baselines/perf-baseline-2026-09-04.json` |
-| 38 | CI 车道 | 统一 planner 仍只有 swift/app/ds；`rust-perf.yml` 已用 SwiftPM 构建被测产品，提供 PR/nightly 比对与归档、每周默认 4 h soak。跨主机不匹配时显式 skip，不构成性能门通过；尚无生产 Rust/Windows 构建车道 | F | `scripts/ci/plan.py:55-60,85-113`；`.github/workflows/rust-perf.yml`；`scripts/bench/README.md` |
+| 37 | 性能采集与比对已落地 | `hack/bench` 有 capture/compare、固定数据规模、独立冷 idle 进程及 RSS plateau/steady 两电平；最新提交 SPK-1 JSON 含 9 个产品指标与 1 个校准指标。它测量 Swift daemon，不是 Rust 或 Windows 结果 | F/H | `hack/bench/metrics.py:278-365`；`hack/bench/compare.py`；`hack/bench/baselines/perf-baseline-2026-09-04.json` |
+| 38 | CI 车道 | 统一 planner 仍只有 swift/app/ds；`rust-perf.yml` 已用 SwiftPM 构建被测产品，提供 PR/nightly 比对与归档、每周默认 4 h soak。跨主机不匹配时显式 skip，不构成性能门通过；尚无生产 Rust/Windows 构建车道 | F | `hack/ci/plan.py:55-60,85-113`；`.github/workflows/rust-perf.yml`；`hack/bench/README.md` |
 | 39 | 发布状态 | 无 git tag；`MARKETING_VERSION 0.1.0`；ADR-0002 四道 release gate 未满足（Developer ID 未就位等）；自动更新为自研 Ed25519 feed + Finder 交接 | H | `git tag`；`project.pbxproj:740`；`docs/adr/0002-macos-v1-sandboxed-distribution.md:69-80`；`docs/release/macos-auto-update.md:3-21` |
 | 40 | 相关任务进展 | CHG-074 已在仓；SVC-001..004 为 done，SVC-005 为 ready；XPA-001 为 in-progress（schema 已交付，GJ re-pass 待设备窗口），XPA-023 为 done；SPK-2 已有通过记录。其余实现与平台验收不能由这些状态推导完成 | F | CHG-074/075 `tasks.md`；CHG-074 `evidence/runs/TASK-XPA-001/run.md`；SVC-005 `single-v1-baseline.md` |
-| 41 | 路径护栏机制 | 已退役（CHG-2026-077）：`scripts/check_pr_paths.py`、其配置与两个 allowed-paths job 已删除，改动范围由维护者在真实 diff 上 review；Agent PR workflow 只保留 bot PR 的身份核验（`scripts/agent_pr_identity.py`） | F | CHG-2026-077 `tasks.md`；`scripts/agent_pr_identity.py`；`.github/workflows/agent-pr.yml` |
+| 41 | 路径护栏机制 | 已退役（CHG-2026-077）：`hack/check_pr_paths.py`、其配置与两个 allowed-paths job 已删除，改动范围由维护者在真实 diff 上 review；Agent PR workflow 只保留 bot PR 的身份核验（`hack/agent_pr_identity.py`） | F | CHG-2026-077 `tasks.md`；`hack/agent_pr_identity.py`；`.github/workflows/agent-pr.yml` |
 | 42 | ADR-0009 依据已失效 | 其论证的四个符号在仓内零命中，维护者尚未裁决决策 2/4 今日由何承载 | F（悬而未决） | `docs/adr/0009-campaign-unknown-outcome-authority.md:3-14` |
 | 43 | Windows App SDK 现状（官方） | 稳定版 2.4.0（2026-08-13）、2.3.1（07-16）…；2.0 起 SemVer；runtime installer 提供 x64/x86/arm64；WinUI 3 支持 Windows 10 1809+；framework-dependent vs self-contained；`PublishSingleFile` 仅 unpackaged+self-contained；Native AOT 自 1.6 起支持（需 CsWinRT 2.1.1，`{Binding}` 需手工 root） | F（外部） | learn.microsoft.com（§C/§H 引用） |
 | 44 | 用户线索校正 | 「macOS App 通过 XPC 进入同一 Runtime admission」正确；「约 15 万行 Swift」应为 ~18 万行生产代码 + ~10.8 万行测试；「12/29 覆盖」已是历史，现为 29/29 | I/H | 本表 #18、#22、#3 |
-| 45 | 当前未闭合证据 | Windows W0/WinUI/驱动/耐久语义仍待主机验证；生产 XPC/pipe、artifact 吞吐、cancel 与整套产品资源占用未测；post-SVC HEAD 尚无新的 SPK-1 性能结果。外部 ArkForge AF-W1 与开发工具链需在实施时核对 | M | §I、§L；`scripts/bench/baselines/perf-baseline-2026-09-04.json`；CHG-074/075 现有记录 |
+| 45 | 当前未闭合证据 | Windows W0/WinUI/驱动/耐久语义仍待主机验证；生产 XPC/pipe、artifact 吞吐、cancel 与整套产品资源占用未测；post-SVC HEAD 尚无新的 SPK-1 性能结果。外部 ArkForge AF-W1 与开发工具链需在实施时核对 | M | §I、§L；`hack/bench/baselines/perf-baseline-2026-09-04.json`；CHG-074/075 现有记录 |
 
 ### B.2 裁决与假设
 
@@ -141,8 +141,8 @@ P4/P5 不在题目要求的三方案之内，但它们是「不做 Rust」的两
 
 ```mermaid
 flowchart TB
-  subgraph SPEC["spec/ 语言无关事实源（生成后冻结，Rust conformance 为 oracle）"]
-    CAT[Catalog/operations + schema]
+  subgraph SPEC["api/ 语言无关事实源（生成后冻结，Rust conformance 为 oracle）"]
+    CAT[catalog/operations + schema]
     CTRL[control: single-v1 envelope, validation, per-method typed schemas]
     SM[job-state-machine.yaml + reason codes + effects]
     JRN[journal / manifest / artifact-index / capability schemas 1.0.0–3.0.0]
@@ -311,7 +311,7 @@ flowchart TB
 | 不变量 | 落点 |
 |---|---|
 | UI 不能执行进程/HDC/shell/设备副作用 | Z0→Z1 只有 typed 方法；App 进程内没有 `arkdeck-runtime`（结构测试）；FFI 无 I/O |
-| 外部调用方只能提交 published operation ref/typed inputs/refs/预算 | `arkdeck-control` 方法表封闭 + per-method schema；`FORBIDDEN_FIELD_NAMES`（`scripts/catalog_gen/generate.py:50-113`）延伸到 method schema |
+| 外部调用方只能提交 published operation ref/typed inputs/refs/预算 | `arkdeck-control` 方法表封闭 + per-method schema；`FORBIDDEN_FIELD_NAMES`（`hack/catalog_gen/generate.py:50-113`）延伸到 method schema |
 | 只有 protected Runtime 生成/持久化/消费 RuntimeCapability | `arkdeck-runtime` 内唯一 enforcement；控制面无 capability admin 方法（今日已如此，`ArchitectureRules.md:113`） |
 | connectKey 只寻址；mutation 前验证稳定身份与 binding revision | `arkdeck-runtime::admission` 的 `validateEvidenceFacts` 等价（`RuntimeJobEngine.swift:3297,3320`）+ 首个外部 effect 前重 materialize（`:8161-8177`） |
 | intent-before-effect / durable journal / unknown 永不盲重放 | `arkdeck-durable::journal` 复刻 `DurableFiles.swift` 的 fsync 与 tail cursor 语义；recovery 只读回 |
@@ -351,9 +351,9 @@ flowchart TB
 
 | 现有模块（子域） | 处置 | 目标 crate / 包 | 依据与要点 |
 |---|---|---|---|
-| ArkDeckCore：Catalog 类型与生成物、`WorkflowEffect`、`JobStateMachine`、`RuntimeCapability` 模型、Target identity、`PortableCanonicalJSON`、`CanonicalCBOR`、`CanonicalDigests`、`ControlProtocolGenerated/Negotiation`、`AgentXPCContract` 常量、`ArtifactResource/ImportContract` | **migrate** | `arkdeck-contract` | 已 Darwin-free；状态机由 `switch`（`JobStateMachine.swift:558-620`）转为 `spec/job-state-machine.yaml` 数据表，Swift 测试断言两者相等后冻结 |
+| ArkDeckCore：Catalog 类型与生成物、`WorkflowEffect`、`JobStateMachine`、`RuntimeCapability` 模型、Target identity、`PortableCanonicalJSON`、`CanonicalCBOR`、`CanonicalDigests`、`ControlProtocolGenerated/Negotiation`、`AgentXPCContract` 常量、`ArtifactResource/ImportContract` | **migrate** | `arkdeck-contract` | 已 Darwin-free；状态机由 `switch`（`JobStateMachine.swift:558-620`）转为 `api/job-state-machine.yaml` 数据表，Swift 测试断言两者相等后冻结 |
 | ArkDeckCore：Swift 侧 DTO | **split** | `ArkDeckClientKit`（生成） | 客户端仍需 Codable 模型，但改由 per-method schema 生成，不再手写 |
-| ArkDeckRuntime：v2 请求 DTO、`HumanActionRequired`、crash-ledger schema、`AgentStrictJSON` | **migrate** | `spec/` + `arkdeck-contract` | HAR 文档（`HumanActionRequired.swift:81-113`）先固化为 schema（CLI 规格 §19 已要求 Windows 不得以该 Swift 文件为规范） |
+| ArkDeckRuntime：v2 请求 DTO、`HumanActionRequired`、crash-ledger schema、`AgentStrictJSON` | **migrate** | `api/` + `arkdeck-contract` | HAR 文档（`HumanActionRequired.swift:81-113`）先固化为 schema（CLI 规格 §19 已要求 Windows 不得以该 Swift 文件为规范） |
 | ArkDeckRuntime：`RuntimeClocks`、`PowerActivity`、`SingleInstance`、`SystemLogger` | **migrate** | `arkdeck-platform` | 双时钟语义（`RuntimeClocks.swift:18,32`）：macOS `mach_continuous_time`/`mach_absolute_time`，Windows `GetTickCount64`（含睡眠）/`QueryUnbiasedInterruptTime`（不含）；契约测试证明睡眠行为，符合 `platform-ports.md:20-21` |
 | ArkDeckRuntime：`Activation`（CFMessagePort 二次实例激活） | **retain** | App / ClientKit | 属 App 自身 `PORT-ACTIVATION-001`，与 daemon 无关 |
 | ArkDeckStorage：`DurableFiles`、`JournalEvent/Replay/Validation`、`JournalEventPages`、`RuntimeJobRepository`（SQLite）、`RuntimeCapabilityStore`、`RecoveryCoordination`、`SessionManifest/Layout`、`ArtifactStorage`、`RetentionAndExport` | **migrate** | `arkdeck-durable` | 字节级兼容：同 schema 版本、同 fsync 纪律、同 lock 文件名；SQLite 用 `rusqlite`（bundled）读写 SVC-002 完成后的 v1 布局；`PRAGMA user_version` 精确校验 pinned baseline，不移植旧迁移路径 |
@@ -410,15 +410,15 @@ flowchart TB
 
 | 资产 | 今日事实源 | 目标事实源 | 迁移动作 |
 |---|---|---|---|
-| Catalog descriptor + digest | `Catalog/operations/*.json`，Python 生成 Swift（`scripts/catalog_gen/generate.py:974-978`） | 不变；生成器改为同时生成 Rust（`RuntimeOperationCatalogGenerated.rs`）并断言 digest 相等 | 零漂移检查扩到两种语言 |
+| Catalog descriptor + digest | `catalog/operations/*.json`，Python 生成 Swift（`hack/catalog_gen/generate.py:974-978`） | 不变；生成器改为同时生成 Rust（`RuntimeOperationCatalogGenerated.rs`）并断言 digest 相等 | 零漂移检查扩到两种语言 |
 | 单 v1 控制协议 envelope | `Packages/ArkDeckKit/Contracts/control-protocol.json` 与 `ControlProtocolGenerated.swift`；固定版本与 identity | 保持一个 canonical registry，Rust/C# 消费同一输入；若迁移路径须同步全部引用，不能另建第二份正本 | 保留当前 envelope、health 校验、帧上限与错误语义；不恢复 negotiation bootstrap |
-| 逐 method typed schema | 已交付 96 份 `spec/control/methods/<method>.json` 与实际录制 corpus | 同一路径，生成 Swift/Rust/C# 客户端输入 | XPA-001 保持 schema 与真实帧一致并完成剩余验收；Windows 与 ClientKit 生成工作仍待实现 |
-| Job 状态机/终态/转换 | Swift `switch` | `spec/job-state-machine.yaml`（states、terminal、mode×state→destinations、directives、invariant violations） | Swift 测试导出并断言相等后冻结；Rust 直接加载 |
-| reason codes / error registry / exit codes | `cli-error-registry.yaml`（45 码）、Swift `RuntimeAvailabilityReasonCode`（7）、`cli-next-action.schema.json`（7） | 合并为 `spec/registries/*.yaml` | 从 Swift 导出一次后冻结 |
+| 逐 method typed schema | 已交付 96 份 `api/control/methods/<method>.json` 与实际录制 corpus | 同一路径，生成 Swift/Rust/C# 客户端输入 | XPA-001 保持 schema 与真实帧一致并完成剩余验收；Windows 与 ClientKit 生成工作仍待实现 |
+| Job 状态机/终态/转换 | Swift `switch` | `api/job-state-machine.yaml`（states、terminal、mode×state→destinations、directives、invariant violations） | Swift 测试导出并断言相等后冻结；Rust 直接加载 |
+| reason codes / error registry / exit codes | `cli-error-registry.yaml`（45 码）、Swift `RuntimeAvailabilityReasonCode`（7）、`cli-next-action.schema.json`（7） | 合并为 `api/registries/*.yaml` | 从 Swift 导出一次后冻结 |
 | journal/manifest/artifact-index/capability schema | SVC-002/003 完成后的 current contracts 与 Swift strict decoders | 从最终单 v1 文档结构生成语言无关契约；SQLite 采用该基线布局 | 不补记或移植旧代际；XPA-001 记录最终 commit、schema/corpus digest |
 | canonical vectors | `cli-canonical-json-vectors.json`、CBOR permit vectors、HDC Golden/Probes | 不变，加入 `arkdeck-conformance` 回放 | Rust 与 Swift 都必须逐向量通过 |
 | CLI argv fixtures | SVC-001..004 完成后重建的 current corpus（`Tests/ArkDeckContractTests/Fixtures/CLI/**`） | pin 该单 v1 corpus | Rust CLI 逐 fixture 字节相等，不恢复 retired/legacy argv |
-| UI 语义 | 分散在当前 facade 与 xcstrings 消息源中，尚无 spec/ui-semantics | `spec/ui-semantics/*.json`：名称、危险等级、effect 徽章、next-action 意图、双语消息 | 生成 xcstrings 与 `.resw` |
+| UI 语义 | 分散在当前 facade 与 xcstrings 消息源中，尚无 api/ui-semantics | `api/ui-semantics/*.json`：名称、危险等级、effect 徽章、next-action 意图、双语消息 | 生成 xcstrings 与 `.resw` |
 
 事实源翻转规则：**任一资产在 Rust 通过全部向量与 differential 之前，Swift 保持 oracle；通过之后由 `arkdeck-conformance` 生成 fixture 并提交，Swift 变为消费方**。Swift/Rust 迁移期间仅保留两个实现对同一当前契约的对照；不得新增历史格式 decode-only shim。
 
@@ -507,7 +507,7 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
   durable 格式（journal、`runtime_job` 索引、`job-record.json`、Session manifest/audit、capability
   ledger、Artifact index、recovery manifest），因为安装态持有真实 intent/outcome/capability/evidence
   （§G.2 第三行）。T1 语义相等：状态迁移、错误码、拒绝条件、零派发证明、nextAction、evidence 优先级。
-  T2 自由：`message` 文本与 Swift 调试渲染（`spec/control/methods/*.json` 只钉 code 与结构）、schema
+  T2 自由：`message` 文本与 Swift 调试渲染（`api/control/methods/*.json` 只钉 code 与结构）、schema
   之外的时间戳精度、日志、偶然副作用文件。oracle 只录 T0 文件；T1 按 code、形状、迁移序列比对；不再为
   T2 输出新写 Foundation/ICU 仿真。
 - **安装态逐 store 组合撤回。** #1888 之后其余 store 因 Swift 引擎仍在消费而搬不动；路线 C 本就是消费方
@@ -517,9 +517,9 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
   `arkdeck-agentd`、`arkdeck-provider-hdc` 的 operation 部分；B 平台执行器（016）：`arkdeck-platform`、
   `arkdeck-provider-hdc` 的 process/observation 部分；C 客户端（019、018）：`ArkDeckClientKit`、
   `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`arkdeck-cli`，独占 UI 测试跑道；D 供应者与性能（015、017 的
-  ArkForge lane、025）：`arkdeck-provider-workspace/analyzer/arkforge`、`scripts/bench`、`rust-perf.yml`。
+  ArkForge lane、025）：`arkdeck-provider-workspace/analyzer/arkforge`、`hack/bench`、`rust-perf.yml`。
   共享文件（`Package.swift`、`project.pbxproj`、`Cargo.toml`/`Cargo.lock`、`control-protocol.json`、
-  `spec/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；
+  `api/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；
   语料计数断言一律 `>=` published 条数；新方法/错误码由该车道自己录帧并在同一 PR
   `generate-contract.py --write`。015/016/019/025 的 DAG 边改为「仅验收」依赖（§J.2）。
 - **穿刺先行（§J.3 SPK-6..11）。** 每个 ≤ 1 天，产出 go/no-go 事实与可复用库；SPK-6/9/10 全过则 014 的
@@ -554,7 +554,7 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 
 ### G.4 切换时 active Job、未决 intent、outcomeUnknown、recovery epoch 的处理
 
-- **cutover 前置（`runtime service update` preflight，机械判据，r5 改为 blocking/parked 两集）**：`JobState`（`JobStateMachine.swift:6-40`）里只有六个终态，`waitingForRecovery` 是非终态，所以 r1–r4 的「无非终态 job」会把下一条明文允许承接的 `outcomeUnknown` lane 也拒掉。**阻断集**（有执行在途、有协调/恢复在跑、有等待中的人工决定、有 reserved 未 settle 的 capability use）：`queued`、`preflight`、`running`、`waitingForDevice`、`awaitingRebindConfirmation`、`planning`、`cancelRequested`、`cancellingAtSafeBoundary`、`reconciling`、`recoveringByCompleteOverwrite`、`resumeAtConfirmedSafeBoundary`、`userAbandonRequested`、`finalizing`，加上任何未决 intent 与 running 的 agent execution；**静止集**（原样承接，不阻断）：`waitingForRecovery`（`outcomeUnknown` lane，无执行在途，只能经 `job.reconcile` 读回或 POL-RECOVERY-001 的完整证明路径推进）与全部终态。命中阻断集即拒绝切换并给出 job 列表；判定谓词写进 `spec/` 的状态表，两个实现共用。
+- **cutover 前置（`runtime service update` preflight，机械判据，r5 改为 blocking/parked 两集）**：`JobState`（`JobStateMachine.swift:6-40`）里只有六个终态，`waitingForRecovery` 是非终态，所以 r1–r4 的「无非终态 job」会把下一条明文允许承接的 `outcomeUnknown` lane 也拒掉。**阻断集**（有执行在途、有协调/恢复在跑、有等待中的人工决定、有 reserved 未 settle 的 capability use）：`queued`、`preflight`、`running`、`waitingForDevice`、`awaitingRebindConfirmation`、`planning`、`cancelRequested`、`cancellingAtSafeBoundary`、`reconciling`、`recoveringByCompleteOverwrite`、`resumeAtConfirmedSafeBoundary`、`userAbandonRequested`、`finalizing`，加上任何未决 intent 与 running 的 agent execution；**静止集**（原样承接，不阻断）：`waitingForRecovery`（`outcomeUnknown` lane，无执行在途，只能经 `job.reconcile` 读回或 POL-RECOVERY-001 的完整证明路径推进）与全部终态。命中阻断集即拒绝切换并给出 job 列表；判定谓词写进 `api/` 的状态表，两个实现共用。
 - **outcomeUnknown lane**：不是切换阻断项，而是必须**原样承接**的 durable 状态。Rust owner 启动时读到 `waitingForRecovery`/`outcomeUnknown` job 保持不变，只允许 `job.reconcile` 读回或 POL-RECOVERY-001 的完整机械证明路径；绝不因 owner 更换而重放（AGENTS `:49-51`）。
 - **未决 intent**：由 preflight 排除；若崩溃窗口留下「intent 已落、无 outcome」，新 owner 按 journal 分类为 outcomeUnknown（与 `recoverActiveJobs` 语义相同）。
 - **recovery epoch**：epoch 文档是 owner 无关的 durable 事实；新 owner 继续从已有最高 epoch 计数。
@@ -587,7 +587,7 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 
 ### H.2 共享 semantic presentation/state/action/error contract
 
-来源分三层：(1) daemon 计算的投影（`job.status` compact status + `nextAction` 闭集、`operation.list` 的 `available/unavailable(reasonCode)`、HAR 文档、recovery 分类）；(2) `spec/ui-semantics`（operation 显示名、danger class、effect 徽章文案、next-action 意图、错误分类的用户文案键）；(3) 双语消息源（一个 JSON 生成 `Localizable.xcstrings` 与 `Resources.resw`，AC-I18N-001 在两端各跑一次）。两端 App 只做「语义 → 平台组件」映射，不得再实现任何状态推导。
+来源分三层：(1) daemon 计算的投影（`job.status` compact status + `nextAction` 闭集、`operation.list` 的 `available/unavailable(reasonCode)`、HAR 文档、recovery 分类）；(2) `api/ui-semantics`（operation 显示名、danger class、effect 徽章文案、next-action 意图、错误分类的用户文案键）；(3) 双语消息源（一个 JSON 生成 `Localizable.xcstrings` 与 `Resources.resw`，AC-I18N-001 在两端各跑一次）。两端 App 只做「语义 → 平台组件」映射，不得再实现任何状态推导。
 
 ### H.3 Surface 映射与 parity gate
 
@@ -666,9 +666,9 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 | 交互设备控制实测 | 裸点击 p95 396 ms；每帧 543–765 ms（瓶颈 display readback ~490 ms）；`shell_echo` n=50 p50 102.8 / p95 113.0 ms；`list targets -v` p50 40 ms | `chg-2026-071/tasks.md:13-18,75-77,262`；`…/data/latency.json` | 证据记录 |
 | soak | 24 h、RSS 增长 ≤ 32 MiB、fd 增长 ≤ 16 | `Tests/ArkDeckRuntimeSoakFixture/main.swift:30,209-210,512-518` | 硬门；#1714 修复其 2026-08-12 起的 `jobNotFound` 中止并由 `rust-perf.yml` 接为**首个调用方** |
 | 车道 | nightly slow lanes 实测 artifact 73 s / runtime 38 s / journal 52 s，峰值 RSS ~1.2 GB；UI 35 tests ~500 s | `.github/workflows/swift-slow-lanes.yml:39-41,71-72` | 注释记录 |
-| 归档比对 | PR/nightly 已调用 `bench capture/compare`；nightly 归档 baseline JSON，soak 始终尝试归档指标 | `.github/workflows/rust-perf.yml`；`scripts/bench/compare.py` | 已落地；当前测 Swift，主机不匹配时明确 skip，缺 runner 自身基线及 24 h runner |
+| 归档比对 | PR/nightly 已调用 `bench capture/compare`；nightly 归档 baseline JSON，soak 始终尝试归档指标 | `.github/workflows/rust-perf.yml`；`hack/bench/compare.py` | 已落地；当前测 Swift，主机不匹配时明确 skip，缺 runner 自身基线及 24 h runner |
 
-当前 `scripts/bench` 已补上跨 run 的采集、归档与比较。表中此前的 journal、App、Viewer 等独立实测保留各自时间与条件；SPK-1 的正式数值以已提交 JSON 为准。生产 XPC 与 named pipe 分位、artifact 吞吐、cancel 往返仍无基线；SPK-2 的 libxpc 回显实验不能替代生产 XPC 成本。
+当前 `hack/bench` 已补上跨 run 的采集、归档与比较。表中此前的 journal、App、Viewer 等独立实测保留各自时间与条件；SPK-1 的正式数值以已提交 JSON 为准。生产 XPC 与 named pipe 分位、artifact 吞吐、cancel 往返仍无基线；SPK-2 的 libxpc 回显实验不能替代生产 XPC 成本。
 
 ### I.2 指标、基线、预算、门
 
@@ -676,7 +676,7 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 
 TASK-XPA-025 的当前 Rust 采集主机硬件仍为 Apple M3 / 8 核 / 16 GB，系统为 macOS 27 / Xcode 27。新增该组合的独立 Rust release 基线环境，候选数据先留在任务 evidence，经维护者对实现和实测 PR review 后才采纳到 `baselines/`；不修改历史 Swift JSON，不把新 OS 与旧 OS 的 host mismatch skip 当作回归通过。原有预算、30% 跨 run 稳定性限制及未测指标保持。RSS 采集改为必须观察到释放才报告 post-release steady；未观察到时保留原始轨迹、原因和其他 run 的部分数据，不能用 plateau 替代。释放时间从实际 elapsed 读取，旧记录中的样本序号不追溯改写为秒。此采集修正不替代注 2 的产品上限适用阶段决定。
 
-SPK-1 已提交结果为 2026-09-04 的 release/静机/3 次独立 run，实际 store 为 30 个终态 Job；冷启动 p95 波动 23.6%，三项 UDS IPC 最大 6.8%，均低于 30%。下表同步 [原始 JSON](../../../scripts/bench/baselines/perf-baseline-2026-09-04.json) 的 p50/p95/p99 与按既有公式计算的预算值；[测量报告](spk-1-macos-performance-baseline.md)保留过程。本次没有重跑测量，post-SVC 当前二进制须重新采集，不能直接沿用旧二进制结果声称性能通过。规则边界：
+SPK-1 已提交结果为 2026-09-04 的 release/静机/3 次独立 run，实际 store 为 30 个终态 Job；冷启动 p95 波动 23.6%，三项 UDS IPC 最大 6.8%，均低于 30%。下表同步 [原始 JSON](../../../hack/bench/baselines/perf-baseline-2026-09-04.json) 的 p50/p95/p99 与按既有公式计算的预算值；[测量报告](spk-1-macos-performance-baseline.md)保留过程。本次没有重跑测量，post-SVC 当前二进制须重新采集，不能直接沿用旧二进制结果声称性能通过。规则边界：
 
 - **量测下限**：基线 p95 落在仪器分辨率上时（如 idle CPU 用 `ps` 读到 0.0%），`p95 × 1.5` 推出 0，没有实现能满足。此时**产品上限原样保留**，不做推导。
 - **数据规模**：预算只在取得它的数据规模上成立。基线文档 SHALL 记录该规模；某行的实测规模小于表内规定规模时，实测值只作该规模的预算，表内规定规模仍用「拟」上限，直到按规定规模测出为止。
@@ -818,10 +818,10 @@ flowchart TD
 | SPK-5 | NTFS 上 `FlushFileBuffers`/`MoveFileExW` 写穿原子性、`LockFileEx` 语义、断电/kill 撕裂尾部 | 撕裂尾部穷举通过；append p95 记录 | 原子替换不可证明 | Windows journal/record 写入设计 | Windows 主机 |
 | SPK-6 | Rust HDC 进程执行器：PTY 一次性口令交换（`IdentityBoundPTYExecutor`）、带退出码框架的持久 `hdc shell` 通道（`PersistentDeviceShellChannel`）、libproc supervisor 观测（server identity/generation）、`/.vol/<dev>/<ino>` 启动 | 37 个 Golden/Probe fixture 全回放；fake HDC 子进程见到含 `-t <connectKey>` 的真实 argv；接板时 `hdc list targets -v` + 一次 shell 往返 | 某原语离开 Swift 不可复刻 | XPA-016；M1（r11） | 本机，接板可选 |
 | SPK-7 | `observe.device@1` 在隔离 Rust daemon 上对 `ArkDeckFakeHDCFixture` 端到端：runbook §2 全部命令（不含 §2.1） | journal/record/receipt/index T0 相等；`job result/evidence`、`artifact list` T1 相等 | 引擎设备路径需要 executor sidecar | XPA-014 M1；验证 r11 切法（r11） | 本机 |
-| SPK-8 | ClientKit 传输：App 经 `xpc_connection` 长连接并反向钉 daemon 身份，typed 模型由 `spec/control/methods/**` 生成，只切最小的 `RuntimeHistoryFilterApplicationFacade` | History filter UI 测试在 Rust standalone daemon 上绿；六项 entitlements 不动 | 生成模型或传输无法服务某 facade | XPA-019（其余 12 个 facade 并行）（r11） | 本机 |
+| SPK-8 | ClientKit 传输：App 经 `xpc_connection` 长连接并反向钉 daemon 身份，typed 模型由 `api/control/methods/**` 生成，只切最小的 `RuntimeHistoryFilterApplicationFacade` | History filter UI 测试在 Rust standalone daemon 上绿；六项 entitlements 不动 | 生成模型或传输无法服务某 facade | XPA-019（其余 12 个 facade 并行）（r11） | 本机 |
 | SPK-9 | ArkForge Rust↔Rust：Rust daemon 用 `arkforge-client` 驱动 `arkforged` 跑 `flash.prerequisites`/`lanePlanPreview`（无设备）；StepPermit CBOR 向量沿用 | 与 Swift `ArkForgeLaneHost` 的 preview T1 相等；CBOR 向量逐字节 | Swift SDK 承载了 crate 未暴露的语义 | XPA-017 ArkForge lane；M4（r11） | 本机 |
 | SPK-10 | 签名与凭据：Rust 经 `SecItem*` 读 Keychain、DevEco 口令解码、hap-sign-tool/hvigor 经 registered toolchain 调用 | `ArkDeckFakeHapSignerFixture` 下 argv/env/receipt 零口令；真签名产物 digest 与 Swift 相等 | 某步骤需要 `LAContext` 或 Rust 走不通的路径 | XPA-015；M3（r11） | 本机 + DevEco SDK |
-| SPK-11 | Rust 上的性能与 soak：`scripts/bench` 对 cargo 构建的隔离 daemon 采 13 项；`arkdeck-soak` 复刻 `ArkDeckRuntimeSoakFixture` | 参考主机 3 轮 p95 离散 < 30%；RSS 两电平分开记 | harness 驱动不了 Rust daemon | XPA-025；顺带给 §L.1 第 15/16 条 Rust 数据（r11） | 参考主机 |
+| SPK-11 | Rust 上的性能与 soak：`hack/bench` 对 cargo 构建的隔离 daemon 采 13 项；`arkdeck-soak` 复刻 `ArkDeckRuntimeSoakFixture` | 参考主机 3 轮 p95 离散 < 30%；RSS 两电平分开记 | harness 驱动不了 Rust daemon | XPA-025；顺带给 §L.1 第 15/16 条 Rust 数据（r11） | 参考主机 |
 
 ### J.4 任务明细
 
@@ -833,8 +833,8 @@ flowchart TD
 - 当前进展：96 份 per-method schema/corpus 已交付；SVC-001..004 已 done，后续修复未改变已提交控制 schema 的形状；交接基线见 §F.1。录制 corpus 的覆盖与动态值限制不能省略。
 - 依赖：TASK-SVC-001、TASK-SVC-002、TASK-SVC-003、TASK-SVC-004；按现有 tasks.md 为 in-progress，剩余 GJ-1～5 headless re-pass 等待设备窗口；本次不改任务状态。
 - Production reachability：`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` → 单 v1 方法表 → 既有 handler；不新增 effect。
-- 模块/路径：以本 change `tasks.md` 的 TASK-XPA-001 Allowed paths 为准：current Contracts、生成器、Core/daemon/client/CLI schema 消费、contract tests、`spec/**` 与最小设计文档；不得修改 Core/Catalog 或恢复版本选择。
-- 交付物：每个当前 method 的 `spec/control/methods/*.json`；单一 canonical source 生成的 Swift/Rust/client inputs；最终 current journal 契约；供后续 XPA 共用的 post-SVC baseline pins。
+- 模块/路径：以本 change `tasks.md` 的 TASK-XPA-001 Allowed paths 为准：current Contracts、生成器、Core/daemon/client/CLI schema 消费、contract tests、`api/**` 与最小设计文档；不得修改 Core/Catalog 或恢复版本选择。
+- 交付物：每个当前 method 的 `api/control/methods/*.json`；单一 canonical source 生成的 Swift/Rust/client inputs；最终 current journal 契约；供后续 XPA 共用的 post-SVC baseline pins。
 - AC：当前实际帧通过 schema；额外/缺失字段、未知版本/方法结构化拒绝且 dispatch 0；无协商/降级/历史方法表；同一输入的 Swift/runtime/schema 一致。
 - 验证：contract 正反例、生成物零漂移、normal single-v1 CLI headless GJ-1～5；不使用 `--require-protocol 2`，不以本任务替代 SVC-005。
 - 硬件：DAYU200，真实结果按 current Catalog digest 记录。
@@ -848,7 +848,7 @@ flowchart TD
 - 缺口：仓内无生产 Rust workspace、无 Windows daemon；SPK-2 Rust 实验不替代本任务；B.1 #23。
 - 依赖：XPA-001；macOS read-only foundation 已交付（#1768）并供 XPA-003 消费；SPK-3 与 Windows 11 x64 + DAYU200 验收在 XPA-017 之后（r8）。r12：Windows 验收是 Windows 阶段的第一步，不再等 XPA-017；其软件部分（机器输出与 macOS fixture 字节相等、SPK-3 主机侧行、Windows HDC tuple 的独立 integration change）在阶段 S 完成，真机行属维护者的阶段 A。
 - Production reachability：`arkdeck.exe` → named pipe → `arkdeck-control` → 当前 `doctor/device.observations` 方法 → HDC provider/观测投影（executable + argv 数组、句柄绑定 hash）。CLI `device candidates` 不引入同名旧 RPC。读-only，无 effect。
-- 模块/路径：新 `rust/**`（`arkdeck-contract`、`arkdeck-platform`、`arkdeck-control`、`arkdeck-provider-hdc`（parsers）、`arkdeck-client`、`arkdeck-cli`、`arkdeck-agentd`）、`spec/**`、`.github/workflows/rust-ci.yml`、`scripts/catalog_gen/generate.py`（生成 Rust）、`scripts/ci/plan.py` + `scripts/ci/test_plan.py` + `.github/workflows/swift-ci.yml` + `scripts/test_agent_pr_workflow.py`（r3/r5：新增 `rust` 车道并接入统一入口——今日 `classify_paths` 对 `rust/**` 全部车道为 false，只改 Rust 的 PR 本地闸会空转通过；新车道必须折进 `swift` 聚合 job 的 `needs`，而 `test_agent_pr_workflow.py:412-421` 逐字钉住该列表，须同 PR 更新）、`openspec/platforms/windows/**`；Forbidden `Packages/**` 生产源码（本任务不改 Swift 语义）。
+- 模块/路径：新 `rust/**`（`arkdeck-contract`、`arkdeck-platform`、`arkdeck-control`、`arkdeck-provider-hdc`（parsers）、`arkdeck-client`、`arkdeck-cli`、`arkdeck-agentd`）、`api/**`、`.github/workflows/rust-ci.yml`、`hack/catalog_gen/generate.py`（生成 Rust）、`hack/ci/plan.py` + `hack/ci/test_plan.py` + `.github/workflows/swift-ci.yml` + `hack/tests/test_agent_pr_workflow.py`（r3/r5：新增 `rust` 车道并接入统一入口——今日 `classify_paths` 对 `rust/**` 全部车道为 false，只改 Rust 的 PR 本地闸会空转通过；新车道必须折进 `swift` 聚合 job 的 `needs`，而 `test_agent_pr_workflow.py:412-421` 逐字钉住该列表，须同 PR 更新）、`openspec/platforms/windows/**`；Forbidden `Packages/**` 生产源码（本任务不改 Swift 语义）。
 - 交付物：JCS/CBOR/digest 向量全过；catalog digest 与 Swift 相等；单 v1 帧验证矩阵；HDC Golden/Probe fixtures 回放；Windows pipe（DACL/REJECT_REMOTE/FIRST_INSTANCE/SID 校验）+ 客户端对服务端的两层认证（owner SID + 本连接服务端 PID 的映像/签名实例认证，§F.2，r3/r5）；macOS UDS（peer euid）；planner `rust` 车道（r3）折进 `swift` 聚合器（r5）。
 - AC：`operation list` 返回 30 descriptor 与同 digest；`device candidates` 在 Windows 真机列出 DAYU200，同 fixture 输出与 macOS 字节相等；跨账户 pipe 连接被拒；假服务端先占 pipe 名：跨账号 → 客户端按 owner SID 拒绝、零帧；同账号不同映像且第二层可用 → 客户端按实例身份拒绝、零帧；同账号且第二层不可用 → 仅 daemon 侧 fail-closed + `doctor` 报告，客户端不作声称（r5）；SPK-3 记录 `GetNamedPipeServerProcessId` 在客户端句柄上的可用性；`rust/**`-only diff 至少选中一条车道（r3）；非 v1 帧结构化拒绝。
 - 验证：contract、differential（Swift CLI 与 Rust CLI 对同 fixture 的 envelope）、fault-injection（帧上限、畸形帧、pipe 名先占）、Windows 真机。
@@ -879,7 +879,7 @@ flowchart TD
 - 缺口：`DeviceBootstrapMachine`（ADR-0006）无 Rust 实现。
 - 依赖：XPA-002 的 Windows 验收（r12：去掉 r8 加的 XPA-017/G5 依赖）。targets store 代码此时已由 XPA-012 在 macOS 交付。
 - Reachability：CLI → pipe → `target.adopt` → `arkdeck-runtime::bootstrap`（四例封闭观测动作）→ `targets/` + `.targets.lock`。
-- 路径：`rust/**`、`spec/**`；Forbidden `Packages/**`。
+- 路径：`rust/**`、`api/**`；Forbidden `Packages/**`。
 - 交付物：bootstrap 状态机、targets store（同 JSON 形状）、HAR `physicalConnection/needsSelection`。
 - AC：serial 归一化 SHA-256 与 macOS 相同（同 fixture 同 target ID）；无 serial fail closed；重复 adopt 幂等；多候选零自动选择。
 - 验证：contract、differential（同一 `list targets -v` 输入两端 target ID 相等）、fault-injection（lock 争用、torn write）、真机。
@@ -918,7 +918,7 @@ flowchart TD
 - 平台/GJ：Windows GJ-1 的 App 呈现 AC（AC-UX-001/003/004 在 Windows 首次可验）。
 - 依赖：XPA-006、SPK-4。
 - Reachability：WinUI → `ArkDeck.ClientKit`（生成 records）→ pipe → 只读方法 + `job.submit` typed 门。
-- 路径：新 `windows/**`（App 与 ClientKit）、`spec/ui-semantics/**`、生成器脚本、`ArkDeckApp/Resources/*.xcstrings`（改为生成物，但内容不变）、`scripts/ci/plan.py` + `scripts/ci/test_plan.py` + `.github/workflows/swift-ci.yml`/`windows-*.yml` + `scripts/test_agent_pr_workflow.py`（r3/r5：新增 `windows` 车道并折进 `swift` 聚合器，契约测试同 PR 更新；非 Windows 主机上 `--run-local` 对该车道显式报不可运行、非零退出，而非静默绿）。
+- 路径：新 `windows/**`（App 与 ClientKit）、`api/ui-semantics/**`、生成器脚本、`ArkDeckApp/Resources/*.xcstrings`（改为生成物，但内容不变）、`hack/ci/plan.py` + `hack/ci/test_plan.py` + `.github/workflows/swift-ci.yml`/`windows-*.yml` + `hack/tests/test_agent_pr_workflow.py`（r3/r5：新增 `windows` 车道并折进 `swift` 聚合器，契约测试同 PR 更新；非 Windows 主机上 `--run-local` 对该车道显式报不可运行、非零退出，而非静默绿）。
 - 交付物：MSIX 工程、UIA 名称、live region、键盘路径、双语。
 - AC：UIA 树快照与 macOS AX 快照语义一致（导航项/状态/动作）；Narrator 读出 Job 状态变化；无 disabled 占位。
 - 工程落实：按 §H.5 固定工具链并提供 build/run/test/package 入口；消费当前单 v1 schema 与连接校验；按 §H.6 提供稳定控件标识和语义快照。
@@ -1068,9 +1068,9 @@ flowchart TD
 - 规模：M。
 
 #### TASK-XPA-025 — Port the performance lanes to the Rust daemon and a Rust soak fixture（r5 新增）
-- 缺口：`rust-perf.yml` 用 SwiftPM 构建 `arkdeck-agentd` 与 `ArkDeckRuntimeSoakFixture` 并由 `scripts/bench` 驱动；XPA-017 要删这两个产品却无权改 workflow，XPA-023 已 done——退役前置无法闭合，直接删则打坏性能车道。
+- 缺口：`rust-perf.yml` 用 SwiftPM 构建 `arkdeck-agentd` 与 `ArkDeckRuntimeSoakFixture` 并由 `hack/bench` 驱动；XPA-017 要删这两个产品却无权改 workflow，XPA-023 已 done——退役前置无法闭合，直接删则打坏性能车道。
 - 依赖：XPA-023、SPK-11（r11：去掉 XPA-014 done 边，隔离 Rust daemon 已可被测量；`ready`，D 车道）。
-- 交付物：Rust `arkdeck-soak`（复刻 soak fixture 语义与 `arkdeck-runtime-soak/v1` schema）；`scripts/bench` 对 cargo 构建的 Rust `arkdeck-agentd`（同名）capture；`rust-perf.yml` 不再构建任何 SwiftPM 产品；在参考主机上用 Rust daemon 重取基线（含 RSS 两电平拆分）并入仓，Swift 末版基线并列保留作迁移前后记录。
+- 交付物：Rust `arkdeck-soak`（复刻 soak fixture 语义与 `arkdeck-runtime-soak/v1` schema）；`hack/bench` 对 cargo 构建的 Rust `arkdeck-agentd`（同名）capture；`rust-perf.yml` 不再构建任何 SwiftPM 产品；在参考主机上用 Rust daemon 重取基线（含 RSS 两电平拆分）并入仓，Swift 末版基线并列保留作迁移前后记录。
 - AC：PR/nightly/soak 三车道在 Rust daemon 上全绿后 XPA-017 才可开工。
 - 硬件：无。
 - 规模：M。
@@ -1170,7 +1170,7 @@ flowchart TD
 17. **同用户信任边界（r5 新增，见 §F.2）**：确认「同用户、同完整性级别的任意代码在信任边界之外；本产品签名的 daemon 二进制按构造可信」这一表述，与 ADR-0005 决策 1 的 MVP 立场一致；若维护者要求把同用户任意代码也纳入边界，Windows 需要 protected-process 级别的方案而 macOS UDS 没有对应物，本文不推荐。
 18. **macOS 先行次序（r8 新增，维护者 2026-09-09 裁定，本 revision 合入即为 attestation）**：macOS 迁移链完成并在纯 Rust daemon 上取得 GJ-1～5 PASS（G5）之后才开始任何 Windows GJ 任务；XPA-003 只依赖 XPA-002 已交付的 macOS read-only foundation；XPA-014 不再依赖 XPA-005；XPA-004 与 XPA-002 的 Windows 验收等 XPA-017。Windows 主机提前到位不自动重开 Windows 阶段，只有新的 revision 可以。**r12 改为（提议并随合入 attestation）：现在打开 Windows 阶段。** 理由：Swift runtime 已删（#2311、#2312、#2316），Rust 是唯一实现；r8 担心 Windows 建在一份会被 macOS differential 重塑的快照上，这个前提已不成立。G5 仍是 macOS 的门（XPA-017），macOS 阶段 A 与 Windows 阶段并行；同一文件里 macOS 阶段 A 的修复优先于 Windows 的改动，Windows 的改动必须保持 macOS 与 ubuntu 两条 Rust CI 车道为绿。XPA-004 与 XPA-002 的 Windows 验收不再等 XPA-017。
 19. **对等三级（r11 新增，维护者 2026-09-14 评审，本 revision 合入即为 attestation）**：XPA-AC-1/3 在 r10 前提下按 §G.1 r11 的 T0/T1/T2 解释——T0 逐字节只限线协议、digest/引用身份与 cutover 后仍被读的 durable 格式；T1 语义相等；`message` 文本等 T2 不比对。不放宽任何 AC 行文；只界定「product contract」的范围。
-20. **以 Swift 为参照的验证行的读法（r12 新增，提议并随合入 attestation）**：XPA-005「decoded by the Swift decoders unchanged」、XPA-008「decoded by Swift」、XPA-AC-2「`job.plan` digest equality with Swift」、XPA-AC-4「ledger decodes in Swift」、XPA-010「Swift and Rust compute the same plan digest」——Swift 的 runtime target 已删除（#2311、#2312、#2316），这几行的参照物改为 `rust/tests/fixtures/**` 与 `spec/**` 中录下的 Swift oracle 和语料，加上 macOS 上 Rust writer 写出的 T0 字节。不改 AC 原文，只界定参照物，性质同第 19 条。
+20. **以 Swift 为参照的验证行的读法（r12 新增，提议并随合入 attestation）**：XPA-005「decoded by the Swift decoders unchanged」、XPA-008「decoded by Swift」、XPA-AC-2「`job.plan` digest equality with Swift」、XPA-AC-4「ledger decodes in Swift」、XPA-010「Swift and Rust compute the same plan digest」——Swift 的 runtime target 已删除（#2311、#2312、#2316），这几行的参照物改为 `rust/tests/fixtures/**` 与 `api/**` 中录下的 Swift oracle 和语料，加上 macOS 上 Rust writer 写出的 T0 字节。不改 AC 原文，只界定参照物，性质同第 19 条。
 21. **Windows 同样「软件先做完、真机放最后」（r12 新增，提议并随合入 attestation；沿用维护者 2026-09-28 对 macOS 的裁决）**：阶段 S 由 agent 完成全部软件，阶段 A 由维护者在真实主机和 DAYU200 上验收（SPK-3 主机条件行、GJ-1～5 headless `REAL_DEVICE_PASS`、干净主机 smoke、翻转 conformance/traceability/lock）。例外：会决定设计走向的主机事实尽早采集——HDC 的 Windows 输出、DAYU200 的 USB 设备属性、SPK-3 中 CI 测不到的行。
 22. **开发期 daemon 身份（r12 新增，提议并随合入 attestation）**：本机由维护者创建一张开发用代码签名证书、只在本机信任，用 `ARKDECK_DAEMON_SIGNER_SHA256` 钉住签名者，daemon 放在钉住的路径上；CI 在 hosted runner 上用临时自签证书测正向路径；任何情况下都不加跳过身份校验的开关（XPA-AC-6 与 §F.2 不变）。
 

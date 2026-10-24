@@ -1,4 +1,4 @@
-//! The shared Job-state preflight table (`spec/recovery/job-state-preflight.json`,
+//! The shared Job-state preflight table (`api/recovery/job-state-preflight.json`,
 //! design §G.4) and the two classifiers that read it.
 //!
 //! Design §G.4 asks for the restart and cutover predicate to be written once and
@@ -11,7 +11,7 @@
 //!
 //! The table's copy beside the historical Swift oracle remains available to
 //! contract views that carry only `rust/` and the registered inputs. Keep that
-//! copy byte-identical to `spec/recovery/job-state-preflight.json`.
+//! copy byte-identical to `api/recovery/job-state-preflight.json`.
 //!
 //! - [`classify_restart`] is `runtime service restart`'s carry-over of the
 //!   daemon's current Jobs, as Swift's `RuntimeCLI.classifyAgentdRestartCurrentJobs`

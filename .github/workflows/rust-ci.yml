@@ -8,7 +8,7 @@ name: Rust CI
 # key. The caller passes that one secret and nothing else; it
 # reaches only the fetch steps, which build and run nothing, and the key is
 # removed before any later step runs checked-out code
-# (scripts/ci/arkforge-cargo-fetch.sh).
+# (hack/ci/arkforge-cargo-fetch.sh).
 on:
   workflow_call:
     secrets:
@@ -99,7 +99,7 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
-        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
+        run: sh ../hack/ci/arkforge-cargo-fetch.sh
 
       - name: Contract isolation and provenance regression tests
         working-directory: .
@@ -253,7 +253,7 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
-        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
+        run: sh ../hack/ci/arkforge-cargo-fetch.sh
 
       # Cargo fingerprints include source mtimes and absolute paths. Restore
       # both the stable source mirror and its products, then synchronize exact
@@ -342,7 +342,7 @@ jobs:
             bash Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh
           python Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py "$output"
 
-      # The release DMG entry (scripts/release/build_macos_release.py, TASK-XPA-017
+      # The release DMG entry (hack/release/build_macos_release.py, TASK-XPA-017
       # S5) driven end to end with recording signing, notary and build tools
       # through the real build-helpers.sh Rust mode, plus one unsigned DMG built
       # and mounted with the real hdiutil. No identity, nothing sent to Apple;
@@ -350,7 +350,7 @@ jobs:
       - name: Release DMG pipeline (fixtures, unsigned)
         if: runner.os == 'macOS'
         working-directory: .
-        run: python3 scripts/release/test_build_macos_release.py
+        run: python3 hack/release/test_build_macos_release.py
 
       # Retain linked/debug products, but remove compiler scratch state before
       # it consumes archive/transfer capacity.
@@ -478,7 +478,7 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
-        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
+        run: sh ../hack/ci/arkforge-cargo-fetch.sh
 
       # The views' Cargo targets live under this job's own cache root, keyed
       # apart from the workspace job's; the restore order is the workspace

@@ -236,7 +236,7 @@ public sealed class WindowsComponentMappingTests
         {
             Require(path == "windows/App.UITests/SemanticSnapshotTests.cs" && method == "PagesMatchTheirSemanticSnapshots"
                 && body.Contains("SurfaceSpec.Load(strings)", StringComparison.Ordinal), "testCase");
-            using var snapshots = JsonDocument.Parse(Read("spec/ui-semantics/surfaces.json"));
+            using var snapshots = JsonDocument.Parse(Read("api/ui-semantics/surfaces.json"));
             var matches = snapshots.RootElement.GetProperty("snapshots").EnumerateArray()
                 .Where(s => s.GetProperty("id").GetString() == Text(proof["snapshotId"])).ToArray();
             Require(matches.Length == 1, "snapshot");
@@ -285,7 +285,7 @@ public sealed class WindowsComponentMappingTests
     {
         Require(!Path.IsPathRooted(path) && !path.Contains('\\') && !path.Split('/').Any(p => p is "" or "." or "..")
             && (path.StartsWith("windows/", StringComparison.Ordinal) || path.StartsWith("docs/design/", StringComparison.Ordinal)
-                || path.StartsWith(".design-sync/", StringComparison.Ordinal) || path == "spec/ui-semantics/surfaces.json"), "sourcePath");
+                || path.StartsWith(".design-sync/", StringComparison.Ordinal) || path == "api/ui-semantics/surfaces.json"), "sourcePath");
         var absolute = RepoPaths.At(path.Replace('/', Path.DirectorySeparatorChar));
         Require(File.Exists(absolute), "sourceMissing");
         return File.ReadAllText(absolute);

@@ -45,7 +45,7 @@ admission 或设备命令 lowering。
 - 当前生产 facade：
   `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift`
 - 当前发布 Operation：
-  `Catalog/operations/capture.diagnostics.v1.json` 的 `capture.diagnostics@1`
+  `catalog/operations/capture.diagnostics.v1.json` 的 `capture.diagnostics@1`
 - 可复用 Artifact 读取实现：
   `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
 
@@ -305,7 +305,7 @@ contracts、Safety policy、历史 OpenSpec Task 状态或无关页面；发现�
 实现 PR push 前运行仓库统一入口：
 
 ```bash
-python3 scripts/ci/plan.py \
+python3 hack/ci/plan.py \
   --repo-root . \
   --base-revision origin/main \
   --head-revision HEAD \

@@ -26,7 +26,7 @@ def main():
     assert root.stat().st_mode & 0o777 == 0o700
     samples = json.loads((root / 'swift-results.json').read_text())
     assert samples and all(row['method'] == 'job.events' and row['params']['jobId'] == 'job-rust-events' for row in samples)
-    protocol = json.loads((Path(__file__).resolve().parents[2] / 'spec/control/methods/health.json').read_text())
+    protocol = json.loads((Path(__file__).resolve().parents[2] / 'api/control/methods/health.json').read_text())
     daemon, cli = args.daemon.resolve(strict=True), args.cli.resolve(strict=True)
     endpoint = root / 'control.sock'
     env = {k: v for k, v in os.environ.items() if not k.startswith('ARKDECK_')}

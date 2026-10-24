@@ -69,11 +69,11 @@ UI 和对外文档必须使用完整术语，不能把三类能力都暗示为�
 
 ## 控制平面与 Operation Catalog(CHG-2026-046)
 
-设备运行走 Device Agent Runtime Plane:App/CLI/AI 只提交 `Catalog/` 中已
+设备运行走 Device Agent Runtime Plane:App/CLI/AI 只提交 `catalog/` 中已
 发布 operation 的 typed request,不拼接 HDC/Rockchip/shell 命令;每次执行
 只产生 runtime job/session/artifact,不产生 OpenSpec task 或 PR。operation
-的 effect、输入、步骤、补偿、产物与授权要求只在 `Catalog/` 定义一份,经
-`scripts/catalog_gen` 生成 Swift 常量与 effect/authorization matrix,由
+的 effect、输入、步骤、补偿、产物与授权要求只在 `catalog/` 定义一份,经
+`hack/catalog_gen` 生成 Swift 常量与 effect/authorization matrix,由
 check-sdd 做双向 drift 校验。新 operation、新 provider、新 profile 与 E2
 策略变化仍走 OpenSpec change(Repo Agent Plane);详见
 `openspec/governance/enforcement.md`"控制平面分离"节。

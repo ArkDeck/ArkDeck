@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace ArkDeck.App.Core.Strings;
 
 /// <summary>
-/// Looks strings up in the shared bilingual catalogue (spec/ui-semantics/strings.json, as
+/// Looks strings up in the shared bilingual catalogue (api/ui-semantics/strings.json, as
 /// generated into the App's <c>.resw</c>) and formats the macOS printf placeholders it keeps
 /// (<c>%@</c>, <c>%d</c>, <c>%lld</c>, positional <c>%1$@</c>). A key the catalogue lacks is
 /// shown as the key itself, as the macOS String Catalog does, and recorded in

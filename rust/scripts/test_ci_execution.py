@@ -29,7 +29,7 @@ def load(name):
 cache = load("ci-workspace")
 tests = load("run-workspace-tests")
 policy = load("ci-policy-tools")
-retention_spec = importlib.util.spec_from_file_location("retention", Path(__file__).resolve().parents[2] / "scripts/ci/retain-rust-caches.py")
+retention_spec = importlib.util.spec_from_file_location("retention", Path(__file__).resolve().parents[2] / "hack/ci/retain-rust-caches.py")
 retention = importlib.util.module_from_spec(retention_spec)
 retention_spec.loader.exec_module(retention)
 

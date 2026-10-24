@@ -1219,7 +1219,7 @@ mod preflight_table_tests {
     use arkdeck_contract::{JobStateClass, job_state_class, job_states};
 
     /// The Runtime's Job states are the shared preflight table's
-    /// (`spec/recovery/job-state-preflight.json`, design §G.4), terminal
+    /// (`api/recovery/job-state-preflight.json`, design §G.4), terminal
     /// exactly where the table says so.
     #[test]
     fn the_job_states_are_the_shared_preflight_tables() {

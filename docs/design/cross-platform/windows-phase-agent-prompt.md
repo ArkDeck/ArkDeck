@@ -42,14 +42,14 @@
    - durable 格式与 macOS 的 T0 字节一致，由回放已录的 oracle 证明；
    - daemon 重启后能读回，XPA-AC-7 的 kill 矩阵通过。
 3. **Windows HDC tuple 已注册**：通过一个独立的 integration change 完成，输入来自本机的真实采样（§3 WM1）。
-4. **CLI 覆盖完整**：`openspec/contracts/cli-feature-coverage.json` 里每个条目的 `implementationStatusByPlatform.windows` 都是 `implemented`。唯一例外是维护者接受 deferred 的 platformService 条目。
+4. **CLI 覆盖完整**：`api/contracts/cli-feature-coverage.json` 里每个条目的 `implementationStatusByPlatform.windows` 都是 `implemented`。唯一例外是维护者接受 deferred 的 platformService 条目。
    - 这个文件由 `rust/crates/arkdeck-cli/src/feature_coverage.rs` 经 contracts export 生成，不手改。
    - 现在是 256 项里 140 项 `notImplemented`、116 项未填。
 5. **Windows 客户端完成**：
    - SPK-4 已定案，选 WinUI 3 还是 WPF；
    - XPA-007 的骨架和 XPA-020 的各个页面接的是真实的 Windows daemon；
    - UIA 语义快照测试齐全；
-   - `scripts/ci/plan.py` 里有 `windows` 车道，并已加入 `swift` 聚合。
+   - `hack/ci/plan.py` 里有 `windows` 车道，并已加入 `swift` 聚合。
 6. **Trace 按决策 5 交付**（XPA-021）：至少做到 capture、inspect、export 与 macOS 对等。viewer 没做的话，如实显示 `unavailable`。
 7. **打包就绪**（XPA-022 的软件部分）：MSIX（按决策 10）以及 daemon、CLI 的 xcopy 形态，都能由脚本从同一个修订构建出来；签名步骤已就绪，凭据由维护者提供并执行。
 8. **全部落在 main 上**：
@@ -159,7 +159,7 @@
    - XPA-AC-4「ledger decodes in Swift」；
    - XPA-010「Swift and Rust compute the same plan digest」。
 
-   Swift 的 runtime target 已删除（#2311/#2312/#2316），所以参照物改为：`rust/tests/fixtures/**` 与 `spec/**` 中录下的 Swift oracle 和语料，加上 macOS 上 Rust writer 写出的 T0 字节。这一条不改 AC 原文，只界定参照物，性质同 r11 的对等三级。
+   Swift 的 runtime target 已删除（#2311/#2312/#2316），所以参照物改为：`rust/tests/fixtures/**` 与 `api/**` 中录下的 Swift oracle 和语料，加上 macOS 上 Rust writer 写出的 T0 字节。这一条不改 AC 原文，只界定参照物，性质同 r11 的对等三级。
 4. **决策 9（支持格）**：Windows 11 x64 与 ARM64，不支持 Windows 10。（r13 改为：只支持 Windows 11 x64，ARM64 延后，不支持 Windows 10 与 32 位 x86。）
 5. **决策 10（打包）**：App 用 MSIX packaged + self-contained Windows App SDK，签名用 Azure Artifact Signing 并加时间戳，更新走 App Installer；daemon 和 CLI 另外提供 xcopy 形态，供 CI 和 headless 使用。
 6. **决策 11（daemon 生命周期）**：由客户端自启动，daemon 单实例。
@@ -226,7 +226,7 @@
 - **git 卫生。**
   - 不用不带唯一标签的 `git stash`，不用 `git checkout <branch> -- .`。
   - squash 时基于 `git merge-base HEAD origin/main`，不要直接基于 `origin/main`。
-- **union 合并的文件。** `tasks.md` 和 `rust/README.md` 标了 `merge=union`。rebase 后检查有没有重复的 bullet，`#[cfg(...)]` 属性是否仍然成对（`scripts/check_union_merge.py` 能查出重复）。
+- **union 合并的文件。** `tasks.md` 和 `rust/README.md` 标了 `merge=union`。rebase 后检查有没有重复的 bullet，`#[cfg(...)]` 属性是否仍然成对（`hack/check_union_merge.py` 能查出重复）。
 - **记录写在哪里。**
   - 每一刀：`evidence/runs/<TASK>/<slice>-run.md`；
   - `tasks.md`：只在 Task 的 Status 行变化时才改；
@@ -242,7 +242,7 @@
   - 多个 worktree 各用各的 `CARGO_TARGET_DIR`（放 D 盘）。
 - 改了契约输入：`"$ARKDECK_PYTHON" rust/scripts/generate-contract.py --check`。
 - 改了 `rust/scripts/check-contracts.py`：跑 `"$ARKDECK_PYTHON" rust/scripts/test_contract_checks.py`。
-- 改了 `openspec/**`、`docs/**` 或 `AGENTS.md`：`sh scripts/check-sdd.sh`。
+- 改了 `openspec/**`、`docs/**` 或 `AGENTS.md`：`sh hack/check-sdd.sh`。
 - Windows 客户端工程：跑受影响项目的 build 和 test。
 
 **本机做不到、交给 CI 的：**
@@ -280,7 +280,7 @@ Host github-arkdeck-agent
   IdentitiesOnly yes
 ```
 
-**3. 钉住 GitHub 的主机公钥。** 在 known_hosts 里写入 `scripts/ci/arkforge-cargo-fetch.sh` 里钉的那一行 `github.com ssh-ed25519 …`，并和 `https://api.github.com/meta` 交叉核对。
+**3. 钉住 GitHub 的主机公钥。** 在 known_hosts 里写入 `hack/ci/arkforge-cargo-fetch.sh` 里钉的那一行 `github.com ssh-ed25519 …`，并和 `https://api.github.com/meta` 交叉核对。
 
 如果 22 端口不通，改成 `HostName ssh.github.com` 加 `Port 443`，known_hosts 那行的主机部分相应写成 `[ssh.github.com]:443`。
 
@@ -331,7 +331,7 @@ Host github-arkdeck-agent
   - `verification.md`：第 3 行必须严格写成 `> Change:CHG-2026-074-shared-rust-runtime-core@r12`，并补上 §1.2 第 3 条的读法；
   - 同车加入：W0 记录（按 §2.2 脱敏）；`evidence/windows-remaining.md`（一张表，见 §5）；本文如需随 r12 修订，也在同一个 PR 里改。
 - **提请的内容**：§1.2 的全部裁决。另外写明不改变的部分：不改任何 Requirement、AC 原文、Core baseline、安全不变量或硬件判据。
-- **推送前**：`sh scripts/check-sdd.sh`、`git diff --check`。
+- **推送前**：`sh hack/check-sdd.sh`、`git diff --check`。
 
 ### WM0.5：平台事实（和 r12 的 review 并行；只产出事实，不写 Windows GJ 的生产代码）
 
@@ -400,9 +400,9 @@ Host github-arkdeck-agent
 - **SPK-4**：按设计 §H.4 的 (a)–(e) 判定；需要的 Visual Studio 工作负载和 Windows App SDK 先列给维护者装。
   - (a)–(e) 任一项失败，且两周内修不好，就改用 WPF；语义契约和 ClientKit 不变。
 - **XPA-007**：
-  - `windows/**` 工程、`.NET ClientKit`（由 `spec/control/methods/**` 生成）；
-  - `spec/ui-semantics/**`；双语资源生成 `.resw` 和 `.xcstrings`（值不变）；
-  - `plan.py` 的 `windows` 车道（非 Windows 主机上 `--run-local` 必须报「不可运行」并以非零退出），同时更新 `scripts/ci/test_plan.py` 与 `scripts/test_agent_pr_workflow.py`；
+  - `windows/**` 工程、`.NET ClientKit`（由 `api/control/methods/**` 生成）；
+  - `api/ui-semantics/**`；双语资源生成 `.resw` 和 `.xcstrings`（值不变）；
+  - `plan.py` 的 `windows` 车道（非 Windows 主机上 `--run-local` 必须报「不可运行」并以非零退出），同时更新 `hack/ci/test_plan.py` 与 `hack/tests/test_agent_pr_workflow.py`；
   - ClientKit 拒绝 owner SID 不是当前用户的 pipe，并显示 daemon 不可用的恢复横幅。
 - **XPA-020**：六个页面，各自依赖对应的 GJ 完成后再接（见 tasks.md）。未实现的能力显示 `unavailable(reasonCode)` 和对应的 CLI 路径，不放禁用的占位控件。
 - **XPA-021**：按决策 5 交付。
@@ -412,13 +412,13 @@ Host github-arkdeck-agent
 - **XPA-022 的软件部分**：MSIX 与 xcopy 的构建脚本、签名接入点、App Installer 更新源、卸载路径；写好干净主机 smoke 的 runbook。
 - **CLI 覆盖**：确认 coverage 已达到出口第 4 条。
 - **`conformance-cases.yaml`**：GJ 相关的行齐全，状态都保持 `NOT_RUN`，等阶段 A。
-- **性能**：让 `scripts/bench` 和 soak 能在 Windows 上跑起来；正式测量属于阶段 A 的参考主机。
+- **性能**：让 `hack/bench` 和 soak 能在 Windows 上跑起来；正式测量属于阶段 A 的参考主机。
 - **阶段 A 的 runbook**：按顺序写出维护者要做的事——身份、采样、SPK-3 行、GJ-1..5、干净主机、翻转——每一步写清命令和预期。
 
 ### 车道（r12 合入后可以并行）
 
 - **Runtime 车道**：WM1–WM4，以及 WM6 的 coverage 部分。拥有 `rust/**`。
-- **Client 车道**：WM5。拥有 `windows/**`、`spec/ui-semantics/**`，以及 `plan.py` 的 `windows` 车道。
+- **Client 车道**：WM5。拥有 `windows/**`、`api/ui-semantics/**`，以及 `plan.py` 的 `windows` 车道。
 
 两条车道各用一个 worktree 和各自的 `CARGO_TARGET_DIR`。开工时维护者会说明你是哪条车道；没说就按 Runtime 车道做，Client 车道在 Runtime 车道空闲时推进。
 
@@ -445,7 +445,7 @@ Host github-arkdeck-agent
 **跨机协作。**
 
 - 你看不到 Mac 上的会话。macOS 的 RC 和阶段 A 可能随时往 `rust/**` 合入修复，所以要勤 rebase。
-- 要改 macOS 侧拥有的东西（`scripts/release/**`、`Packages/**`、`ArkDeckApp/**`）时，在 commit message 里说明，并把改动控制到最小。
+- 要改 macOS 侧拥有的东西（`hack/release/**`、`Packages/**`、`ArkDeckApp/**`）时，在 commit message 里说明，并把改动控制到最小。
 
 ## 5. 仪表盘与汇报
 

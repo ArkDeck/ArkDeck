@@ -25,7 +25,7 @@
    exact-plan capability。E2 凭据的创建/修改/吊销仍以维护者 merged PR
    为唯一载体——信任根不因平面分离而弱化。
 4. **catalog 是两平面的分界物**。operation 语义(effect/输入/步骤/补偿/
-   预算/授权)只在 `Catalog/` 定义一份,merge 即发布;catalog 之外不存在
+   预算/授权)只在 `catalog/` 定义一份,merge 即发布;catalog 之外不存在
    可执行 operation,catalog 内不可表达 generic shell step。
 5. **PR 形态收敛为垂直交付单元**。实现+测试+文档+evidence+任务状态翻转
    同 PR;readiness-only/status-only/done-only/verified-only PR 废止;

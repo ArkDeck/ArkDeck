@@ -93,7 +93,7 @@ public sealed record JobSummary(
     string? ActualEffect = null,
     string? StartedAtUtc = null)
 {
-    /// <summary>The terminal Job states (spec/recovery/job-state-preflight.json, class
+    /// <summary>The terminal Job states (api/recovery/job-state-preflight.json, class
     /// "terminal"); every other state counts as active, as the macOS Job Inspector counts.</summary>
     public static readonly IReadOnlySet<string> TerminalStates =
         new HashSet<string>(StringComparer.Ordinal) { "planned", "succeeded", "failed", "cancelled", "interrupted", "recovered" };

@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 const JOB: &str = "job-73b1cb9a96d12a0ea736a065afdf5abd";
-// Artifact identities depend on the producer's Catalog/plan hash. Read the
+// Artifact identities depend on the producer's catalog/plan hash. Read the
 // immutable recording selected for this contract view, preserving its bytes.
 fn recorded_id(name: &str) -> &'static str {
     static INDEX: std::sync::OnceLock<Value> = std::sync::OnceLock::new();

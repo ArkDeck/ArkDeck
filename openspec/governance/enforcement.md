@@ -34,7 +34,7 @@
 
 ## 控制平面分离(Repo/Runtime;2.2.0 = CHG-2026-046 ADDED)
 
-- **Repo Agent Plane**:代码、契约、`Catalog/`、provider、profile 与安全策略
+- **Repo Agent Plane**:代码、契约、`catalog/`、provider、profile 与安全策略
   的一切变更,载体是 OpenSpec change + PR,信任根与批准语义不变。**恰四类
   变化需要 OpenSpec/PR 审批**:新 operation 或对已发布 operation 的破坏性
   修改;新 provider;新 integration/device profile;destructive 自动化安全策略变化。
@@ -103,7 +103,7 @@ PR/决策维度,与设备 effect(`hostOnly/readOnly/deviceMutation/destructive`)
 
 ## CI 校验(sdd-guard)
 
-`scripts/check-sdd.sh` 在每次 push/PR 运行,只做只读一致性校验:
+`hack/check-sdd.sh` 在每次 push/PR 运行,只做只读一致性校验:
 
 - 所有 YAML/JSON 可解析,拒绝 duplicate key;
 - Requirement/AC ID 全局唯一;每个 Requirement 至少一个 Given/When/Then Scenario;

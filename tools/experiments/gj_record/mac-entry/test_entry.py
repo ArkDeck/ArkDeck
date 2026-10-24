@@ -185,7 +185,7 @@ class NativeEntryTests(unittest.TestCase):
     def native(self, *, peer_pid=123, birth_drift=False, socket_drift=False, image_drift=False):
         native = entry.MacNative.__new__(entry.MacNative)
         native.uid, native.daemon = 501, self.config["daemon"]
-        spec = importlib.util.spec_from_file_location("pure_native_parser", REPOSITORY / "scripts/ci/installed_rust_ui.py")
+        spec = importlib.util.spec_from_file_location("pure_native_parser", REPOSITORY / "hack/ci/installed_rust_ui.py")
         existing = importlib.util.module_from_spec(spec)
         # The reused parser module imports POSIX pwd; no test calls its account
         # helpers. Keep these fake-native regressions runnable on Windows too.

@@ -26,7 +26,7 @@
 //!   register|list|show`, `workspace preset list|show`, `trace cache
 //!   status`), and what they wrote is read back after a restart. Each of
 //!   their coverage entries must be Windows `implemented` in
-//!   `openspec/contracts/cli-feature-coverage.json`.
+//!   `api/contracts/cli-feature-coverage.json`.
 //! - The same daemon as its own analyzer (`ARKDECK_ANALYZER_PATH`, TASK-
 //!   XPA-011) over a development root holding a recorded Swift source Job's
 //!   Artifacts: `analyze crash-signature` and `analyze hilog-summary` run to
@@ -548,7 +548,7 @@ mod windows {
     /// The Windows status of the coverage entry of the daemon method `leaf`
     /// fronts, in the coverage manifest this CLI renders. That is the product
     /// `maintainer contracts export` writes, which `tests/machine_contracts.rs`
-    /// holds to the committed `openspec/contracts/cli-feature-coverage.json`.
+    /// holds to the committed `api/contracts/cli-feature-coverage.json`.
     /// It is read from the build rather than the checkout, because
     /// check-contracts' views copy `rust/` without `openspec/`.
     fn windows_statuses(leaf: &str) -> Vec<String> {

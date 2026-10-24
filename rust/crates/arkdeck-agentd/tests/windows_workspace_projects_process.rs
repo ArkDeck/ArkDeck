@@ -1171,7 +1171,7 @@ fn build_and_test_presets_pin_the_host_s_deveco_through_the_cli() {
 /// What this test measured is what the coverage manifest counts: each
 /// leaf's entries are Windows `implemented` in the manifest the CLI renders
 /// (`maintainer contracts export`'s product, held to the committed
-/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+/// `api/contracts/cli-feature-coverage.json` by the CLI's own tests).
 fn assert_measured(leaves: &[&str]) {
     let product = arkdeck_cli::machine_contracts::contract_products()
         .into_iter()

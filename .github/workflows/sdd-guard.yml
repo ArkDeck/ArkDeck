@@ -49,14 +49,14 @@ jobs:
           python3 -m pip install \
             --disable-pip-version-check \
             --target "$RUNNER_TEMP/arkdeck-sdd-deps" \
-            -r scripts/requirements-sdd.txt
+            -r hack/requirements-sdd.txt
           printf 'PYTHONPATH=%s\n' \
             "$RUNNER_TEMP/arkdeck-sdd-deps" >> "$GITHUB_ENV"
 
       - name: SDD consistency check
         env:
           ARKDECK_PYTHON: python3
-        run: ./scripts/check-sdd.sh
+        run: ./hack/check-sdd.sh
 
       # These two suites had no workflow running them at all, so the properties
       # they pin held only when someone remembered to run them by hand.
@@ -64,16 +64,16 @@ jobs:
       # whatever its module-level `unittest.main()` has collected so far, which
       # has twice been less than the whole file.
       - name: SDD checker contract tests
-        run: python3 scripts/test_check_sdd.py
+        run: python3 hack/tests/test_check_sdd.py
 
-      # The Agent PR workflow runs scripts/agent_pr_identity.py without an
+      # The Agent PR workflow runs hack/agent_pr_identity.py without an
       # install step; its contract suite is stdlib-only and runs here so a
       # regression in the identity checks turns the required check red.
       - name: Agent PR identity helper contract tests
-        run: python3 scripts/test_agent_pr_identity.py
+        run: python3 hack/tests/test_agent_pr_identity.py
 
       - name: Agent PR stack helper tests
-        run: python3 scripts/ci/test_agent_pr.py
+        run: python3 hack/ci/test_agent_pr.py
 
       - name: host-loop contract suite
         working-directory: tools/experiments

@@ -35,7 +35,7 @@ fn all_thirty_one_unchanged_descriptors_have_the_exact_complete_catalog_lineage(
     let lineage = Lineage::frozen().unwrap();
     lineage
         .assert_catalog_view_sources(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../catalog/operations"),
             arkdeck_contract::CATALOG_DIGEST,
         )
         .unwrap();

@@ -8,7 +8,7 @@
 // through it — and because it is fail-closed, a failure leaves no `dist/` and
 // the converter stops at [NO_DIST] rather than shipping stale tokens.
 //
-// It lives next to the package rather than under `scripts/` or `.github/`: it
+// It lives next to the package rather than under `hack/` or `.github/`: it
 // is the package's own build check, and when it was written those two
 // directories sat behind a PR path guard that needed a task to cover them
 // (retired by CHG-2026-077). See .design-sync/NOTES.md.

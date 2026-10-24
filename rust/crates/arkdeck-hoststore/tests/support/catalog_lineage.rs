@@ -283,7 +283,7 @@ fn reference(operation: &Value) -> Result<String, String> {
     Ok(format!("{id}@{version}"))
 }
 
-// Exactly scripts/catalog_gen/generate.py catalog_digest: sorted objects,
+// Exactly hack/catalog_gen/generate.py catalog_digest: sorted objects,
 // sorted operation id/version, compact JSON and ensure_ascii=True.
 pub fn catalog_bytes(operations: &[Value]) -> Result<Vec<u8>, String> {
     let mut ordered = operations.to_vec();

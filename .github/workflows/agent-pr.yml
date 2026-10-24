@@ -51,7 +51,7 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           HEAD_SHA: ${{ github.sha }}
         run: |
-          python3 scripts/ci/agent_pr.py \
+          python3 hack/ci/agent_pr.py \
             --repo-root "$GITHUB_WORKSPACE" \
             --repository "$GITHUB_REPOSITORY" \
             --branch "$BRANCH" \

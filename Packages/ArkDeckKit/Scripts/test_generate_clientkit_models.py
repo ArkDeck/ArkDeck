@@ -12,7 +12,7 @@ spec.loader.exec_module(generator)
 
 class ClientKitGeneratorTests(unittest.TestCase):
     def setUp(self):
-        self.documents = {method: json.loads((generator.ROOT / f'spec/control/methods/{method}.json').read_text()) for method in generator.METHODS}
+        self.documents = {method: json.loads((generator.ROOT / f'api/control/methods/{method}.json').read_text()) for method in generator.METHODS}
 
     def test_committed_output_is_deterministic(self):
         output = generator.render(self.documents)

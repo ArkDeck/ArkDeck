@@ -26,9 +26,9 @@ transport, packaging, installation, or device mutation changes.
 
 ## Local targeted checks
 
-- `ARKDECK_XCODE_CACHE_ROOT=/private/tmp/arkdeck-device-debug-build ARKDECK_XCODE_JOBS=2 sh scripts/ci/run-xcodebuild.sh`: exit 0.
+- `ARKDECK_XCODE_CACHE_ROOT=/private/tmp/arkdeck-device-debug-build ARKDECK_XCODE_JOBS=2 sh hack/ci/run-xcodebuild.sh`: exit 0.
   Log: `/private/tmp/arkdeck-device-debug-build.log`.
-- Final incremental `ARKDECK_UI_TEST_DERIVED_DATA=/private/tmp/arkdeck-device-debug-build/DerivedData sh scripts/ci/run-ui-tests.sh --build-once`: exit 0.
+- Final incremental `ARKDECK_UI_TEST_DERIVED_DATA=/private/tmp/arkdeck-device-debug-build/DerivedData sh hack/ci/run-ui-tests.sh --build-once`: exit 0.
   Log: `/private/tmp/arkdeck-device-debug-final-build.log`.
 - `DebugWorkspaceRefreshStateTests`: 3 executed, 0 failures, exit 0. The exact App
   helper and test source were compiled with `xcrun swiftc`, Xcode's XCTest include,
@@ -39,7 +39,7 @@ transport, packaging, installation, or device mutation changes.
   runner entry point: `/private/tmp/arkdeck-debug-selection-tests/main.swift`.
 - `cargo fmt --all --check --manifest-path rust/Cargo.toml`: exit 0.
   Log: `/private/tmp/arkdeck-device-debug-fmt.log`.
-- `sh scripts/check-sdd.sh`: exit 0; 0 errors, 0 warnings.
+- `sh hack/check-sdd.sh`: exit 0; 0 errors, 0 warnings.
   Log: `/private/tmp/arkdeck-device-debug-sdd.log`.
 - UI test selection (same independent DerivedData):
   `AppShellUITests/testInspectorReloadsAfterHistoryRefreshInBothLanguages`,

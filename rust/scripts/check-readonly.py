@@ -42,8 +42,8 @@ import jsonschema
 import catalog_test_views
 
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
-CANDIDATE_INPUTS = ROOT / "spec/baselines/swift-candidate-inputs.json"
+BASELINE = ROOT / "api/baselines/swift-single-v1.json"
+CANDIDATE_INPUTS = ROOT / "api/baselines/swift-candidate-inputs.json"
 REGISTRY = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
 SUPPORTED = {"health", "doctor", "operation.list", "device.observations"}
 # These methods reach the Import owner, including immutable discovery lists.
@@ -61,7 +61,7 @@ IMPORT_OWNER_METHODS = frozenset({
 
 def missing_import_owner_error(method: str) -> str:
     assert method in IMPORT_OWNER_METHODS, f"not an Import owner route: {method}"
-    schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")
+    schema = read_json(ROOT / "api/control/methods" / f"{method}.json")
     definitions = schema["$defs"]
     code = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorCode"})
     details = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorDetails"})
@@ -325,8 +325,8 @@ def wait_ready(endpoint: str, daemon: subprocess.Popen) -> None:
 
 def validate_completed(directory: Path, rows: list, registry: dict) -> dict:
     # Called only after all producers have exited and every output is on disk.
-    wire = jsonschema.Draft202012Validator(read_json(ROOT / "openspec/contracts/runtime-control-plane.schema.json"))
-    cli = jsonschema.Draft202012Validator(read_json(ROOT / "openspec/contracts/cli-result.schema.json"))
+    wire = jsonschema.Draft202012Validator(read_json(ROOT / "api/contracts/runtime-control-plane.schema.json"))
+    cli = jsonschema.Draft202012Validator(read_json(ROOT / "api/contracts/cli-result.schema.json"))
     counts = {"controlResponses": 0, "cliEnvelopes": 0, "validRequests": 0}
     for row in rows:
         data = (directory / row["file"]).read_bytes()
@@ -348,7 +348,7 @@ def validate_completed(directory: Path, rows: list, registry: dict) -> dict:
             else:
                 counts["controlResponses"] += 1
             if method in registry["methods"]:
-                definitions = read_json(ROOT / f"spec/control/methods/{method}.json")["$defs"]
+                definitions = read_json(ROOT / f"api/control/methods/{method}.json")["$defs"]
                 if value["ok"]:
                     jsonschema.Draft202012Validator(definitions["result"]).validate(value["result"])
                 elif kind == "response.jsonl":
@@ -550,7 +550,7 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
                       "workspace.preset.remove"}:
             expected = "invalidParams"
         if method == "workspace.project.list":
-            schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")
+            schema = read_json(ROOT / "api/control/methods" / f"{method}.json")
             definitions = schema["$defs"]
             error_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorCode"})
             detail_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorDetails"})

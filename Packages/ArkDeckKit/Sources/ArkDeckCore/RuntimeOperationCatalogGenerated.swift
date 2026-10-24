@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
-// Source of truth: Catalog/operations/*.json (CHG-2026-046 T04).
-// Regenerate: python3 scripts/catalog_gen/generate.py --write
+// Source of truth: catalog/operations/*.json (CHG-2026-046 T04).
+// Regenerate: python3 hack/catalog_gen/generate.py --write
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {

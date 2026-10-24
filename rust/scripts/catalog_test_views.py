@@ -99,7 +99,7 @@ def custom_harnesses(metadata: dict) -> dict[str, tuple[str, tuple[str, ...]]]:
 
 
 def generated_catalog(rows: list[dict], digest: str) -> str:
-    path = Path(__file__).resolve().parents[2] / 'scripts/catalog_gen/generate.py'
+    path = Path(__file__).resolve().parents[2] / 'hack/catalog_gen/generate.py'
     spec = importlib.util.spec_from_file_location('arkdeck_test_view_catalog_generator', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -119,7 +119,7 @@ def source_inventory(rust: Path) -> dict[str, str]:
                   'crates/arkdeck-contract/src/catalog_generated.rs',
                   'crates/arkdeck-contract/src/control_generated.rs')]
     files += list(rust.glob('crates/*/Cargo.toml'))
-    files += [path for path in (rust.parent / 'scripts/catalog_gen/generate.py',)
+    files += [path for path in (rust.parent / 'hack/catalog_gen/generate.py',)
               if path.is_file()]
     return {(path.relative_to(rust).as_posix() if path.is_relative_to(rust)
              else '../' + path.relative_to(rust.parent).as_posix()): sha(path.read_bytes().replace(b'\r\n', b'\n'))
@@ -191,7 +191,7 @@ def catalog_table_digest(rust: Path, rows: list[dict]) -> str:
 
 
 def catalog(rust: Path) -> str:
-    directory = rust.parent / 'Catalog/operations'
+    directory = rust.parent / 'catalog/operations'
     rows = [json.loads(path.read_bytes()) for path in sorted(directory.glob('*.json'))]
     digest = catalog_table_digest(rust, rows)
     generated = (rust / 'crates/arkdeck-contract/src/catalog_generated.rs').read_text(encoding='utf-8')

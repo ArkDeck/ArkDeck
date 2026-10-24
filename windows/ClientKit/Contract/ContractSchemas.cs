@@ -5,7 +5,7 @@ using ArkDeck.ClientKit.Json;
 namespace ArkDeck.ClientKit.Contract;
 
 /// <summary>
-/// The method schemas <c>spec/control/methods/*.json</c>, embedded at build time. Each one
+/// The method schemas <c>api/control/methods/*.json</c>, embedded at build time. Each one
 /// must have the SHA-256 the generator recorded in <see cref="ControlContract.MethodSchemaSha256"/>
 /// and the set must equal <see cref="ControlContract.Methods"/>; otherwise the client refuses
 /// to validate anything (fail closed), so an edited schema without a regeneration cannot
