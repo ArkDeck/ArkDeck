@@ -14,7 +14,7 @@ public sealed class JobInspectorTests
     public void TheLogTableIsTheCatalogsLogRoles()
     {
         var declared = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var file in Directory.EnumerateFiles(RepoPaths.At("Catalog", "operations"), "*.json"))
+        foreach (var file in Directory.EnumerateFiles(RepoPaths.At("catalog", "operations"), "*.json"))
         {
             using var doc = JsonDocument.Parse(File.ReadAllBytes(file));
             var root = doc.RootElement;

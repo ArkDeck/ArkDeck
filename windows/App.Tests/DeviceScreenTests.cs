@@ -333,7 +333,7 @@ public sealed class DeviceScreenTests
             {
                 var reference = Text(parameters["reference"]);
                 var name = reference.Split('@')[0];
-                var catalog = (JsonObject)StrictJson.Parse(File.ReadAllBytes(RepoPaths.At("Catalog", "operations", name + ".v1.json")));
+                var catalog = (JsonObject)StrictJson.Parse(File.ReadAllBytes(RepoPaths.At("catalog", "operations", name + ".v1.json")));
                 return Ok($$"""{"reference":"{{reference}}","title":"Device fixture","minimumEffect":"readOnly","timeoutSeconds":{{catalog["timeoutSeconds"]}},"outputByteBudget":1,"steps":[]}""");
             }
             if (method == "target.show")

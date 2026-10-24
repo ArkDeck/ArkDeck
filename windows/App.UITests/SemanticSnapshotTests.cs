@@ -19,7 +19,7 @@ public sealed class SemanticSnapshotTests
     /// <summary>Every scenario some snapshot names (so none goes unchecked), in each language.</summary>
     public static IEnumerable<object[]> Scenarios()
     {
-        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "surfaces.json")));
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "surfaces.json")));
         var scenarios = doc.RootElement.GetProperty("snapshots").EnumerateArray().Select(s => s.GetProperty("scenario").GetString()!).Distinct().ToArray();
         return from scenario in scenarios
                from language in new[] { "en-US", "zh-Hans" }

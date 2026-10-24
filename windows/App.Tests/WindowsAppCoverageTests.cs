@@ -12,7 +12,7 @@ public sealed class WindowsAppCoverageTests
     [TestMethod]
     public void EveryAppClaimLinksItsExactWindowsFixtureAndRecord()
     {
-        using var document = JsonDocument.Parse(File.ReadAllBytes(RepoPaths.At("openspec", "contracts", "cli-feature-coverage.json")));
+        using var document = JsonDocument.Parse(File.ReadAllBytes(RepoPaths.At("api", "contracts", "cli-feature-coverage.json")));
         var rows = document.RootElement.GetProperty("entries").EnumerateArray()
             .Where(row => row.GetProperty("source").GetString()!.StartsWith("app:", StringComparison.Ordinal)).ToArray();
         Assert.AreEqual(68, rows.Length);

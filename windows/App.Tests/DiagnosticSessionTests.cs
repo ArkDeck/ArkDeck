@@ -528,7 +528,7 @@ public sealed class DiagnosticSessionTests
     {
         foreach (var (file, reference) in new[] { ("capture.diagnostics.v1.json", DiagnosticSessionOfflineInspector.OperationReference), ("analyzer.summarize-hilog.v1.json", DiagnosticHilogSummary.OperationReference) })
         {
-            using var operation = JsonDocument.Parse(File.ReadAllBytes(RepoPaths.At("Catalog", "operations", file)));
+            using var operation = JsonDocument.Parse(File.ReadAllBytes(RepoPaths.At("catalog", "operations", file)));
             var declared = operation.RootElement.GetProperty("artifacts").EnumerateArray()
                 .ToDictionary(a => a.GetProperty("name").GetString()!, a => a.GetProperty("role").GetString()!);
             var table = DiagnosticArtifactRoles.Declared[reference];
