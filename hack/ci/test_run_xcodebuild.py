@@ -534,8 +534,8 @@ class TraceResourcePhaseTests(unittest.TestCase):
             if destination.name == "trace_streamer":
                 destination.write_bytes(b"canonical unsigned helper fixture")
             else:
-                shutil.copyfile(self.repo_root / relative, destination)
-        canonical_manifest = source_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json"
+                shutil.copyfile(self.repo_root / "apple" / relative, destination)
+        canonical_manifest = source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json"
         canonical_bytes = canonical_manifest.read_bytes()
         canonical = json.loads(canonical_bytes)
         products = temporary / "products"
@@ -566,7 +566,7 @@ class TraceResourcePhaseTests(unittest.TestCase):
             self.assertEqual(canonical_manifest.read_bytes(), canonical_bytes)
             self.assertEqual(helper.read_bytes(), final_bytes)
             self.assertFalse(stale_license.exists())
-            expected_licenses = source_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES"
+            expected_licenses = source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES"
             self.assertCountEqual(
                 [path.name for path in license_root.iterdir()],
                 [path.name for path in expected_licenses.iterdir()],
