@@ -237,7 +237,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   ]
 
   private static let xcodeTargetSources: [String: String] = [
-    "ArkDeck": "ArkDeckApp",
+    "ArkDeck": "apple/ArkDeckApp",
     "ArkDeckHDCUITests": "apple/ArkDeckAppUITests",
   ]
 
@@ -340,13 +340,15 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     project: String
   ) throws -> [String: Set<String>] {
     let identifier = "[0-9A-Za-z]+"
+    // The local package path is relative to the project directory (apple/), so the
+    // pbxproj still names Packages/ArkDeckKit rather than a repository-root path.
     let localPackage = try NSRegularExpression(
-      pattern: "(\(identifier)) /\\* XCLocalSwiftPackageReference \"apple/Packages/ArkDeckKit\" \\*/ = \\{")
+      pattern: "(\(identifier)) /\\* XCLocalSwiftPackageReference \"Packages/ArkDeckKit\" \\*/ = \\{")
     let fullRange = NSRange(project.startIndex..., in: project)
     guard let packageMatch = localPackage.firstMatch(in: project, range: fullRange),
       let packageRange = Range(packageMatch.range(at: 1), in: project)
     else {
-      XCTFail("apple/ArkDeck.xcodeproj no longer references apple/Packages/ArkDeckKit")
+      XCTFail("apple/ArkDeck.xcodeproj no longer references Packages/ArkDeckKit")
       return [:]
     }
     let packageID = String(project[packageRange])
