@@ -33,7 +33,7 @@ const files = dir => readdirSync(dir, {withFileTypes:true}).flatMap(entry => {
 let swiftSourceCache;
 function swiftSources() {
   if (swiftSourceCache === undefined) {
-    const roots = ['ArkDeckApp', 'apple/ArkDeckAppUITests', 'Packages'].map(dir => join(root, dir));
+    const roots = ['apple/ArkDeckApp', 'apple/ArkDeckAppUITests', 'apple/Packages'].map(dir => join(root, dir));
     swiftSourceCache = roots
       .filter(dir => { try { readdirSync(dir); return true; } catch { return false; } })
       .flatMap(dir => files(dir))
@@ -600,7 +600,7 @@ test('Flash stage summaries never lower the published maximum effect', () => {
 
 test('every App View file and preview is covered and linked', () => {
   const declaration = /\b(?:struct|class)\s+\w+(?:<[^{}]*>)?\s*:\s*[^\n{]*\b(?:View|NSViewRepresentable|NSView)\b/;
-  const actual = files(join(root, 'ArkDeckApp'))
+  const actual = files(join(root, 'apple/ArkDeckApp'))
     .filter(path => path.endsWith('.swift') && declaration.test(readFileSync(path, 'utf8')))
     .map(path => relative(root, path).split(sep).join('/')).sort();
   assert.deepEqual(actual, coverage.appViewFiles);
