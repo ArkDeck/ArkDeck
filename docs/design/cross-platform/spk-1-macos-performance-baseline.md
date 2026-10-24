@@ -3,8 +3,8 @@
 Task: `TASK-XPA-023` of `CHG-2026-074-shared-rust-runtime-core`.
 Design input: `docs/design/cross-platform/rust-core-cross-platform-architecture.md`
 sections I.1, I.2 and I.3.
-Harness: `scripts/bench` (`arkdeck-perf-baseline-1.1.0`).
-Committed baseline: `scripts/bench/baselines/perf-baseline-2026-09-04.json`.
+Harness: `hack/bench` (`arkdeck-perf-baseline-1.1.0`).
+Committed baseline: `hack/bench/baselines/perf-baseline-2026-09-04.json`.
 
 > Host measurement only. Nothing here is hardware, platform or conformance
 > evidence (POL-VERIFY-001, POL-MODE-001): the harness starts its own daemon on

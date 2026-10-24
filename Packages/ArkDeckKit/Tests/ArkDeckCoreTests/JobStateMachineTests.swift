@@ -983,7 +983,7 @@ struct JobStateMachineTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let data = try Data(contentsOf: repositoryRoot.appending(path: "openspec/contracts/\(name)"))
+    let data = try Data(contentsOf: repositoryRoot.appending(path: "api/contracts/\(name)"))
     return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
 

@@ -5,5 +5,5 @@
   },
   "producer" : "JobStatePreflightTableContractTests.testTheTableIsSwiftsJobStatesAndRecordsTheRestartOracle",
   "restartClassifier" : "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift RuntimeCLI.classifyAgentdRestartCurrentJobs",
-  "table" : "spec/recovery/job-state-preflight.json"
+  "table" : "api/recovery/job-state-preflight.json"
 }

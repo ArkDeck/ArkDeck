@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACTS = ROOT / "openspec/contracts"
+CONTRACTS = ROOT / "api/contracts"
 
 
 class PreconsumeManifestSchemaTests(unittest.TestCase):

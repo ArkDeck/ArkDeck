@@ -5,7 +5,7 @@
 //!
 //! * `runtime tool register --kind deveco` measures and registers the
 //!   DevEco Studio at `ARKDECK_LIVE_DEVECO_ROOT`;
-//! * the repository's WaterFlow demo (`tests/waterflow-demo`, its tracked
+//! * the repository's WaterFlow demo (`test/fixtures/waterflow-demo`, its tracked
 //!   sources copied below the fake account) is registered with
 //!   `workspace project register`, and an `openharmony.hvigor-build@1`
 //!   preset pinning that toolchain with `workspace preset register`;
@@ -435,7 +435,7 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
     let pin = pin["pin"].as_str().unwrap().to_owned();
     let project = account.0.join("p");
     copy_demo(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/waterflow-demo"),
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../test/fixtures/waterflow-demo"),
         &project,
     );
     plant_commands(&project);

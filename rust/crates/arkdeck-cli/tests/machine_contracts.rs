@@ -1,7 +1,7 @@
 //! The machine-contract products this CLI owns (Swift `CLIMachineContracts`),
 //! held byte for byte to the committed bundle.
 //!
-//! The committed bundle lives outside `rust/` (`openspec/contracts/` and the
+//! The committed bundle lives outside `rust/` (`api/contracts/` and the
 //! contract tests' `Fixtures/CLI/`). A contract view carries only the few
 //! files of it the contract inputs list, so each owned product's SHA-256 is
 //! kept in `rust/tests/fixtures/contracts-bundle/owned.json`, and
@@ -43,11 +43,11 @@ fn published_view() -> bool {
     inputs["kind"] == "development" && inputs.get("commit").is_some()
 }
 
-/// A product's committed file (`contracts/…` under `openspec/`), if this tree
+/// A product's committed file (`contracts/…` under `api/`), if this tree
 /// has it.
 fn committed(path: &str) -> Option<Vec<u8>> {
     let file: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../openspec")
+        .join("../../../api")
         .join(path);
     match std::fs::read(&file) {
         Ok(bytes) => Some(bytes),

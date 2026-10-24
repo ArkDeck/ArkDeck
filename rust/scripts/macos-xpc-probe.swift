@@ -17,7 +17,7 @@ var errors = [String]()
 // The current protocol version and contract identity, as this checkout's
 // published method schemas name them.
 let published = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-  .appendingPathComponent("../../spec/control/methods/health.json")
+  .appendingPathComponent("../../api/control/methods/health.json")
 guard let schema = try? JSONSerialization.jsonObject(with: Data(contentsOf: published)) as? [String: Any],
   let protocolVersion = schema["x-arkdeck-protocolVersion"] as? String,
   let contractIdentity = schema["x-arkdeck-contractIdentity"] as? String else { exit(66) }

@@ -20,7 +20,7 @@ keychain_group="$team_identifier.com.arkdeck.shared"
 # the rollback is the installed helper itself, which `runtime service update`
 # keeps in Helpers/.rollback and the maintainer copies aside before the first
 # cutover. The Swift helper build and its Rust transport facade are retired
-# (TASK-XPA-017). scripts/release/build_macos_release.py calls this script for
+# (TASK-XPA-017). hack/release/build_macos_release.py calls this script for
 # the release DMG.
 
 if [[ -z "$cli_profile" || -z "$daemon_profile" ]]; then

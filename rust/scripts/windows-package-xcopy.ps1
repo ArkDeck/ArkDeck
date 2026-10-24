@@ -171,7 +171,7 @@ function New-PackageBuild {
         default { $null }
     }
     $rustDirectory = Join-Path $repository 'rust'
-    $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'scripts/release/release-version.json') -Raw | ConvertFrom-Json
+    $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'hack/release/release-version.json') -Raw | ConvertFrom-Json
 
     $rustc = (Invoke-Checked rustc @('-V') $rustDirectory).Trim()
     $cargoVersion = (Invoke-Checked cargo @('-V') $rustDirectory).Trim()

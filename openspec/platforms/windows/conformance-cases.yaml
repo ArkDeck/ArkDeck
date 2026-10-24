@@ -22,7 +22,7 @@ notes: >-
   criteria are the headless runbook's, and the Windows order and gates are
   docs/design/cross-platform/windows-phase-a-runbook.md.
 shared_inputs:
-  development_baseline: spec/baselines/swift-single-v1.json
+  development_baseline: api/baselines/swift-single-v1.json
   change_acceptance: openspec/changes/chg-2026-074-shared-rust-runtime-core/verification.md
   task_definition: openspec/changes/chg-2026-074-shared-rust-runtime-core/tasks.md
   platform_boundary: rust/crates/arkdeck-platform/README.md

@@ -346,7 +346,7 @@ The harness exits 1 whenever any row is `FAIL`, and 2 when every row is
   written, with the Windows differences below. Its judging criteria are unchanged.
 - **Who does what.**
   - An agent drives every step through the published CLI and the Runtime's typed operations
-    (`scripts/agent-guides/acceptance.md`).
+    (`hack/agent-guides/acceptance.md`).
   - The maintainer does the physical actions: plugging, unplugging and board images, plus every
     step marked **maintainer gate** below.
   - Device effects go only through `agent run --operation …` / `agent resume` and the typed

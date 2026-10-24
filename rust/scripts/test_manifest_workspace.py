@@ -13,7 +13,7 @@ class WorkspaceManifestSchemaTests(unittest.TestCase):
     def setUpClass(cls):
         PreconsumeManifestSchemaTests.setUpClass.__func__(cls)
     def fixture_for(self, operation):
-        catalog = json.loads((ROOT / f"Catalog/operations/{operation}.v1.json").read_text(encoding="utf-8"))
+        catalog = json.loads((ROOT / f"catalog/operations/{operation}.v1.json").read_text(encoding="utf-8"))
         self.assertEqual(catalog["provider"], "workspace")
         self.assertEqual(catalog["binding"], "none")
         self.assertEqual(len(catalog["steps"]), 1)

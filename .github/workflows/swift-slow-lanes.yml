@@ -149,7 +149,7 @@ jobs:
           #   tolerance is written against a real display; it is a statement
           #   about scroll behaviour, not about the runner's geometry.
           #
-          # They stay in the target and run under scripts/ci/run-ui-tests.sh
+          # They stay in the target and run under hack/ci/run-ui-tests.sh
           # locally, which is where their claims are meaningful.
           # Named once: a retry that ran a different set than the first
           # attempt would report on tests nobody chose.
@@ -167,13 +167,13 @@ jobs:
           fi
           echo "UI test scope: $UI_TEST_SCOPE" >> "$GITHUB_STEP_SUMMARY"
           log="$RUNNER_TEMP/ui-tests.log"
-          if sh scripts/ci/run-ui-tests.sh "$@" 2>&1 | tee "$log"; then
+          if sh hack/ci/run-ui-tests.sh "$@" 2>&1 | tee "$log"; then
             exit 0
           fi
           if grep -qE 'failed to initialize for UI testing|before establishing connection' "$log"
           then
             echo "::warning::UI-test runner did not bootstrap; retrying once"
-            sh scripts/ci/run-ui-tests.sh "$@"
+            sh hack/ci/run-ui-tests.sh "$@"
           else
             exit 1
           fi
@@ -206,4 +206,4 @@ jobs:
           echo "assertions run — minus two cases that need a real display and" >> "$GITHUB_STEP_SUMMARY"
           echo "a real HDC toolchain, which stay local. Red here = file a" >> "$GITHUB_STEP_SUMMARY"
           echo "product defect; this job is" >> "$GITHUB_STEP_SUMMARY"
-          echo "not a merge gate. Reproduce with scripts/ci/run-ui-tests.sh." >> "$GITHUB_STEP_SUMMARY"
+          echo "not a merge gate. Reproduce with hack/ci/run-ui-tests.sh." >> "$GITHUB_STEP_SUMMARY"

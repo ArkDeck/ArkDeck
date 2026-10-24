@@ -36,7 +36,7 @@ PR_TYPES = TASK_BOUND_TYPES + CHANGE_BOUND_TYPES
 DECISION_GRADES = frozenset(("D0", "D1", "D2"))
 
 # Single canonical task-token definition, byte-identical to
-# scripts/agent_pr_identity.py TASK_TOKEN_TEXT (the MECH-004 r4 grammar, kept
+# hack/agent_pr_identity.py TASK_TOKEN_TEXT (the MECH-004 r4 grammar, kept
 # by the Agent PR identity helper after CHG-2026-077). The active
 # task-header grammar allows one uppercase suffix after the three digits
 # (TASK-HLR-002A) and multi-segment groups (TASK-UD-REDACTOR-001); a narrower

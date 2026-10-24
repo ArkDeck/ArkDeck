@@ -1,7 +1,7 @@
 # ArkDeck task runner.
 #
 # Recipes wrap the scripts the repository already uses. They do not fetch
-# dependencies, select a toolchain, or replace scripts/ci/plan.py.
+# dependencies, select a toolchain, or replace hack/ci/plan.py.
 
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
@@ -19,7 +19,7 @@ build-swift:
 
 # Build the macOS app with the shared Xcode runner. Extra arguments are forwarded.
 build-app *args:
-    sh scripts/ci/run-xcodebuild.sh {{args}}
+    sh hack/ci/run-xcodebuild.sh {{args}}
 
 # Build the Rust workspace and the Swift package.
 build: build-rust build-swift
@@ -45,11 +45,11 @@ test: test-rust test-swift
 lint crate="arkdeck-contract":
     python3 rust/scripts/run-cargo.py fmt --all --check
     python3 rust/scripts/run-cargo.py clippy -p {{crate}} --all-targets -- -D warnings
-    sh scripts/check-sdd.sh
+    sh hack/check-sdd.sh
 
 # Run the path-aware local CI plan. Missing base facts select every lane.
 ci:
-    python3 scripts/ci/plan.py \
+    python3 hack/ci/plan.py \
         --repo-root . \
         --base-revision origin/main \
         --head-revision HEAD \
@@ -59,7 +59,7 @@ ci:
 
 # Read-only SDD and catalog consistency check used by the guard job.
 sdd:
-    sh scripts/check-sdd.sh
+    sh hack/check-sdd.sh
 
 # Check that every arkforge crate is pinned to the same full commit.
 pin:

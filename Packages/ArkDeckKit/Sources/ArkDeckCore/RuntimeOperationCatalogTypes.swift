@@ -1,7 +1,7 @@
 // Operation Catalog value types (CHG-2026-046, T04).
 //
-// The catalog data itself lives in Catalog/operations/*.json and is compiled
-// into `RuntimeOperationCatalogGenerated.swift` by scripts/catalog_gen.
+// The catalog data itself lives in catalog/operations/*.json and is compiled
+// into `RuntimeOperationCatalogGenerated.swift` by hack/catalog_gen.
 // These types are hand-written so the generator only ever emits literals.
 // Every type is a frozen value: the runtime consults the catalog, it never
 // mutates it, and nothing here can carry an executable, argv or shell string.
@@ -312,7 +312,7 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
   }
 }
 
-/// The compiled operation catalog. Data is generated from Catalog/ and lives
+/// The compiled operation catalog. Data is generated from catalog/ and lives
 /// in `RuntimeOperationCatalogGenerated.swift`; drift between the two is a
 /// check-sdd error.
 public enum RuntimeOperationCatalog {

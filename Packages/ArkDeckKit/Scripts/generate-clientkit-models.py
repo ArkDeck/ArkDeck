@@ -134,7 +134,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    documents = {method: json.loads((ROOT / f"spec/control/methods/{method}.json").read_text()) for method in METHODS}
+    documents = {method: json.loads((ROOT / f"api/control/methods/{method}.json").read_text()) for method in METHODS}
     expected = render(documents)
     path = ROOT / DESTINATION
     if args.check:

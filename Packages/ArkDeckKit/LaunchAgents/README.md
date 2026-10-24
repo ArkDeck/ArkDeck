@@ -53,7 +53,7 @@ Swift 回滚 helper：回滚目标是切换前安装态的 helper（Swift daemon
 `runtime service update` 留在 `Helpers/.rollback`，维护者另用 `ditto` 留一份；Rust CLI 的
 `runtime service update --daemon <该 bundle>` 仍按原样安装它（plist 指向 `arkdeck-facade` 并以
 `ARKDECK_SWIFT_SHA256` 钉住同包的 Swift daemon）。发布 DMG（App、这对 helper 与 ArkForge.bundle）由
-`scripts/release/build_macos_release.py` 调用 `build-helpers.sh` 产出，见 `docs/release/macos-install.md`。
+`hack/release/build_macos_release.py` 调用 `build-helpers.sh` 产出，见 `docs/release/macos-install.md`。
 `Distribution/macOS/build-unsigned-rust-helpers.sh` 用同一布局步骤产出 ad hoc 签名、占位 profile 的
 一对 helper，输出根写有 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`，只供
 `Distribution/macOS/check-rust-helpers.py` 检查结构；生产 helper 校验会拒绝它，不可分发或安装。

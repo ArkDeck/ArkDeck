@@ -116,7 +116,7 @@ class ReadOnlyImportExpectationTests(unittest.TestCase):
     def test_each_view_selects_one_exact_refusal_for_every_import_owner_route(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            directory = root / "spec/control/methods"
+            directory = root / "api/control/methods"
             directory.mkdir(parents=True)
             # Begin/append/commit already permitted the owner refusal in the
             # published view. Remaining routes exercise a narrower old view.
@@ -416,7 +416,7 @@ class ContractChecksTests(unittest.TestCase):
         for module, key, value in [
             (runner, "ROOT", self.root), (contract, "ROOT", self.root),
             (workspace, "REPO_ROOT", self.root),
-            (contract, "BASELINE", self.root / "spec/baselines/swift-single-v1.json"),
+            (contract, "BASELINE", self.root / "api/baselines/swift-single-v1.json"),
             (contract, "GENERATED", self.root / "rust/crates/arkdeck-contract/src/control_generated.rs"),
             # Rust formatting is exercised by the real generation check. These
             # tests isolate Git/input behavior and require no installed compiler.
@@ -436,7 +436,7 @@ class ContractChecksTests(unittest.TestCase):
         registry = {"currentVersion": "1.0.0", "maximumRequestFrameBytes": 1000,
                     "maximumResponseFrameBytes": 2000, "methods": methods}
         identity = contract.sha(json.dumps(registry, sort_keys=True, separators=(",", ":")).encode())
-        directories = {contract.METHODS, contract.CORPUS, "Catalog/operations", "Catalog/profiles",
+        directories = {contract.METHODS, contract.CORPUS, "catalog/operations", "catalog/profiles",
                        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC"}
         for name in contract.INPUTS:
             if name in directories:
@@ -444,9 +444,9 @@ class ContractChecksTests(unittest.TestCase):
             else:
                 self.write(name, b"test input\n")
         self.write(contract.REGISTRY, registry)
-        self.write("Catalog/generated/effect-authorization-matrix.md", b"Catalog digest: `" + b"a" * 64 + b"`\n")
-        self.write("Catalog/operations/example.json", {})
-        self.write("Catalog/profiles/example.json", {})
+        self.write("catalog/generated/effect-authorization-matrix.md", b"Catalog digest: `" + b"a" * 64 + b"`\n")
+        self.write("catalog/operations/example.json", {})
+        self.write("catalog/profiles/example.json", {})
         self.write("Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/example.txt", b"host fixture\n")
         for method in methods:
             schema = {"x-arkdeck-contractIdentity": identity,
@@ -458,7 +458,7 @@ class ContractChecksTests(unittest.TestCase):
             })
         self.write("rust/crates/arkdeck-contract/src/catalog_generated.rs", b"// test catalog\n")
         self.write("rust/scripts/check-readonly.py", b"# test source; not executed\n")
-        self.write("scripts/catalog_gen/generate.py", b"def generate_rust(operations, digest):\n    return '// test catalog\\n'\n")
+        self.write("hack/catalog_gen/generate.py", b"def generate_rust(operations, digest):\n    return '// test catalog\\n'\n")
         self.git("init", "-q", "-b", "main")
         self.git("-c", "user.name=Contract test", "-c", "user.email=contract@example.invalid", "add", ".")
         self.git("-c", "user.name=Contract test", "-c", "user.email=contract@example.invalid",
@@ -478,7 +478,7 @@ class ContractChecksTests(unittest.TestCase):
 
     def fake_pinned_inputs(self, current, digest):
         historical = copy.deepcopy(current)
-        matrix = "Catalog/generated/effect-authorization-matrix.md"
+        matrix = "catalog/generated/effect-authorization-matrix.md"
         data = b"Catalog digest: `" + digest.encode() + b"`\n"
         historical.files[matrix] = data
         historical.blobs[matrix] = runner.hashlib.sha1(
@@ -730,7 +730,7 @@ class ContractChecksTests(unittest.TestCase):
         view = self.root / "candidate-view"
         runner.materialize(view, current, candidate, self.published_info)
         self.assertEqual(json.loads((view / name).read_bytes())["$defs"]["result"], result_schema)
-        self.assertEqual(json.loads((view / "spec/baselines/swift-single-v1.json").read_bytes()),
+        self.assertEqual(json.loads((view / "api/baselines/swift-single-v1.json").read_bytes()),
                          self.published_info)
         generated = (view / "rust/crates/arkdeck-contract/src/control_generated.rs").read_text()
         self.assertIn("swift-candidate-inputs.json", generated)
@@ -857,12 +857,12 @@ class ContractChecksTests(unittest.TestCase):
             runner.materialize(view, inputs, info, self.published_info, review_source=snapshot)
             self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), snapshot)
             self.assertNotEqual((view / runner.REVIEW_PROJECTION).read_bytes(), runner.review_projection())
-            pin = view / "spec/baselines/swift-single-v1.json"
+            pin = view / "api/baselines/swift-single-v1.json"
             self.assertEqual(json.loads(pin.read_bytes()), self.published_info)
             self.assertEqual(json.loads(pin.read_bytes())["commit"], self.commit)
             schema = f"{contract.METHODS}/health.json"
             self.assertEqual((view / schema).read_bytes(), inputs.files[schema])
-            candidate_file = view / "spec/baselines/swift-candidate-inputs.json"
+            candidate_file = view / "api/baselines/swift-candidate-inputs.json"
             self.assertEqual(candidate_file.exists(), name == "candidate")
             if candidate_file.exists():
                 self.assertEqual(json.loads(candidate_file.read_bytes())["kind"], "candidate")
@@ -979,19 +979,19 @@ class ContractChecksTests(unittest.TestCase):
         source = self.root / "rust/scripts/check-readonly.py"
         original = source.read_bytes()
         projection = runner.review_projection()
-        generator = (self.root / "scripts/catalog_gen/generate.py").read_bytes()
+        generator = (self.root / "hack/catalog_gen/generate.py").read_bytes()
 
         def check_view(view, output, info, published_info, **kwargs):
             calls.append("observed" if kwargs.get("observed") else "historical" if kwargs.get("historical") else info["kind"])
             self.assertEqual((view / "rust/scripts/check-readonly.py").read_bytes(), original)
             self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), projection)
-            self.assertEqual((view / "scripts/catalog_gen/generate.py").read_bytes(), generator)
+            self.assertEqual((view / "hack/catalog_gen/generate.py").read_bytes(), generator)
             self.assertEqual((view / "rust/crates/arkdeck-contract/src/catalog_generated.rs").read_bytes(),
                              b"// test catalog\n")
             if info["kind"] == "development":
                 source.write_bytes(b"# concurrently edited Rust checker\n")
                 self.write(runner.REVIEW_PROJECTION, b"// concurrent projection edit\n")
-                self.write("scripts/catalog_gen/generate.py", b"raise RuntimeError('changed generator')\n")
+                self.write("hack/catalog_gen/generate.py", b"raise RuntimeError('changed generator')\n")
 
         with patch.object(runner, "run_view", check_view):
             with self.assertRaisesRegex(ValueError, "Rust sources changed.*App review projection changed.*Catalog generator changed"):
@@ -1148,7 +1148,7 @@ class WorkspacePresetListSchemaTests(unittest.TestCase):
 
     @classmethod
     def schema(cls, method):
-        return json.loads((cls.ROOT / f"spec/control/methods/{method}.json").read_bytes())
+        return json.loads((cls.ROOT / f"api/control/methods/{method}.json").read_bytes())
 
     @classmethod
     def results(cls, method):
@@ -1371,7 +1371,7 @@ class ContractBundleDigestTests(unittest.TestCase):
         replacement = patch.object(runner, "ROOT", self.root)
         replacement.start()
         self.addCleanup(replacement.stop)
-        self.contracts = self.root / "openspec/contracts"
+        self.contracts = self.root / "api/contracts"
         self.contracts.mkdir(parents=True)
         (self.contracts / "cli-page.schema.json").write_bytes(b"{}\n")
         self.table = self.root / "rust/tests/fixtures/contracts-bundle/owned.json"

@@ -8,7 +8,7 @@
 > 0.3 同日按 `d28d57a3` 重算 §13；0.2 为 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
 > local control protocol `1.0.0`。实现与验收仍必须 pin exact Catalog digest，不能只比较数量。
 > 权威边界：Constitution Safety invariants / POL-*、`PRODUCT-LOOP.md`、accepted specs、
-> contracts、当前 `Catalog/` 与 Runtime 行为高于本文。发生冲突时本文失效，不能用本文修改
+> contracts、当前 `catalog/` 与 Runtime 行为高于本文。发生冲突时本文失效，不能用本文修改
 > Core 语义、放宽 admission，或恢复 raw shell/HDC/argv 执行面。
 > 平台范围：定义 macOS 与后续 Windows 实现必须共享的 CLI 产品语义；不声称 Windows 当前
 > 已受支持，也不提前修改 Windows platform profile。
@@ -1365,7 +1365,7 @@ server/peer identity validation；“在本机”本身不是充分信任证明�
   纳入业务 digest。path identity 来自打开后的 file handle/ID，不依赖文本 normalization。
 - Runtime JSON 中的 device identity、operation reference、Artifact ID 等仍使用平台无关格式。
 - CLI-owned machine timestamp 固定为 RFC 3339 UTC、恰好三位 fractional second
-  (`YYYY-MM-DDTHH:mm:ss.SSSZ`)，生成时向零截断到 millisecond；Runtime/Catalog/Artifact accepted
+  (`YYYY-MM-DDTHH:mm:ss.SSSZ`)，生成时向零截断到 millisecond；Runtime/catalog/Artifact accepted
   record 中的 timestamp 先按其 authoritative schema 验证，再保留 exact string pass-through，CLI
   不为美化而改 precision 或重写 identity。digest 为 lowercase hex，整数范围按 schema 固定。
 - PowerShell/cmd.exe 示例只负责正确产生同一 argv；不能拥有不同命令语义。
@@ -1469,7 +1469,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 > 本节按 protected `main` `4bde4749`（2026-09-02）重算。命令面的事实源是
 > `arkdeck commands --output json`（`arkdeck.cli.command-registry/1`），coverage 的事实源是
-> `openspec/contracts/cli-feature-coverage.json`；本节的数字都可以由它们重新得出，不再手数 Swift。
+> `api/contracts/cli-feature-coverage.json`；本节的数字都可以由它们重新得出，不再手数 Swift。
 
 ### 13.1 已实现面
 
@@ -1511,7 +1511,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `docs/design/cli-*.md`。
 - §14 机器契约产物已落地（`TASK-AIN-026`，实现见 `cli-machine-contracts.md`）：
   `arkdeck maintainer contracts export|check` 从 Swift 事实源生成全部十项
-  `openspec/contracts/` 产物与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**`
+  `api/contracts/` 产物与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**`
   （208 个 argv fixture、envelope/page/`nextAction` 样本），`CLIMachineContractTests` 以零漂移、
   fixture 回放与 schema 正反例把产物钉在 protected `main` 上；`--version` 的
   `pageSchemaVersion`/`nextActionSchemaVersion` 为 `arkdeck.cli.page/1`/`arkdeck.cli.next-action/1`。
@@ -1583,16 +1583,16 @@ CLI 能按 schema inspect/export 源数据与派生数据，并明确 parser/ver
 入口的 governance PR：
 
 ```text
-openspec/contracts/cli-command-registry.yaml
-openspec/contracts/cli-result.schema.json
-openspec/contracts/cli-page.schema.json
-openspec/contracts/cli-event.schema.json
-openspec/contracts/cli-next-action.schema.json
-openspec/contracts/cli-error-registry.yaml
-openspec/contracts/cli-canonical-json-vectors.json
-openspec/contracts/cli-feature-coverage.json
-openspec/contracts/app-product-capability-registry.yaml
-openspec/contracts/runtime-control-plane.schema.json
+api/contracts/cli-command-registry.yaml
+api/contracts/cli-result.schema.json
+api/contracts/cli-page.schema.json
+api/contracts/cli-event.schema.json
+api/contracts/cli-next-action.schema.json
+api/contracts/cli-error-registry.yaml
+api/contracts/cli-canonical-json-vectors.json
+api/contracts/cli-feature-coverage.json
+api/contracts/app-product-capability-registry.yaml
+api/contracts/runtime-control-plane.schema.json
 Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**
 ```
 
@@ -1671,7 +1671,7 @@ registry、generated Catalog index、declarative CLI registry，以及
 
 覆盖检查必须保证：
 
-- daemon/Catalog/App/CLI 四个 registry 的每个 feature ID 都使用上述闭集，不存在
+- daemon/catalog/App/CLI 四个 registry 的每个 feature ID 都使用上述闭集，不存在
   `unclassified`、orphan 或 duplicate；
 - `capability.draft/install/revoke` 必须是 `refused`，并有持续证明 stable rejection 和零副作用的 negative fixture；
 - 每个 canonical Catalog operation 可经 generic surface 发现、plan、submit、run 和读取 result；
@@ -1716,7 +1716,7 @@ invocation 种类或 error code/category/exit，不记 prose）；第 3、8、9 
 - event-enabled leaf 的 `jsonl` 每行独立可解析并有唯一 terminal；non-event leaf 明确拒绝；
 - page/cursor/`nextAction` 所有 union 分支和 reconnect/high-water vector；
 - RFC 8785 canonical JSON property/string/number/Unicode/rejection vectors，以及 existing
-  Catalog/plan/Artifact digest 不被重算的 pass-through vectors；
+  catalog/plan/Artifact digest 不被重算的 pass-through vectors；
 - artifact range/raw/export 的 byte、digest、EOF、privacy 与 overwrite；
 - target/candidate/binding revision/facts drift negative matrix；
 - idempotency same-key/same-request、same-key/different-request、lost-response retry；
@@ -1798,7 +1798,7 @@ Artifact digest、台账计数、HAR 状态）。执行者是人还是外部 Age
 ### Slice B：现有 daemon 与 Catalog 的领域全覆盖
 
 - Flash prerequisites/access/bootloader/lane/bind；
-- Debug probe、template-run Catalog/Job 迁移与 normal Debug namespace；
+- Debug probe、template-run catalog/Job 迁移与 normal Debug namespace；
 - screen/input/diagnostics/UI dump/trace/analyze/port-forward/workspace convenience mapping；
 - workspace project/preset bounded registration/discovery 与 typed continuation；
 - target availability aggregate Runtime projection；
@@ -2054,7 +2054,7 @@ stdin/request/response frame/duration 必须有共享的数值语法与上限。
 invalid UTF-8、3 MiB stdin、4 MiB request frame 与
 8 MiB response frame 边界±1 byte、duration overflow/
 fraction/compound、RFC 8785 string/number/order/rejection 和 NFC/NFD distinct vectors 全部与本规格
-一致；existing Catalog/plan/Artifact digest 保持 authoritative pass-through，dispatch 0 的 case 有证据。
+一致；existing catalog/plan/Artifact digest 保持 authoritative pass-through，dispatch 0 的 case 有证据。
 
 ### CLI-REQ-025：Control protocol 保真
 
@@ -2100,8 +2100,8 @@ CLI 称为“全功能”；macOS 达成不表示 Windows 已实现，Windows �
 - [`platform-ports.md`](../../openspec/architecture/platform-ports.md)：允许替换的平台 adapter；
 - [`0005-agentd-uds-control-plane.md`](../adr/0005-agentd-uds-control-plane.md)：本地 control plane、
   transport-free handler 与 Windows named-pipe 方向；
-- [`operation.schema.json`](../../Catalog/schema/operation.schema.json) 与
-  [`Catalog/operations`](../../Catalog/operations)：已发布 operation 事实源；
+- [`operation.schema.json`](../../catalog/schema/operation.schema.json) 与
+  [`catalog/operations`](../../catalog/operations)：已发布 operation 事实源；
 - [`device-targeting-auth`](../../openspec/specs/device-targeting-auth/spec.md)、
   [`workflow-journal-recovery`](../../openspec/specs/workflow-journal-recovery/spec.md)、
   [`session-artifact-storage`](../../openspec/specs/session-artifact-storage/spec.md)：

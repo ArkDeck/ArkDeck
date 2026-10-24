@@ -326,7 +326,7 @@ function New-RcBuild {
     }
     if ($feedBase -and $SkipMsix) { throw '-FeedBaseUri needs the MSIX; drop -SkipMsix.' }
     $dotnet = Get-Dotnet
-    $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'scripts/release/release-version.json') -Raw | ConvertFrom-Json
+    $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'hack/release/release-version.json') -Raw | ConvertFrom-Json
     [void](New-Item -ItemType Directory -Path $OutputDirectory)
     $output = (Resolve-Path -LiteralPath $OutputDirectory).Path
 

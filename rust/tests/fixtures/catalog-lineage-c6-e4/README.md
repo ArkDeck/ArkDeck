@@ -39,7 +39,7 @@ authority/manifest/hash-chain projections need their own exact derivation and
 old serialized hash proofs before the existing whole-store comparisons can be
 used; this packet does not erase or migrate those fields.
 
-Prepared portable negatives cover unknown Catalog/operation, Native scope,
+Prepared portable negatives cover unknown catalog/operation, Native scope,
 descriptor mutation/duplicates, full plan arguments/executable/timeout/target/
 inputs/steps drift, missing/extra plan fields, unsupported fractional values,
 actual output hash mismatch and unrelated frame drift. They have not been run

@@ -1,6 +1,6 @@
 # Version-update PRs. Secret scanning, push protection, and Dependabot
 # security updates are repository settings; this file does not enable them.
-# pip is omitted: the only pin file is scripts/requirements-sdd.txt, which
+# pip is omitted: the only pin file is hack/requirements-sdd.txt, which
 # Dependabot's pip ecosystem does not scan (it looks for requirements.txt,
 # a Pipfile, or pyproject.toml).
 version: 2

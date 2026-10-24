@@ -68,7 +68,7 @@ impl PlanConnections for Connections {
 }
 
 #[test]
-#[ignore = "run only through scripts/ci/run-spk9-preview-missing.py"]
+#[ignore = "run only through hack/ci/run-spk9-preview-missing.py"]
 fn real_daemon_missing_archive_preview() {
     let runtime = PathBuf::from(std::env::var("ARKDECK_SPK9_RUNTIME").expect("isolated carrier"));
     let report = PathBuf::from(std::env::var("ARKDECK_SPK9_RUST_REPORT").expect("result path"));

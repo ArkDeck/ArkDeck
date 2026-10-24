@@ -29,7 +29,7 @@
   （既定规则见[《Viewer UI 实现交接任务》§2](viewer-ui-implementation-task.md)）。
 - 设计侧权威顺序 = [`macos-ux-interaction-spec.md`](macos-ux-interaction-spec.md) →
   [`prototype.html`](prototype.html) → [`arkdeck-ds`](arkdeck-ds/) →
-  `.design-sync/previews`（见 `.design-sync/conventions.md`）。preview 与 spec/原型
+  `.design-sync/previews`（见 `.design-sync/conventions.md`）。preview 与 api/原型
   冲突时，preview 过期。
 - 不一致时的处置：
   - **稿有实现无**：先沿 View → ViewModel → facade → XPC/RPC → Catalog 调用链证实该
@@ -102,7 +102,7 @@
 | 类别 | 含义 | 处置 |
 | --- | --- | --- |
 | P-OVER | 稿呈现为当前能力，实现无 | 稿改 unavailable/移除/挪 concept；真实产品缺口登记进[审计记录 §5](implementation-audit-2026-08-27.md)，不建 readiness/status-only 载体 |
-| P-DRIFT | 实现有，稿无或过时 | 同车更新原型/spec/brief/组件镜像 |
+| P-DRIFT | 实现有，稿无或过时 | 同车更新原型/api/brief/组件镜像 |
 | C-ORPHAN | 组件无消费方、无 preview、无对应物 | 删除或写明保留理由 |
 | C-DUP | 同一模式重复实现未复用 | 收敛为共享件，或记 exception 及理由 |
 | C-UNMAPPED | 组件缺 preview 或缺 App 映射 | 补齐映射或降级为非受控组件 |
@@ -131,7 +131,7 @@ C-DUP 的收敛取舍）单列，不静默改。
 - 设计侧：`docs/design/arkdeck-ds/` 下 `npm test`（交互 + 覆盖测试）、`npm run build`
   与 `npm run build:review` 两种构建全绿。
 - 原生侧：统一本地闸
-  `python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local`
+  `python3 hack/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local`
   （SDD、catalog、zero-drift 恒跑；触碰 Swift/App 时含全量并行测试与
   `build-for-testing`）。纯设计/文档轮不分配编译车道属正常分类，不是跳过验证。
 - 触碰的 App 表面跑对应语言 sweep 的 XCUITest（macOS UI 套件是本地门禁，不在 CI）。

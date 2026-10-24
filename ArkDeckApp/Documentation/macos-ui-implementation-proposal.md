@@ -47,7 +47,7 @@
 - 当前没有打开的 PR；最近合入的 #1100 只更新设计稿，没有修改生产 SwiftUI；
 - `flash.dayu200`、现有 DeviceProviders 和 Runtime Job engine 已存在，本任务不重复创建它们。
 
-实现 PR 可使用 base-tree `TASK-BRC-005` 作为 `scripts/check_pr_paths.py` 的机械路径护栏，因为其 Allowed paths 覆盖 `ArkDeckApp/**`、`ArkDeckAppUITests/**` 和 `ArkDeck.xcodeproj/**`。这不恢复该历史 Task 的 readiness/hardware/evidence 链，也不得修改其 task/evidence 文件或声称完成其 signed Sandbox E0 验收。
+实现 PR 可使用 base-tree `TASK-BRC-005` 作为 `hack/check_pr_paths.py` 的机械路径护栏，因为其 Allowed paths 覆盖 `ArkDeckApp/**`、`ArkDeckAppUITests/**` 和 `ArkDeck.xcodeproj/**`。这不恢复该历史 Task 的 readiness/hardware/evidence 链，也不得修改其 task/evidence 文件或声称完成其 signed Sandbox E0 验收。
 
 ## 3. 用户结果
 
@@ -234,7 +234,7 @@ Flash、Debug、UI Dump、Trace、History 必须路由到可复用的 `Unavailab
 
 禁止修改：
 
-- `Catalog/**`
+- `catalog/**`
 - `openspec/**`
 - `Packages/ArkDeckKit/**`
 - `ArkDeckApp/ArkDeckApp.entitlements`
@@ -326,9 +326,9 @@ xcodebuild test \
   -scheme ArkDeck \
   -destination 'platform=macOS'
 
-sh scripts/check-sdd.sh
-.venv-sdd/bin/python -m unittest discover -s scripts/catalog_gen -p "test_*.py"
-.venv-sdd/bin/python scripts/catalog_gen/generate.py --check
+sh hack/check-sdd.sh
+.venv-sdd/bin/python -m unittest discover -s hack/catalog_gen -p "test_*.py"
+.venv-sdd/bin/python hack/catalog_gen/generate.py --check
 swift test --package-path Packages/ArkDeckKit --parallel --num-workers 8
 git diff --check
 ```
@@ -342,7 +342,7 @@ feat(TASK-BRC-005): modernize the macOS device workspace
 push 前运行：
 
 ```bash
-python3 scripts/check_pr_paths.py \
+python3 hack/check_pr_paths.py \
   --repo-root . \
   --preflight \
   --base-revision origin/main \

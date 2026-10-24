@@ -186,7 +186,7 @@ final class FacadeRollbackUITests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-    process.arguments = ["-I", root.appendingPathComponent("scripts/ci/installed_rust_ui.py").path, stage, evidence]
+    process.arguments = ["-I", root.appendingPathComponent("hack/ci/installed_rust_ui.py").path, stage, evidence]
     let pipe = Pipe()
     process.standardOutput = pipe
     // The helper emits a bounded redacted result; do not attach subprocess diagnostics.

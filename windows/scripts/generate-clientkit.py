@@ -8,10 +8,10 @@ two clients cannot drift silently:
 * `Packages/ArkDeckKit/Contracts/control-protocol.json` — protocol version,
   frame limits and the published method list; the contract identity is the
   SHA-256 of its sorted, compact JSON, as the Rust generator computes it.
-* `spec/control/methods/*.json` — one typed schema per method. The ClientKit
+* `api/control/methods/*.json` — one typed schema per method. The ClientKit
   embeds these files and refuses to start if one differs from the SHA-256
   recorded here.
-* `spec/baselines/swift-single-v1.json` — cross-check of the identity and the
+* `api/baselines/swift-single-v1.json` — cross-check of the identity and the
   method count.
 * `rust/crates/arkdeck-contract/src/schema_patterns.json` — the closed pattern
   vocabulary both validators implement.
@@ -32,8 +32,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = "Packages/ArkDeckKit/Contracts/control-protocol.json"
-METHODS = "spec/control/methods"
-BASELINE = "spec/baselines/swift-single-v1.json"
+METHODS = "api/control/methods"
+BASELINE = "api/baselines/swift-single-v1.json"
 SCHEMA_PATTERNS = "rust/crates/arkdeck-contract/src/schema_patterns.json"
 INPUTS = [REGISTRY, METHODS, BASELINE, SCHEMA_PATTERNS]
 GENERATED = ROOT / "windows/ClientKit/Generated/ControlContract.g.cs"
@@ -191,7 +191,7 @@ def generate() -> str:
     identity = sha256(json.dumps(registry, sort_keys=True, separators=(",", ":")).encode())
     baseline = json.loads(read(BASELINE))
     if baseline["contractIdentity"] != identity or baseline["protocolVersion"] != registry["currentVersion"]:
-        raise ValueError("spec/baselines/swift-single-v1.json does not describe the registry")
+        raise ValueError("api/baselines/swift-single-v1.json does not describe the registry")
     methods = registry["methods"]
     if not methods or len(methods) != len(set(methods)) or baseline["methodCount"] != len(methods):
         raise ValueError("registry methods must be nonempty, unique and match the baseline")
@@ -252,7 +252,7 @@ def generate() -> str:
         *[f"        {csharp_string(m)}," for m in methods],
         "    ];",
         "",
-        "    /// <summary>SHA-256 of each embedded `spec/control/methods/&lt;method&gt;.json`.</summary>",
+        "    /// <summary>SHA-256 of each embedded `api/control/methods/&lt;method&gt;.json`.</summary>",
         "    public static readonly IReadOnlyDictionary<string, string> MethodSchemaSha256 = new Dictionary<string, string>(StringComparer.Ordinal)",
         "    {",
         *[f"        [{csharp_string(m)}] = {csharp_string(d)}," for m, d in schema_digests.items()],

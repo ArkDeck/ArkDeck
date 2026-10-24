@@ -911,7 +911,7 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
 /// What this test measured is what the coverage manifest counts: each
 /// leaf's entries are Windows `implemented` in the manifest the CLI renders
 /// (`maintainer contracts export`'s product, held to the committed
-/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+/// `api/contracts/cli-feature-coverage.json` by the CLI's own tests).
 fn assert_measured(leaves: &[&str]) {
     let product = arkdeck_cli::machine_contracts::contract_products()
         .into_iter()

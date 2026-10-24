@@ -57,9 +57,9 @@ sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 
 python3 rust/scripts/run-cargo.py fmt --all --check
 python3 rust/scripts/run-cargo.py clippy -p arkdeck-contract --all-targets -- -D warnings
-sh scripts/check-sdd.sh
+sh hack/check-sdd.sh
 
-python3 scripts/ci/plan.py \
+python3 hack/ci/plan.py \
   --repo-root . \
   --base-revision origin/main \
   --head-revision HEAD \
@@ -74,18 +74,18 @@ Targeted checks before push:
 - For each crate you changed, and crates that depend on it directly:
   `python3 rust/scripts/run-cargo.py clippy -p <crate> --all-targets -- -D warnings`
   and `python3 rust/scripts/run-cargo.py test -p <crate>`
-- Contract inputs (`control-protocol.json`, `spec/control/methods/**`, ControlFrames,
+- Contract inputs (`control-protocol.json`, `api/control/methods/**`, ControlFrames,
   CLI argv corpora): `python3 rust/scripts/generate-contract.py --check`
-- `openspec/**`, `docs/**`, or `AGENTS.md`: `sh scripts/check-sdd.sh`
+- `openspec/**`, `docs/**`, or `AGENTS.md`: `sh hack/check-sdd.sh`
 - Swift: `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <Class>`
-- App changes: `sh scripts/ci/run-xcodebuild.sh` for the affected scheme
+- App changes: `sh hack/ci/run-xcodebuild.sh` for the affected scheme
 
 The Rust runner keeps `CARGO_BUILD_JOBS=2` and isolates caches with
 `ARKDECK_CARGO_OWNER` (default `CODEX_THREAD_ID`, or `local` in a normal terminal).
 Do not run the full CI matrix locally. GitHub CI is the complete gate.
 
 The macOS app build is separate: `just build-app`, or
-`sh scripts/ci/run-xcodebuild.sh`. A Release build is `just build-app --release`.
+`sh hack/ci/run-xcodebuild.sh`. A Release build is `just build-app --release`.
 
 ## Pull requests
 

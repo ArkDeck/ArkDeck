@@ -102,7 +102,7 @@ final class TestLaneContractTests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
     let plan = try String(
-      contentsOf: repositoryRoot.appending(path: "scripts/ci/plan.py"), encoding: .utf8)
+      contentsOf: repositoryRoot.appending(path: "hack/ci/plan.py"), encoding: .utf8)
     let invocations = plan.components(separatedBy: "run-test-lane.sh").dropFirst()
     XCTAssertEqual(invocations.count, 1, "the gate must invoke the lane runner exactly once")
     for invocation in invocations {

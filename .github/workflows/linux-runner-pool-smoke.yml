@@ -38,4 +38,4 @@ jobs:
       - name: Validate the actual lightweight suites
         env:
           ARKDECK_SMOKE_SUITE: ${{ matrix.suite }}
-        run: python3 scripts/ci/linux_runner_pool.py check-suite "$ARKDECK_SMOKE_SUITE"
+        run: python3 hack/ci/linux_runner_pool.py check-suite "$ARKDECK_SMOKE_SUITE"

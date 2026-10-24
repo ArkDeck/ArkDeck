@@ -2,7 +2,7 @@ namespace ArkDeck.Spk4.Fixtures;
 
 /// <summary>An unimplemented capability shown as `unavailable(reasonCode)` plus its CLI path
 /// (XPA-AC-8), never as a disabled placeholder control. CLI paths are the target commands in
-/// openspec/contracts/cli-feature-coverage.json for the named feature.</summary>
+/// api/contracts/cli-feature-coverage.json for the named feature.</summary>
 public sealed record UnavailableCapability(string Feature, string Title, string ReasonCode, string CliPath)
 {
     public string Heading => $"{Title}: unavailable({ReasonCode})";

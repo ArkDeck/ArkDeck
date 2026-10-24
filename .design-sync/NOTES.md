@@ -78,7 +78,7 @@ each drift kind. It catches seven things:
    package's export list answers "does this component exist" without needing a
    build at all.
 
-It lives inside the package rather than in `scripts/` or `.github/` because both of those
+It lives inside the package rather than in `hack/` or `.github/` because both of those
 are governance-sensitive paths (see the `.gitignore` note below): touching them demands a
 single active task covering the whole diff, and none covers this one.
 
@@ -370,7 +370,7 @@ changed historically).
   must run `npm install && npm run build` in `docs/design/arkdeck-ds` before the
   converter has an entry to bundle.
 - **`ds-bundle/` and `.ds-sync/` are NOT ignored by any committed file.** The root
-  `.gitignore` is in `scripts/automation_config.json`'s `sensitive_paths`, so touching
+  `.gitignore` is in `hack/automation_config.json`'s `sensitive_paths`, so touching
   it makes preflight demand a single active task whose Allowed paths cover the *entire*
   diff — and none covers `.design-sync/**` + `docs/design/arkdeck-ds/**` together
   (`check_pr_paths.py`: `if not sensitive_paths: → pass`, so dropping the root file was

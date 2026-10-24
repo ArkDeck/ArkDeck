@@ -340,7 +340,7 @@ projection. The fresh canonical Windows GJ-5 run on 2026-10-13 now passes all
 210 criteria; the paired Mac run remains separate.
 
 The signed/notarized macOS RC build 4 is already downloadable from release run
-37461315601. Its protected-main ancestor has the same Catalog/contracts; reuse
+37461315601. Its protected-main ancestor has the same catalog/contracts; reuse
 does not require another build. The prepared executable entry is
 `scripts/gj_record/mac-entry/entry.py`. No currently accessible Mac has proved
 DAYU200 USB access: a usable Mac SSH endpoint/account with existing safe

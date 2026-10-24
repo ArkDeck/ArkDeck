@@ -20,7 +20,7 @@ internal static class RepoPaths
     }
 }
 
-/// <summary>The shared catalogue (spec/ui-semantics/strings.json) in one language.</summary>
+/// <summary>The shared catalogue (api/ui-semantics/strings.json) in one language.</summary>
 internal sealed partial class Catalogue
 {
     private readonly Dictionary<string, string> _values;
@@ -67,7 +67,7 @@ internal sealed record Step(string Action, string AutomationId);
 
 internal sealed record Snapshot(string Id, string Scenario, string Page, IReadOnlyList<Step> Steps, IReadOnlyList<ExpectedElement> Elements);
 
-/// <summary>spec/ui-semantics/surfaces.json, with names resolved in one language.</summary>
+/// <summary>api/ui-semantics/surfaces.json, with names resolved in one language.</summary>
 internal static class SurfaceSpec
 {
     public static IReadOnlyDictionary<string, string> Roles { get; } = LoadRoles();

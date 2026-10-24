@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate and verify the Rust contract bindings from this checkout's Swift inputs.
 
-The committed manifest `spec/baselines/swift-single-v1.json` describes the
+The committed manifest `api/baselines/swift-single-v1.json` describes the
 contract inputs of the checkout it is committed in. --write regenerates it and
 the Rust bindings from the working tree; --check fails when either differs from
 such a regeneration, so a change that edits a consumed input regenerates in the
@@ -24,9 +24,9 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = "Packages/ArkDeckKit/Contracts/control-protocol.json"
-METHODS = "spec/control/methods"
+METHODS = "api/control/methods"
 CORPUS = "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
-BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
+BASELINE = ROOT / "api/baselines/swift-single-v1.json"
 GENERATED = ROOT / "rust/crates/arkdeck-contract/src/control_generated.rs"
 BASE_REF = "origin/main"
 INPUTS = [
@@ -36,21 +36,21 @@ INPUTS = [
     "Packages/ArkDeckKit/Sources/ArkDeckCore/CanonicalCBOR.swift",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolContract.swift",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlFrameJSON.swift",
-    "openspec/contracts/runtime-control-plane.schema.json",
-    "openspec/contracts/cli-canonical-json-vectors.json",
-    "openspec/contracts/cli-result.schema.json",
-    "openspec/contracts/cli-error-registry.yaml",
+    "api/contracts/runtime-control-plane.schema.json",
+    "api/contracts/cli-canonical-json-vectors.json",
+    "api/contracts/cli-result.schema.json",
+    "api/contracts/cli-error-registry.yaml",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/operation.list.json",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/device.candidates.json",
     "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
-    "openspec/contracts/journal-event.schema.json",
-    "openspec/contracts/workflow-step.schema.json",
+    "api/contracts/journal-event.schema.json",
+    "api/contracts/workflow-step.schema.json",
     METHODS,
     CORPUS,
-    "Catalog/operations",
-    "Catalog/profiles",
-    "Catalog/generated/effect-authorization-matrix.md",
+    "catalog/operations",
+    "catalog/profiles",
+    "catalog/generated/effect-authorization-matrix.md",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC",
 ]
 KEYWORDS = {"type", "properties", "additionalProperties", "required", "items", "enum", "anyOf",
@@ -116,6 +116,44 @@ def published_base() -> str:
                          "baseline cannot be established") from error
 
 
+# Checkout spellings, and the paths those inputs used before this rename.
+# published_inputs reads whichever spelling the commit stores, then records
+# the checkout spelling so a published view and this tree share one vocabulary.
+LEGACY_INPUT_PREFIXES = (
+    ("api/contracts/", "openspec/contracts/"),
+    ("api/control/", "spec/control/"),
+    ("api/baselines/", "spec/baselines/"),
+    ("api/recovery/", "spec/recovery/"),
+    ("api/ui-semantics/", "spec/ui-semantics/"),
+    ("catalog/", "Catalog/"),
+)
+
+
+def _commit_has(commit: str, path: str) -> bool:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), "cat-file", "-e", f"{commit}:{path}"],
+        capture_output=True, check=False,
+    ).returncode == 0
+
+
+def _stored_input(commit: str, path: str) -> str:
+    if _commit_has(commit, path):
+        return path
+    for current, legacy in LEGACY_INPUT_PREFIXES:
+        if path.startswith(current):
+            old = legacy + path[len(current):]
+            if _commit_has(commit, old):
+                return old
+    return path
+
+
+def _checkout_spelling(path: str) -> str:
+    for current, legacy in LEGACY_INPUT_PREFIXES:
+        if path.startswith(legacy):
+            return current + path[len(legacy):]
+    return path
+
+
 def published_inputs(commit: str) -> ContractInputs:
     """Read path types, membership and bytes from Git at a main commit, never from the worktree."""
     if not isinstance(commit, str) or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
@@ -126,21 +164,23 @@ def published_inputs(commit: str) -> ContractInputs:
     subprocess.check_call(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, base_reference()])
     files, blobs, directories = {}, {}, set()
     for path in INPUTS:
-        kind = git("cat-file", "-t", f"{commit}:{path}").decode().strip()
+        stored = _stored_input(commit, path)
+        kind = git("cat-file", "-t", f"{commit}:{stored}").decode().strip()
         if kind == "tree":
             directories.add(path)
         elif kind != "blob":
             raise ValueError(f"unsupported published input type: {path}: {kind}")
         rows = git("ls-tree", "-r", commit,
-                   "--format=%(objectmode) %(objecttype) %(objectname) %(path)", "--", path)
+                   "--format=%(objectmode) %(objecttype) %(objectname) %(path)", "--", stored)
         if not rows:
             raise ValueError(f"missing published input: {path}")
         for line in rows.decode().splitlines():
             mode, kind, blob, file = line.split(" ", 3)
             if kind != "blob" or mode not in ("100644", "100755"):
                 raise ValueError(f"published input must be a regular file: {file}")
-            files[file] = git("cat-file", "blob", blob)
-            blobs[file] = blob
+            current = _checkout_spelling(file)
+            files[current] = git("cat-file", "blob", blob)
+            blobs[current] = blob
     return ContractInputs(files, blobs, directories)
 
 
@@ -200,7 +240,7 @@ def describe_inputs(inputs: ContractInputs) -> dict:
                 method_counts[method][key] += 1
                 counts[key] += 1
     identity = sha(json.dumps(registry, sort_keys=True, separators=(",", ":")).encode())
-    matrix = inputs.files["Catalog/generated/effect-authorization-matrix.md"].decode()
+    matrix = inputs.files["catalog/generated/effect-authorization-matrix.md"].decode()
     match = re.search(r"Catalog digest: `([a-f0-9]{64})`", matrix)
     if match is None:
         raise ValueError("missing Catalog digest")
@@ -322,9 +362,9 @@ def generate(info: dict, inputs: ContractInputs) -> str:
         ty = "&str" if isinstance(value, str) else "usize"
         lines.append(f"pub const {rust_name}: {ty} = {json.dumps(value)};")
     lines.append(f'pub const CONTRACT_IDENTITY: &str = "{info["contractIdentity"]}";')
-    lines.append('pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");')
+    lines.append('pub const SWIFT_BASELINE: &str = include_str!("../../../../api/baselines/swift-single-v1.json");')
     lines.append('pub const CONTRACT_INPUTS: &str = ' + (
-        'include_str!("../../../../spec/baselines/swift-candidate-inputs.json");'
+        'include_str!("../../../../api/baselines/swift-candidate-inputs.json");'
         if info["kind"] == "candidate" else 'SWIFT_BASELINE;'))
     lines.append("pub const METHODS: &[&str] = &[")
     lines.extend(f'    "{method}",' for method in registry["methods"])

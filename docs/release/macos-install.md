@@ -1,7 +1,7 @@
 # ArkDeck macOS 安装说明
 
 本页随发布 DMG 一起分发（DMG 里的 `INSTALL.md` 就是本页），也是维护者构建发布候选版（RC）的说明。
-构建入口：`scripts/release/build_macos_release.py`（CHG-2026-074 TASK-XPA-017，阶段 S 第 S5 刀）。
+构建入口：`hack/release/build_macos_release.py`（CHG-2026-074 TASK-XPA-017，阶段 S 第 S5 刀）。
 
 ## DMG 里有什么
 
@@ -96,7 +96,7 @@ App 连 daemon 时要求两者都相等，所以**每次升级都必须把 App �
 
 ### workflow 做什么
 
-- 触发：`main` 上 `scripts/release/release-version.json` 有变更的 push（即版本号或 build 号变更的 PR 合入），
+- 触发：`main` 上 `hack/release/release-version.json` 有变更的 push（即版本号或 build 号变更的 PR 合入），
   或手动 `workflow_dispatch`（只接受 `main`，别的 ref 在第一步失败）。同时只跑一个 RC，且不会被后来者取消。
 - 同一版本与 build 已有未过期 artifact `arkdeck-rc-<版本>-<build>`，或某个 GitHub Release 已带
   `ArkDeck-<版本>-<build>.dmg` 时，不再构建，job 以 notice 结束；要新 RC 就递增 build 号。
@@ -119,7 +119,7 @@ App 连 daemon 时要求两者都相等，所以**每次升级都必须把 App �
 ### 产出一个 RC
 
 ```sh
-python3 scripts/release/release_version.py bump-build     # 在 agent/** 分支上，提交并开 PR
+python3 hack/release/release_version.py bump-build     # 在 agent/** 分支上，提交并开 PR
 # PR 合入 main 后 release-rc.yml 自动运行
 gh run list --workflow release-rc.yml --branch main --limit 1
 gh run download <run-id> -n arkdeck-rc-<版本>-<build> -D /abs/arkdeck-rc-<版本>-<build>
@@ -132,7 +132,7 @@ Mac 上只读复核。
 在离线主机上先检查下载物料（不挂载、不执行包内程序、不改安装态）：
 
 ```sh
-python3 scripts/release/build_macos_release.py verify \
+python3 hack/release/build_macos_release.py verify \
   --input /abs/arkdeck-rc-<版本>-<build> \
   --expected-revision <发布-run-的完整-source-SHA> \
   --expected-sha256 <从可信发布-run-预先保存的-DMG-SHA256>
@@ -149,18 +149,18 @@ receipt、DMG 字节与摘要、ArkForge 构建 pin 和两份公证日志的 sub
 
 前提：
 
-- 本仓 checkout 干净，位于要发布的 `main` 提交；`python3 scripts/release/release_version.py check` 通过。
+- 本仓 checkout 干净，位于要发布的 `main` 提交；`python3 hack/release/release_version.py check` 通过。
 - ArkForge checkout 干净，`HEAD` 等于 `rust/Cargo.toml` 的 pin（脚本核对，不等即失败），且已
   `cargo fetch`（其打包脚本用 `--offline` 构建）。
 - 钥匙串里有 Developer ID Application 身份；两个 helper 的 provisioning profile；公证凭据二选一：
   `notarytool store-credentials` 存好的 keychain profile，或 App Store Connect API key。
 
-版本号：`scripts/release/release-version.json` 是唯一来源，`release_version.py` 把它同步到 pbxproj 与两个
+版本号：`hack/release/release-version.json` 是唯一来源，`release_version.py` 把它同步到 pbxproj 与两个
 helper Info.plist。发 RC 前由维护者决定是否递增 build 号：
 
 ```sh
-python3 scripts/release/release_version.py bump-build     # 0.1.0 (1) -> 0.1.0 (2)
-python3 scripts/release/release_version.py set 0.1.0 2    # 或显式指定
+python3 hack/release/release_version.py bump-build     # 0.1.0 (1) -> 0.1.0 (2)
+python3 hack/release/release_version.py set 0.1.0 2    # 或显式指定
 ```
 
 改动后提交再构建（构建要求 checkout 干净）。
@@ -171,7 +171,7 @@ python3 scripts/release/release_version.py set 0.1.0 2    # 或显式指定
 ARKDECK_CLI_PROVISIONING_PROFILE=/abs/cli.provisionprofile \
 ARKDECK_DAEMON_PROVISIONING_PROFILE=/abs/daemon.provisionprofile \
 ARKDECK_NOTARY_KEYCHAIN_PROFILE=<profile 名> \
-python3 scripts/release/build_macos_release.py release \
+python3 hack/release/build_macos_release.py release \
   --output /abs/arkdeck-rc-<版本>-<build> \
   --arkforge-checkout /abs/ArkForge
 ```
@@ -191,7 +191,7 @@ archive 经 `OTHER_CODE_SIGN_FLAGS` 带上；它还必须在用户钥匙串搜�
 （helper 对签名、公证、staple、spctl）；ArkForge 的 `packaging/macos/package-arkforge.sh`（Developer ID、
 hardened runtime、timestamp，按签名后字节写 manifest）；App 的 Release archive（所有 target 含 SwiftPM 包都只编
 arm64：`ARCHS=arm64 ONLY_ACTIVE_ARCH=NO` 在命令行给出，因为项目里的 `ARCHS` 管不到包 target；包只用
-`Package.resolved` 钉住的修订）与 Developer ID 导出（`scripts/release/ExportOptions.plist`），核对每个 Mach-O 都是
+`Package.resolved` 钉住的修订）与 Developer ID 导出（`hack/release/ExportOptions.plist`），核对每个 Mach-O 都是
 单一 arm64 切片后单独公证、staple、spctl。三者都成功后 → 组装 DMG → DMG 签名（timestamp）→
 `notarytool submit --wait` → `stapler staple` 与 `validate` → DMG 的 `spctl` → 挂载 DMG 核对：各项目录树与暂存时
 逐字节一致、严格验签、App 的身份要求、App 对 daemon 的完整要求（身份、Team、版本号与 build 号）、挂载后 App 与
@@ -210,7 +210,7 @@ ArkForge.bundle 不单独 staple（它不是 `.app`，也不能多出文件）�
 无签名结构检查（不需要任何凭据，不联系 Apple，产物不可分发）：
 
 ```sh
-python3 scripts/release/build_macos_release.py unsigned \
+python3 hack/release/build_macos_release.py unsigned \
   --output /abs/out --app /abs/ArkDeck.app \
   --helpers <build-unsigned-rust-helpers.sh 的输出根> \
   --arkforge-bundle /abs/ArkForge.bundle

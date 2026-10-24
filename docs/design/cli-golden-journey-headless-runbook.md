@@ -5,7 +5,7 @@
 
 GJ-1～GJ-5 必须有**当前发布构建与 Catalog digest** 上的 headless 结果，并按
 `PRODUCT-LOOP.md` §6 的四态逐条记录。机器门
-（`openspec/contracts/cli-feature-coverage.json` 的 `summary.fullFunction`）不替代真机证据。
+（`api/contracts/cli-feature-coverage.json` 的 `summary.fullFunction`）不替代真机证据。
 先核对现有 Runtime 记录及其构建适用性，只重验本轮变更影响或尚未通过的部分，说明原因；
 不得只因 Catalog digest 相同就把旧协议、旧构建的结果标成本轮通过。
 
@@ -498,9 +498,9 @@ TASK-SVC-005 Deliverable 3 要求验证设备/导入/任务/History/Settings 的
 **目标名不是目录名。** 源码在 `ArkDeckAppUITests/`，但 XCUITest target 叫
 `ArkDeckHDCUITests`（`ArkDeck.xcodeproj/project.pbxproj:485`），`-only-testing:` 只认后者。
 
-**必须走 `scripts/ci/run-ui-tests.sh`**，它负责 ad-hoc 签名、独立 DerivedData 和键盘布局守卫；
+**必须走 `hack/ci/run-ui-tests.sh`**，它负责 ad-hoc 签名、独立 DerivedData 和键盘布局守卫；
 裸 `xcodebuild` 的失败形态看起来像机器坏了。UI 栈是**全机唯一**的（一个 testmanagerd、一个前台，
-`scripts/ci/run-ui-tests.sh:152-155`），窗口期间不要与任何其他 UI 跑道并行。
+`hack/ci/run-ui-tests.sh:152-155`），窗口期间不要与任何其他 UI 跑道并行。
 
 **开关必须带 `TEST_RUNNER_` 前缀，否则 opt-in 测试会跳过。** 例如 History Viewer
 需要同时提供 startup gate 和精确 Job ID：
@@ -508,7 +508,7 @@ TASK-SVC-005 Deliverable 3 要求验证设备/导入/任务/History/Settings 的
 ```sh
 TEST_RUNNER_ARKDECK_REAL_DEVICE_STARTUP_ACCEPTANCE=1 \
 TEST_RUNNER_ARKDECK_REAL_DEVICE_VIEWER_JOB_ID=<jobId> \
-sh scripts/ci/run-ui-tests.sh \
+sh hack/ci/run-ui-tests.sh \
   -only-testing:ArkDeckHDCUITests/AppShellUITests/testRealDeviceHistoryReopensExactViewerCapture
 ```
 

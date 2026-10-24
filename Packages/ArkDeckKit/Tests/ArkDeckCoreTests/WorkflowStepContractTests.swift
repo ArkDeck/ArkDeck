@@ -741,12 +741,12 @@ struct WorkflowStepContractTests {
 
   private func loadContract(named name: String) throws -> [String: Any] {
     let repositoryRoot = repositoryRoot()
-    let data = try Data(contentsOf: repositoryRoot.appending(path: "openspec/contracts/\(name)"))
+    let data = try Data(contentsOf: repositoryRoot.appending(path: "api/contracts/\(name)"))
     return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
 
   private func loadInlineYAMLRecords(named name: String) throws -> [[String: String]] {
-    let url = repositoryRoot().appending(path: "openspec/contracts/\(name)")
+    let url = repositoryRoot().appending(path: "api/contracts/\(name)")
     let text = try String(contentsOf: url, encoding: .utf8)
     return text.split(separator: "\n").compactMap { line in
       guard line.contains("- { kind:"),

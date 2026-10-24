@@ -19,7 +19,7 @@ on:
     paths:
       - rust/**
       - windows/**
-      - scripts/release/release-version.json
+      - hack/release/release-version.json
       - .github/workflows/windows-rc.yml
   workflow_dispatch:
 

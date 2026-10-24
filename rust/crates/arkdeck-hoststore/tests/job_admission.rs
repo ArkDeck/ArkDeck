@@ -228,7 +228,7 @@ fn current_catalog_refuses_both_original_reviewed_plan_requests_without_admissio
     let source = lineage::Lineage::frozen().unwrap();
     source
         .assert_current_sources(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../catalog/operations"),
         )
         .unwrap();
     source

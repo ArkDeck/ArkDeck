@@ -6,7 +6,7 @@ using ArkDeck.ClientKit.Json;
 namespace ArkDeck.App.Core.Presentation;
 
 /// <summary>The CLI command each surface's data is also read with
-/// (openspec/contracts/cli-feature-coverage.json targetCommand of the surface's feature).</summary>
+/// (api/contracts/cli-feature-coverage.json targetCommand of the surface's feature).</summary>
 public static class CliCommands
 {
     public const string Doctor = "arkdeck doctor";                    // app.overview.main, doctor

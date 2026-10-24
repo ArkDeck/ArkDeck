@@ -80,7 +80,7 @@ and each is named in `[bans] allow`. They carry no third-party dependency and
 declare `Apache-2.0`. cargo-vet treats a crate from a non-registry source as
 first-party, so none of them has an audit or exemption entry; were a
 crates.io crate ever published under one of their names, `cargo vet` would ask
-for an explicit decision. `scripts/check-arkforge-pin.py` refuses any other
+for an explicit decision. `rust/scripts/check-arkforge-pin.py` refuses any other
 source or revision, in `Cargo.toml` or the lock, and reruns ArkForge's own
 wire and StepPermit vectors at the pinned revision on every run.
 

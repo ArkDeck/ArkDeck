@@ -87,7 +87,7 @@ fn current_observe_artifacts(fixture: &Path, completed: &Value) -> Value {
     lineage.operation("observe.device@1").unwrap();
     lineage
         .assert_catalog_view_sources(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../catalog/operations"),
             arkdeck_contract::CATALOG_DIGEST,
         )
         .unwrap();

@@ -17,7 +17,7 @@ fn all_current_operations_reproduce_the_input_catalog_digest() {
         sha256_hex(CATALOG_CANONICAL_JSON.as_bytes()),
         CATALOG_DIGEST
     );
-    let mut operations = fs::read_dir(common::repo_root().join("Catalog/operations"))
+    let mut operations = fs::read_dir(common::repo_root().join("catalog/operations"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
@@ -37,7 +37,7 @@ fn all_current_operations_reproduce_the_input_catalog_digest() {
         .as_object()
         .unwrap()
         .keys()
-        .filter(|path| path.starts_with("Catalog/operations/") && path.ends_with(".json"))
+        .filter(|path| path.starts_with("catalog/operations/") && path.ends_with(".json"))
         .count();
     assert!(expected_count > 0);
     assert_eq!(operations.len(), expected_count);
@@ -64,7 +64,7 @@ fn all_current_operations_reproduce_the_input_catalog_digest() {
     assert_eq!(canonical, CATALOG_CANONICAL_JSON);
     assert_eq!(sha256_hex(canonical.as_bytes()), CATALOG_DIGEST);
     let matrix = fs::read_to_string(
-        common::repo_root().join("Catalog/generated/effect-authorization-matrix.md"),
+        common::repo_root().join("catalog/generated/effect-authorization-matrix.md"),
     )
     .unwrap();
     assert!(matrix.contains(&format!("Catalog digest: `{CATALOG_DIGEST}`")));

@@ -28,7 +28,7 @@ pub fn assert_historical_source() {
     let lineage = lineage::Lineage::frozen().unwrap();
     lineage
         .assert_catalog_view_sources(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../catalog/operations"),
             CATALOG_DIGEST,
         )
         .unwrap();

@@ -10,7 +10,7 @@ mod common;
 
 #[test]
 fn complete_swift_canonical_json_vector_set_is_byte_identical() {
-    let vectors = common::load_json("openspec/contracts/cli-canonical-json-vectors.json");
+    let vectors = common::load_json("api/contracts/cli-canonical-json-vectors.json");
     assert_eq!(
         vectors["canonicalJsonVersion"],
         "arkdeck.cli.canonical-json/1"
@@ -36,7 +36,7 @@ fn complete_swift_canonical_json_vector_set_is_byte_identical() {
 
 #[test]
 fn every_swift_canonical_json_rejection_is_represented() {
-    let vectors = common::load_json("openspec/contracts/cli-canonical-json-vectors.json");
+    let vectors = common::load_json("api/contracts/cli-canonical-json-vectors.json");
     let rejections = vectors["rejections"].as_array().unwrap();
     assert_eq!(rejections.len(), 5);
     for case in rejections {

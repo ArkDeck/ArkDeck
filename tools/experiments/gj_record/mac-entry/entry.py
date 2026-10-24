@@ -221,7 +221,7 @@ class MacNative:
     def __init__(self, repository, config, *, runner=subprocess.run):
         require(platform.system() == "Darwin" and os.getuid() != 0, "logged-in Mac user required")
         self.uid, self.daemon, self.runner = os.getuid(), config["daemon"], runner
-        source = repository / "scripts/ci/installed_rust_ui.py"
+        source = repository / "hack/ci/installed_rust_ui.py"
         spec = importlib.util.spec_from_file_location("mac_entry_installed_native", source)
         self.existing = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.existing)

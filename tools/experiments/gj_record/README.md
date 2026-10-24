@@ -3,7 +3,7 @@
 Phase A gap G9 (`docs/design/cross-platform/windows-phase-a-runbook.md` §4.0.6). This tool
 builds the redacted `arkdeck.gj-headless-rerun/1` record (headless runbook §7) mechanically from
 the Runtime's own outputs. Nobody types a Runtime fact or judges `REAL_DEVICE_PASS`. The tool is
-stdlib-only and runs on Windows and macOS. Run it from `scripts/`.
+stdlib-only and runs on Windows and macOS. Run it from `hack/`.
 
 ## 1. Capture every step
 
@@ -114,7 +114,7 @@ python -m gj_record assemble --out D:\gj-20261005 --date 2026-10-05 `
   - `operation list` is not that Catalog's canonical operation set.
 
   The expected digest is read from `rust/crates/arkdeck-contract/src/catalog_generated.rs` at
-  the revision, and recomputed from its canonical JSON as `scripts/catalog_gen/generate.py`
+  the revision, and recomputed from its canonical JSON as `hack/catalog_gen/generate.py`
   computes it.
 - **Redaction:** the record would carry a connect key, a serial, a USB identity, a display name
   or a path the raw outputs or arguments hold, or anything shaped like a drive, UNC, home or

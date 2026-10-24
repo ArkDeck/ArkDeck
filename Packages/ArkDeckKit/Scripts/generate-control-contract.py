@@ -2,7 +2,7 @@
 """Generate the exact protocol vocabulary; --check is a read-only drift check.
 
 `--derive-method-schemas <frames>` additionally rewrites the per-method typed
-contracts under spec/control/methods/ from control frames a debug daemon
+contracts under api/control/methods/ from control frames a debug daemon
 recorded (ARKDECK_CONTROL_FRAME_LOG), and selects the committed frame corpus.
 """
 
@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--check", action="store_true")
 parser.add_argument(
     "--derive-method-schemas", metavar="FRAMES",
-    help="derive spec/control/methods/<method>.json from control frames recorded by "
+    help="derive api/control/methods/<method>.json from control frames recorded by "
     "ARKDECK_CONTROL_FRAME_LOG (a directory of *.jsonl files or one file), and "
     "select the committed frame corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames")
 args = parser.parse_args()
@@ -54,7 +54,7 @@ else:
 
 # --- per-method typed schemas -------------------------------------------------
 #
-# `spec/control/methods/<method>.json` is derived from frames the daemon really
+# `api/control/methods/<method>.json` is derived from frames the daemon really
 # answered: the request parameters, the result and the error details of every
 # dispatched frame a contract-test run recorded. Results and error details are
 # closed to the fields the daemon emitted; request parameters are closed to the
@@ -63,7 +63,7 @@ else:
 # MAP_VALUED_MEMBERS). `ControlMethodSchemaContractTests` holds the committed corpus to
 # the schemas; re-recording and re-deriving is how a new field enters.
 
-METHOD_SCHEMA_DIRECTORY = repository_root / "spec/control/methods"
+METHOD_SCHEMA_DIRECTORY = repository_root / "api/control/methods"
 FRAME_CORPUS_DIRECTORY = repository_root / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
 # Refusals every method can answer with, whether or not a recorded frame did.
 GENERIC_ERROR_CODES = [

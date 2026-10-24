@@ -313,7 +313,7 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
   }
 
   private func loadWorkflowStepSchema() throws -> [String: Any] {
-    let url = repositoryRoot().appending(path: "openspec/contracts/workflow-step.schema.json")
+    let url = repositoryRoot().appending(path: "api/contracts/workflow-step.schema.json")
     let data = try Data(contentsOf: url)
     return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
@@ -338,7 +338,7 @@ final class HardwareEvidenceWorkflowStepContractTests: XCTestCase {
   func testWorkflowStepSchemaAndSwiftRegistryHaveTheSameRemoteReadActions() throws {
     let data = try Data(
       contentsOf: repositoryRoot()
-        .appending(path: "openspec/contracts/workflow-step.schema.json"))
+        .appending(path: "api/contracts/workflow-step.schema.json"))
     let schema = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     let definitions = try XCTUnwrap(schema["$defs"] as? [String: Any])
     let arguments = try XCTUnwrap(

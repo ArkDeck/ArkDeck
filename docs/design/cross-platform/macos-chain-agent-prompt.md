@@ -47,7 +47,7 @@ target **0/6**。每次合入后更新 `evidence/macos-remaining.md` 顶部同�
 | XPA-015 | **ready（r11）** | HDC 观测/解析与进程基础 | SPK-10 → 13 个 `workspace.*` + `workspace.preset/project.*`（M3）→ `analyze-trace/summarize-*`（M4 后）；GJ-5 |
 | XPA-016 | **ready（r11）** | `arkdeck-provider-hdc` 只读观测（854 行）、`macos_process.rs` 启动雏形 | SPK-6 → HDC provider 全量、supervisor 观测（libproc）、process executor（`/.vol` 启动、PTY、持久 shell）；按 M1/M2/M4 顺序供货 |
 | XPA-019 | **ready（r11）** | 无 `ArkDeckClientKit` target；App 23 个文件 `import ArkDeckWorkflows`；13 个 App-facing facade | SPK-8 → 13 个 facade 逐个切换；**M5 硬前置**（App 的 NSXPC 到不了 Rust daemon） |
-| XPA-025 | **ready（r11）** | `rust-perf.yml` 仍用 SwiftPM 构建；microbenchmarks 车道已退役（#1902） | SPK-11 → Rust `arkdeck-soak`、`scripts/bench` 对 cargo daemon、参考主机基线、三车道绿 |
+| XPA-025 | **ready（r11）** | `rust-perf.yml` 仍用 SwiftPM 构建；microbenchmarks 车道已退役（#1902） | SPK-11 → Rust `arkdeck-soak`、`hack/bench` 对 cargo daemon、参考主机基线、三车道绿 |
 | XPA-017 | blocked（依赖 016、018、019、025） | — | **M5 一次性 cutover**（§4.0 步骤）+ 删 Swift target + DMG + lock/traceability 翻转 = G5 |
 
 安装态事实：`launchctl print gui/$UID/com.arkdeck.agentd` 显示当前 program 是
@@ -77,8 +77,8 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
 
 ## 1. 必读（读完再动手；每个 Task 开工前重读它的小节）
 
-1. `AGENTS.md`（已拆分：提交规则在 `scripts/agent-guides/contributing.md`，真机/App 验收在
-   `scripts/agent-guides/acceptance.md`，按表按需读）；`PRODUCT-LOOP.md` §2、§4、§6、§16、§19。
+1. `AGENTS.md`（已拆分：提交规则在 `hack/agent-guides/contributing.md`，真机/App 验收在
+   `hack/agent-guides/acceptance.md`，按表按需读）；`PRODUCT-LOOP.md` §2、§4、§6、§16、§19。
 2. `openspec/changes/chg-2026-074-shared-rust-runtime-core/`：`proposal.md` 的 Revision 6–11 与
    Governance loop；`tasks.md` 头部约定（含 r8/r9/r10/**r11** 段）、Spikes 表（SPK-6..11）与每个 Task 完整
    小节；`verification.md` 的 XPA-AC-1..10（r10 改 AC-1/AC-9 解释，r11 加对等三级）；`evidence/README.md`；
@@ -94,7 +94,7 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
    `docs/design/references/single-v1/gj-headless-rerun-2026-09-{09,10}-xpa003.json`、
    `docs/design/references/v1.6-goal/real-device-validation.md` 的 2026-09-02 段。
 6. CLI 规格 `docs/design/arkdeck-cli-product-spec.md` §12（版本/弃用/tombstone）、§14/§15/§18（018）；
-   `openspec/contracts/cli-command-registry.yaml`、`cli-feature-coverage.json`（256 条 entry，
+   `api/contracts/cli-command-registry.yaml`、`cli-feature-coverage.json`（256 条 entry，
    `implementationStatusByPlatform` 是 parity 台账）。
 7. `rust/README.md`（构建、检查、每个已迁移 owner 的用法与 `rust/scripts/check-*.py` 进程 harness）、
    `rust/supply-chain/README.md`；Swift 侧要移植的模块：`Packages/ArkDeckKit/Sources/{ArkDeckStorage,
@@ -125,9 +125,9 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
    Swift sidecar**；**C** 消费方全部脱离后删 Swift runtime/CLI 与 façade，再做最终 GJ-1..5、App UI、
    安装签名、IPC 身份、恢复验证。中间态不要求可发布，但每个合入的 PR 都必须让 `main` 可构建、
    全绿、façade 对仍能服务现有 App/CLI。
-3. **contract manifest 语义（#1866/#1878）**：`spec/baselines/swift-single-v1.json` 描述「它所在的
+3. **contract manifest 语义（#1866/#1878）**：`api/baselines/swift-single-v1.json` 描述「它所在的
    checkout」（schema `arkdeck.swift-development-baseline/2`，无 commit 字段）。改了任何被消费的输入
-   （`Packages/ArkDeckKit/Contracts/control-protocol.json`、`spec/control/methods/**`、ControlFrames
+   （`Packages/ArkDeckKit/Contracts/control-protocol.json`、`api/control/methods/**`、ControlFrames
    语料、CLI argv 语料…）就在**同一个 change 里**跑 `python rust/scripts/generate-contract.py --write`，
    `--check` 必须零 diff；`--baseline-revision` 已删除；published 视图 = `git merge-base origin/main HEAD`，
    别人合入不再让你的分支变 stale，**不再需要 re-pin PR**。
@@ -194,7 +194,7 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
   两个实现同一份。
 - **零派发与 fail closed**：任何 step 没有 durable intent 不得派发；两个 owner 写同一 SQLite、两个进程
   持有同一 store lock、Swift 引擎直接写 `index.json`（013 之后）都是停止条件。unknown 不等于零执行。
-- **安全内核不动**：不改 `openspec/specs/**`、constitution、`Catalog/**`、`ArkDeckApp.entitlements`；
+- **安全内核不动**：不改 `openspec/specs/**`、constitution、`catalog/**`、`ArkDeckApp.entitlements`；
   不创建/修改**安装态**的 capability、trusted facts、hardware evidence（测试临时目录里的合成 capability
   可以造，维护者 2026-09-14 明确）；不手改
   `~/Library/Application Support/ArkDeck/` 下任何 Runtime/凭据状态；不 `flash install-binding --rebind`；
@@ -242,18 +242,18 @@ Rust（025）。SPK-6/9/10 全过 ⇒ sidecar 永不建。
 | A 引擎/设备路径 | SPK-7 → M1 → M2 → M4（014 剩余 + 013 剩余 + recovery（裁决后）） | `arkdeck-hoststore`、`arkdeck-agentd`、`arkdeck-provider-hdc` 的 operation 部分 |
 | B 平台执行器 | SPK-6 → 016 全量，按 M1/M2/M4 需要的 provider 族顺序供货 | `arkdeck-platform`、`arkdeck-provider-hdc` 的 process/observation 部分 |
 | C 客户端 | SPK-8 → 019 十三个 facade；018 剩余 leaf 逐个 | `ArkDeckClientKit`（新 target）、`ArkDeckApp/**`、`ArkDeckAppUITests/**`、`arkdeck-cli`；**独占 UI 测试跑道** |
-| D 供应者与性能 | SPK-9/10/11 → 015 workspace/analyzer、017 的 ArkForge lane、025 | `arkdeck-provider-workspace/analyzer/arkforge`（新 crate）、`scripts/bench`、`rust-perf.yml` |
+| D 供应者与性能 | SPK-9/10/11 → 015 workspace/analyzer、017 的 ArkForge lane、025 | `arkdeck-provider-workspace/analyzer/arkforge`（新 crate）、`hack/bench`、`rust-perf.yml` |
 
 共享文件（`Package.swift`、`project.pbxproj`、`Cargo.toml`/`Cargo.lock`、`control-protocol.json`、
-`spec/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；语料计数
+`api/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；语料计数
 断言一律 `>=` published 条数；新方法/错误码由该车道自己录帧并在同一 PR `generate-contract.py --write`。
 
 **只追加的共享记录**（`tasks.md`、`rust/README.md`；2026-09-14 一天 32/30 个提交各改一次，四轮合入每轮让全部在飞
 分支冲突）：一刀的记录是它自己的 `evidence/runs/<task>/<slice>-run.md`，**不再**往 `tasks.md` 的 Task 小节逐刀追加
 bullet——`tasks.md` 只在该 Task 的状态行变化（`ready`→`in-progress`→`done`）时改一行；`rust/README.md` 每个 crate
 领域固定一节、就地改写，不逐刀加节，切片细节放模块 rustdoc 与 run 记录。两文件已在 `.gitattributes` 标 `merge=union`
-（本地 rebase 自动保两边；GitHub 的冲突判定不读它，仍要推一次），`scripts/check_union_merge.py` 在 check-sdd 里拒绝重复
-bullet/标题；重挂用 `scripts/rebase-union.sh [--onto <base> <old>]`。
+（本地 rebase 自动保两边；GitHub 的冲突判定不读它，仍要推一次），`hack/check_union_merge.py` 在 check-sdd 里拒绝重复
+bullet/标题；重挂用 `hack/rebase-union.sh [--onto <base> <old>]`。
 
 **维护者门（r11 之后仍开）**：L.1 第 13 条（决策包 `evidence/adr-0009-decision-package-20260914.md` 已提交，
 裁决前 recovery/`job.reconcile`/可恢复 Job/epoch 不移植）；GJ-4 每次开窗的 go；设备日窗（SPK-7 通过后每天
@@ -345,12 +345,12 @@ bullet/标题；重挂用 `scripts/rebase-union.sh [--onto <base> <old>]`。
 - r11：C 车道持续；每个 Rust owner 方法落地即补 leaf；`evidence/macos-remaining.md` 的「CLI leaves on
   Rust」行是进度记录；envelope/page/nextAction 样本 T0、人读文本 T2。L.1 第 7 条已随 r11 提议并 attestation：
   Swift CLI 随 M5 一起删，双 CLI 期到 cutover 为止，兼容 leaf 按 §12 tombstone。
-- 车道退役：`scripts/ci/plan.py`、`scripts/ci/test_plan.py`、`.github/workflows/swift-ci.yml`、
-  `scripts/test_agent_pr_workflow.py`（`swift` 聚合的 `needs` 被逐字钉住，改车道要同 PR 更新契约测试）。
+- 车道退役：`hack/ci/plan.py`、`hack/ci/test_plan.py`、`.github/workflows/swift-ci.yml`、
+  `hack/tests/test_agent_pr_workflow.py`（`swift` 聚合的 `needs` 被逐字钉住，改车道要同 PR 更新契约测试）。
 
 ### TASK-XPA-019 — App 改用 ArkDeckClientKit，脱离 ArkDeckWorkflows
 
-- 交付：新 `ArkDeckClientKit` target（从 `spec/control/methods/**` 生成 typed 模型、`xpc_connection`
+- 交付：新 `ArkDeckClientKit` target（从 `api/control/methods/**` 生成 typed 模型、`xpc_connection`
   长连接 + 反向钉 daemon 身份、presentation adapter）；13 个 App-facing facade 逐个切换并各自可发布
   （`DebugApplicationFacade`、`DeviceControlFacade`、`DeviceListApplicationFacade`、`FlashApplicationFacade`、
   `HDCApplicationDiagnosticsFacade`、`OverviewCapabilityApplicationFacade`、
@@ -358,9 +358,9 @@ bullet/标题；重挂用 `scripts/rebase-union.sh [--onto <base> <old>]`。
   `RuntimeHistoryFilterApplicationFacade`、`RuntimeJobControlApplicationFacade`、
   `RuntimeTraceCacheApplicationFacade`、`TraceApplicationFacade`、`UIDumpApplicationFacade`；
   `XPCConnectionBox` 随之退役）；23 个 `import ArkDeckWorkflows` 清零；presentation 语义只来自 daemon
-  投影或 `spec/ui-semantics`，App 不派生状态。
+  投影或 `api/ui-semantics`，App 不派生状态。
 - 完成判据：AC-UX-001-01..007-01、AC-DIAG-001-01/02、AC-DIAG-002-01、AC-I18N-001-01、XPA-AC-8；UI 测试
-  全绿（`sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/<Suite>`，全机唯一跑道、安静
+  全绿（`sh hack/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/<Suite>`，全机唯一跑道、安静
   机器 loadavg < 核数×1.5、不 pkill 全局进程；新 UITests 文件要登记 pbxproj；Settings/Storage 这类依赖
   活 daemon 的页面在 CI 无 daemon，要同车给 `--ui-test-*` fixture 且 fixture 值与产品默认值可区分）。
 - r11：`ready`，C 车道，**不等 014 done**；SPK-8 先切最小的 `RuntimeHistoryFilterApplicationFacade`（Rust
@@ -371,7 +371,7 @@ bullet/标题；重挂用 `scripts/rebase-union.sh [--onto <base> <old>]`。
 ### TASK-XPA-025 — 性能车道切到 Rust daemon + Rust soak fixture
 
 - 交付：Rust `arkdeck-soak`（复刻 `ArkDeckRuntimeSoakFixture` 语义与 `arkdeck-runtime-soak/v1`
-  schema）；`scripts/bench` 对 cargo 构建的 `arkdeck-agentd` 采集；`rust-perf.yml` 不再构建任何 SwiftPM
+  schema）；`hack/bench` 对 cargo 构建的 `arkdeck-agentd` 采集；`rust-perf.yml` 不再构建任何 SwiftPM
   产品；参考主机 release 构建重取 13 项基线（含 idle RSS 两电平拆分：启动 plateau 与稳态分开记）
   入仓，Swift 末版基线并列保留；PR/nightly/soak 三车道在 Rust daemon 上绿。跨机器比较绝对值和比值都
   不成立，只在参考主机比；advisory run 不因不稳非零退出；失败时先拷证据再 propagate；`tee` 要配
@@ -418,7 +418,7 @@ bullet/标题；重挂用 `scripts/rebase-union.sh [--onto <base> <old>]`。
 ### 5.2 切片形状（沿 #1841～#1881 先例）
 
 一个切片 = 一个可运行的垂直能力：Rust owner/handler（`rust/crates/*`）+ typed RPC（若新增方法则同步
-`control-protocol.json`、`spec/control/methods/*.json`、`openspec/contracts/runtime-control-plane.schema.json`、
+`control-protocol.json`、`api/control/methods/*.json`、`api/contracts/runtime-control-plane.schema.json`、
 `CLIControlMethodRegistry`/`cli-feature-coverage.json`）+ Rust CLI leaf（必要时 Swift CLI 也切到同一
 typed 方法）+ Swift 侧 producer fixture 与严格 readback 测试 + `rust/scripts/check-<slice>.py` 真实
 进程 harness（启动、请求、重启、CAS/锁、second-owner 拒绝、崩溃窗口）+ `evidence/runs/<task>/<slice>-run.md`
@@ -443,7 +443,7 @@ push 前本地只跑针对性检查（目标 10 分钟内，不拿门锁、不�
 cargo target）：`cargo fmt --all --check`；改动 crate 及其直接依赖方的 `cargo clippy -p <crate> --all-targets
 -- -D warnings`（本机 target）与 `cargo test -p <crate>`（spawn 子进程的测试独占 test 二进制）；改了契约输入
 才 `python rust/scripts/generate-contract.py --check`；改了 `openspec/**`/`docs/**`/`AGENTS.md` 才跑
-`ARKDECK_PYTHON=<repo>/.venv-sdd/bin/python sh scripts/check-sdd.sh`；Swift 只跑受影响测试类
+`ARKDECK_PYTHON=<repo>/.venv-sdd/bin/python sh hack/check-sdd.sh`；Swift 只跑受影响测试类
 `run-swiftpm.sh test --filter <类>`。
 
 统一门是 PR 上的 GitHub CI（`guard` + `swift` 聚合；CI 里的 `plan.py` 与本地 `--run-local` 同一套选车道
@@ -451,7 +451,7 @@ cargo target）：`cargo fmt --all --check`；改动 crate 及其直接依赖方
 CI 日志里失败的那一条），本机同一时刻最多一道：
 
 ```bash
-python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree
+python3 hack/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree
 ```
 
 （不带 `--run-local` 只打印选中的车道。）
@@ -466,7 +466,7 @@ python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revi
   等）——与 diff 无关时按族判读，修法是等真实完成条件，不是放宽 margin；`swift test --parallel` 每个
   method 一个进程，固定 fixture 目录会互删；Foundation `Process.waitUntilExit()` 在非主线程会挂，用
   `isRunning` 轮询 + deadline。
-- App 呈现相关断言用 `sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/<Suite>`（不是
+- App 呈现相关断言用 `sh hack/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/<Suite>`（不是
   merge gate）。
 
 ### 5.4 提交、rebase、冲突、推送、循环
@@ -481,14 +481,14 @@ python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revi
 - 最终 commit：subject 英文、以 `(TASK-XPA-0NN)` 结尾且只含一个 TASK token；正文写 diff 概要、原因、
   跑了什么、没跑什么及原因、重叠/前置 PR、待裁决项——这是 PR 的唯一说明载体。
 - 推送：`git push origin HEAD:refs/heads/agent/<branch>`（维护者主机上的 `origin` 已配成部署密钥 remote，
-  见 `scripts/agent-guides/contributing.md`）；22 端口被网络层拦时改走 `ssh.github.com` 的 443 端口
+  见 `hack/agent-guides/contributing.md`）；22 端口被网络层拦时改走 `ssh.github.com` 的 443 端口
   （`GIT_SSH_COMMAND` 指定同一把部署密钥并加 `-o IdentitiesOnly=yes -p 443`，远端
   `ssh://git@ssh.github.com:443/ArkDeck/ArkDeck.git`）。推完查
   `gh run list --workflow "Agent PR" --branch <branch>` 确认 PR 开出，再 `gh pr view <N>
   --json title,state,files` 读回；重触发 CI 只能 `git commit --amend --no-edit` 换 SHA 后
   `--force-with-lease=refs/heads/<branch>:<old-sha>`。
 - **循环**：CI 绿 → 不等合入，立刻开下一个切片。默认从 `origin/main` 新建分支；只有下一切片硬依赖
-  未合入内容时才叠在其上，并在正文声明；前序 squash 合入后 `scripts/rebase-union.sh --onto origin/main <前序 SHA>`
+  未合入内容时才叠在其上，并在正文声明；前序 squash 合入后 `hack/rebase-union.sh --onto origin/main <前序 SHA>`
   剥离已合入 commit（只追加的共享记录由 union 驱动自动保两边），再 force-with-lease。GitHub 的 stacked pull
   requests（2026-07 起公测：底层 PR 合入后其余 PR 由 GitHub 自动重挂、改 base）与 merge queue（按批合入、
   `merge_group` 事件跑 CI）能省掉这一步，但要 bot 以前序分支为 base 开 PR、CI 加 `merge_group` 触发，属维护者决定。CI 红先分辨本 PR 问题还是 flake，修或重触发。「等合入」永远

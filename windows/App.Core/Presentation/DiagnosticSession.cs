@@ -959,7 +959,7 @@ public sealed record DiagnosticJobArtifact(
 }
 
 /// <summary>The Artifact roles the Catalog declares for the two operations these readers open
-/// (<c>Catalog/operations/capture.diagnostics.v1.json</c>,
+/// (<c>catalog/operations/capture.diagnostics.v1.json</c>,
 /// <c>analyzer.summarize-hilog.v1.json</c>; checked against them by the tests).</summary>
 public static class DiagnosticArtifactRoles
 {

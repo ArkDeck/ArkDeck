@@ -1,0 +1,776 @@
+"""Contract tests for the Operation Catalog validator/generator (CHG-2026-046).
+
+Run: python3 hack/catalog_gen/test_generate.py (interpreter must satisfy
+hack/requirements-sdd.txt, same as check-sdd). Wired into CI through
+hack/tests/test_check_sdd.py::OperationCatalogFamilyTests, which runs this file
+as a subprocess.
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import re
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import generate  # noqa: E402
+
+
+def _real_operations():
+    operations, profiles = generate.load_catalog()
+    return operations, profiles
+
+
+def _first_operation() -> dict:
+    operations, _ = _real_operations()
+    return copy.deepcopy(next(op for op in operations if op["id"] == "observe.device"))
+
+
+def _stdout_operation() -> dict:
+    operations, _ = _real_operations()
+    return copy.deepcopy(next(op for op in operations if op["id"] == "capture.diagnostics"))
+
+
+class RealCatalogTests(unittest.TestCase):
+    def test_real_catalog_validates_and_cross_references(self):
+        operations, profiles = _real_operations()
+        self.assertEqual(
+            sorted(generate.operation_reference(op) for op in operations),
+            [
+                "analyzer.analyze-trace@1",
+                "analyzer.extract-crash-signature@1",
+                "analyzer.summarize-hilog@1",
+                "analyzer.summarize-trace@1",
+                "capture.diagnostic-session@1",
+                "capture.diagnostics@1",
+                "capture.screen-sequence@1",
+                "debug.hap@1",
+                "debug.template@1",
+                "deploy.native-library.app-owned@1",
+                "flash.dayu200",
+                "flash.full-restore@1",
+                "flash.recommission@1",
+                "flash.restore-boot-loop@1",
+                "flash.verify@1",
+                "input.keyboard@1",
+                "input.long-press@1",
+                "input.swipe@1",
+                "input.tap@1",
+                "observe.device@1",
+                "port-forward.create@1",
+                "port-forward.remove@1",
+                "workspace.apply-patch@1",
+                "workspace.build-openharmony@1",
+                "workspace.create-checkpoint@1",
+                "workspace.inspect-diff@1",
+                "workspace.inspect-git-status@1",
+                "workspace.inspect-source@1",
+                "workspace.prepare-isolated-copy@1",
+                "workspace.read-source-range@1",
+                "workspace.revert-patch@1",
+                "workspace.run-tests@1",
+                "workspace.sign-openharmony-hap@1",
+                "workspace.sweep-isolated-copies@1",
+                "workspace.symbolize-crash@1",
+            ],
+        )
+        self.assertEqual(
+            sorted(generate.profile_reference(p) for p in profiles),
+            ["dayu200", "openharmony-standard@1", "workspace-host@1"],
+        )
+
+    def test_operation_and_profile_rosters_agree_in_both_directions(self):
+        """The two hand-written rosters must name each other, not merely resolve.
+
+        Checking only that each reference existed let them drift while every
+        name stayed valid: fourteen operations declared a profile that did not
+        list them, and the generated authorisation matrix — the only published
+        view of what a profile supports — showed workspace-host@1 with seven
+        operations while seventeen claimed it.
+        """
+        operations, profiles = _real_operations()
+        claimed = {}
+        for doc in operations:
+            for profile_ref in doc["profiles"]:
+                claimed.setdefault(profile_ref, set()).add(generate.operation_reference(doc))
+        for doc in profiles:
+            ref = generate.profile_reference(doc)
+            self.assertEqual(
+                set(doc["supportedOperations"]), claimed.get(ref, set()),
+                f"{ref}: the profile's list and the operations claiming it must be one set")
+
+    def test_a_profile_that_omits_a_claiming_operation_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            profile_path = profiles_dir / "workspace-host.v1.json"
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            dropped = profile["supportedOperations"].pop()
+            profile_path.write_text(json.dumps(profile), encoding="utf-8")
+            with self.assertRaisesRegex(generate.CatalogError, "does not list them"):
+                generate.load_catalog(operations_dir, profiles_dir)
+            self.assertTrue(dropped)
+
+    def test_a_profile_listing_an_operation_that_does_not_claim_it_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            profile_path = profiles_dir / "workspace-host.v1.json"
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            profile["supportedOperations"].append("flash.dayu200")
+            profile_path.write_text(json.dumps(profile), encoding="utf-8")
+            with self.assertRaisesRegex(generate.CatalogError, "do not\\s+declare it|do not declare it"):
+                generate.load_catalog(operations_dir, profiles_dir)
+
+    def test_dayu200_is_the_only_unversioned_singleton_profile(self):
+        _, profiles = _real_operations()
+        dayu200 = [profile for profile in profiles if profile["id"] == "dayu200"]
+        self.assertEqual(len(dayu200), 1)
+        self.assertNotIn("version", dayu200[0])
+        self.assertEqual(generate.profile_reference(dayu200[0]), "dayu200")
+
+    def test_dayu200_operation_uses_the_singleton_source_filename(self):
+        self.assertTrue((generate.OPERATIONS_DIR / "flash.dayu200.json").is_file())
+        self.assertFalse((generate.OPERATIONS_DIR / "flash.dayu200.v1.json").exists())
+        operations, _ = _real_operations()
+        dayu200 = [operation for operation in operations if operation["id"] == "flash.dayu200"]
+        self.assertEqual(len(dayu200), 1)
+        self.assertNotIn("version", dayu200[0])
+        self.assertEqual(generate.operation_reference(dayu200[0]), "flash.dayu200")
+
+    def test_unversioned_operation_cannot_coexist_with_a_versioned_variant(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            versioned = json.loads(
+                (operations_dir / "flash.dayu200.json").read_text(encoding="utf-8")
+            )
+            versioned["version"] = 1
+            (operations_dir / "flash.dayu200.v1.json").write_text(
+                json.dumps(versioned), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                generate.CatalogError, "unversioned operation cannot coexist"
+            ):
+                generate.load_catalog(
+                    operations_dir=operations_dir, profiles_dir=profiles_dir
+                )
+
+    def test_generation_is_deterministic(self):
+        first = generate.generated_outputs()
+        second = generate.generated_outputs()
+        self.assertEqual(first, second)
+
+    def test_repo_has_zero_drift(self):
+        self.assertEqual(generate.drift_report(), [])
+
+    def test_digest_is_stable_under_key_reordering(self):
+        operations, _ = _real_operations()
+        digest = generate.catalog_digest(operations)
+        reordered = [
+            {key: doc[key] for key in reversed(list(doc))} for doc in operations
+        ]
+        self.assertEqual(generate.catalog_digest(reordered), digest)
+
+    def test_digest_changes_on_semantic_change(self):
+        operations, _ = _real_operations()
+        digest = generate.catalog_digest(operations)
+        mutated = copy.deepcopy(operations)
+        mutated[0]["timeoutSeconds"] += 1
+        self.assertNotEqual(generate.catalog_digest(mutated), digest)
+
+    def test_published_e2_flash_operation_is_pinned(self):
+        operations, _ = _real_operations()
+        alias = next(op for op in operations if op["id"] == "flash.dayu200")
+        canonical = next(
+            op for op in operations if op["id"] == "flash.full-restore"
+        )
+        self.assertEqual(alias["aliasFor"], "flash.full-restore@1")
+        self.assertEqual(alias["provider"], "arkforge")
+        self.assertEqual(canonical["provider"], "arkforge")
+        self.assertEqual(canonical["effect"]["permitted"], ["destructive"])
+        self.assertEqual(
+            canonical["authorization"], {"destructive": "runtimeCapability"}
+        )
+        self.assertEqual(
+            list(canonical["inputs"]["fields"]),
+            ["artifactLease", "deviceProfileRef", "intent", "verification"],
+        )
+        self.assertEqual(
+            canonical["inputs"]["fields"]["intent"]["enum"], ["fullRestore"]
+        )
+
+    def test_flash_alias_drift_from_canonical_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            alias_path = operations_dir / "flash.dayu200.json"
+            alias = json.loads(alias_path.read_text(encoding="utf-8"))
+            alias["timeoutSeconds"] -= 1
+            alias_path.write_text(json.dumps(alias), encoding="utf-8")
+            with self.assertRaisesRegex(
+                generate.CatalogError, "alias timeoutSeconds must match"
+            ):
+                generate.load_catalog(operations_dir, profiles_dir)
+
+    def test_workspace_checkpoint_uses_runtime_owned_exact_policy(self):
+        operations, _ = _real_operations()
+        checkpoint = next(
+            op for op in operations if op["id"] == "workspace.create-checkpoint"
+        )
+        self.assertEqual(
+            checkpoint["authorization"], {"deviceMutation": "runtimeCapability"}
+        )
+        self.assertEqual(checkpoint.get("defaultPolicyIssuance"), "enabled")
+
+    def test_every_stdout_step_has_an_exact_registered_action(self):
+        operations, _ = _real_operations()
+        registry = generate.load_stdout_action_registry()
+        observed = {}
+        for operation in operations:
+            for step in operation["steps"]:
+                if step["kind"] != "captureRemoteStdout":
+                    continue
+                action_ref = step["actionRef"]
+                pair = (action_ref["catalogId"], action_ref["actionId"])
+                self.assertIn(pair[1], registry[pair[0]])
+                observed[
+                    f"{generate.operation_reference(operation)}/{step['stepID']}"
+                ] = pair
+        self.assertEqual(
+            observed,
+            {
+                "capture.diagnostic-session@1/capture-hilog": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "capture.diagnostics@1/capture-hilog": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "capture.diagnostics@1/capture-ui-dump": (
+                    "arkdeck-diagnostics", "windowInventory"
+                ),
+                "capture.diagnostics@1/capture-advanced-ui-dump": (
+                    "arkdeck-diagnostics", "componentDetail"
+                ),
+                "capture.diagnostics@1/capture-crash-index": (
+                    "arkdeck-diagnostics", "crashIndex"
+                ),
+                "capture.diagnostics@1/capture-crash-log": (
+                    "arkdeck-diagnostics", "crashLog"
+                ),
+                "debug.hap@1/capture-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "flash.dayu200/capture-post-flash-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "flash.full-restore@1/capture-post-flash-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "flash.recommission@1/capture-post-flash-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+            },
+        )
+
+    def test_evidence_remote_reads_have_exact_registered_actions(self):
+        operations, _ = _real_operations()
+        registry = generate.load_remote_action_registry()
+        observed = {}
+        for operation in operations:
+            if operation["id"] not in generate.ACTION_REFERENCE_REQUIRED_OPERATIONS:
+                continue
+            for step in operation["steps"]:
+                if step["kind"] != "runApprovedRemoteRead":
+                    continue
+                action_ref = step["actionRef"]
+                self.assertEqual(action_ref["catalogId"], "arkdeck-remote-operations")
+                self.assertEqual(registry[action_ref["actionId"]], step["kind"])
+                observed[
+                    f"{generate.operation_reference(operation)}/{step['stepID']}"
+                ] = action_ref["actionId"]
+        self.assertEqual(
+            observed,
+            {
+                "capture.diagnostic-session@1/read-evidence-model": "deviceModel",
+                "capture.diagnostic-session@1/read-evidence-firmware": "firmwareBuild",
+                "capture.diagnostics@1/read-evidence-model": "deviceModel",
+                "capture.diagnostics@1/read-evidence-firmware": "firmwareBuild",
+                "debug.hap@1/read-evidence-model": "deviceModel",
+                "debug.hap@1/read-evidence-firmware": "firmwareBuild",
+                "debug.hap@1/package-readback": "packageInfo",
+                "observe.device@1/read-evidence-model": "deviceModel",
+                "observe.device@1/read-evidence-firmware": "firmwareBuild",
+                "observe.device@1/read-boot-context": "bootContext",
+            },
+        )
+
+    def test_evidence_preflight_is_the_first_three_device_bound_steps(self):
+        operations, _ = _real_operations()
+        expected = [
+            ("confirm-evidence-target", "probeDevice", None),
+            (
+                "read-evidence-model",
+                "runApprovedRemoteRead",
+                ("arkdeck-remote-operations", "deviceModel"),
+            ),
+            (
+                "read-evidence-firmware",
+                "runApprovedRemoteRead",
+                ("arkdeck-remote-operations", "firmwareBuild"),
+            ),
+        ]
+        for operation in operations:
+            if operation["id"] not in (
+                generate.ACTION_REFERENCE_REQUIRED_OPERATIONS | {"deploy.native-library.app-owned"}
+            ):
+                continue
+            device_steps = [
+                step for step in operation["steps"]
+                if step["binding"] == "confirmedDevice"
+            ]
+            observed = []
+            for step in device_steps[:3]:
+                action_ref = step.get("actionRef")
+                observed.append(
+                    (
+                        step["stepID"],
+                        step["kind"],
+                        None if action_ref is None else (
+                            action_ref["catalogId"], action_ref["actionId"]
+                        ),
+                    )
+                )
+            self.assertEqual(observed, expected, operation["id"])
+            self.assertTrue(
+                all(not step.get("optional", False) for step in device_steps[:3]),
+                operation["id"],
+            )
+
+
+class ValidatorNegativeTests(unittest.TestCase):
+    def setUp(self):
+        self.registry = generate.load_step_registry()
+
+    def _assert_rejected(self, doc, fragment: str):
+        with self.assertRaises(generate.CatalogError) as ctx:
+            generate.validate_operation(doc, self.registry, "test-doc")
+        self.assertIn(fragment, str(ctx.exception))
+
+    def test_unknown_step_kind_rejected(self):
+        doc = _first_operation()
+        doc["steps"][0]["kind"] = "runShellCommand"
+        self._assert_rejected(doc, "unknown step kind")
+
+    def test_effect_below_registry_minimum_rejected(self):
+        doc = _first_operation()
+        for step in doc["steps"]:
+            if step["kind"] == "probeDevice":
+                step["effect"] = "hostOnly"
+        self._assert_rejected(doc, "below registry minimum")
+
+    def test_forbidden_field_name_rejected(self):
+        for name in sorted(generate.FORBIDDEN_FIELD_NAMES):
+            doc = _first_operation()
+            doc["inputs"]["fields"][name] = {"type": "string", "required": False}
+            self._assert_rejected(doc, "forbidden field name")
+
+    def test_unknown_top_level_key_rejected(self):
+        doc = _first_operation()
+        doc["shellSteps"] = []
+        self._assert_rejected(doc, "unknown keys")
+
+    def test_destructive_requires_one_shot_exact_plan(self):
+        doc = _first_operation()
+        doc["effect"] = {"minimum": "readOnly", "permitted": ["readOnly", "destructive"]}
+        doc["authorization"] = {
+            "readOnly": "defaultReadOnly",
+            "destructive": "standingCapability",
+        }
+        self._assert_rejected(doc, "runtimeCapability")
+
+    def test_default_read_only_cannot_gate_mutation(self):
+        doc = _first_operation()
+        doc["effect"] = {"minimum": "readOnly", "permitted": ["readOnly", "deviceMutation"]}
+        doc["authorization"] = {
+            "readOnly": "defaultReadOnly",
+            "deviceMutation": "defaultReadOnly",
+        }
+        self._assert_rejected(doc, "may not gate a mutation")
+
+    def test_mutation_retry_is_pinned_to_one(self):
+        doc = _first_operation()
+        doc["retry"]["mutationAttempts"] = 2
+        self._assert_rejected(doc, "pinned to 1")
+
+    def test_unknown_outcome_is_pinned(self):
+        doc = _first_operation()
+        doc["unknownOutcome"] = "autoRetry"
+        self._assert_rejected(doc, "reconcileRequired")
+
+    def test_duplicate_step_ids_rejected(self):
+        doc = _first_operation()
+        doc["steps"][1]["stepID"] = doc["steps"][0]["stepID"]
+        self._assert_rejected(doc, "duplicate stepIDs")
+
+    def test_minimum_effect_must_match_required_steps(self):
+        doc = _first_operation()
+        doc["effect"] = {"minimum": "hostOnly", "permitted": ["hostOnly", "readOnly"]}
+        doc["authorization"] = {
+            "hostOnly": "defaultReadOnly",
+            "readOnly": "defaultReadOnly",
+        }
+        self._assert_rejected(doc, "must equal the maximum")
+
+    def test_authorization_must_name_a_gate_for_host_only(self):
+        # A purely hostOnly operation used to be unconstructible: the coverage
+        # rule excluded hostOnly while also demanding a non-empty map. Every
+        # permitted effect now names its gate, host-only work included.
+        doc = _first_operation()
+        doc["effect"] = {"minimum": "hostOnly", "permitted": ["hostOnly"]}
+        doc["authorization"] = {}
+        self._assert_rejected(doc, "non-empty object")
+        doc["authorization"] = {"readOnly": "defaultReadOnly"}
+        self._assert_rejected(doc, "cover exactly")
+
+    def test_permitted_effect_must_be_reachable(self):
+        doc = _first_operation()
+        doc["effect"] = {"minimum": "readOnly", "permitted": ["readOnly", "deviceMutation"]}
+        doc["authorization"] = {
+            "readOnly": "defaultReadOnly",
+            "deviceMutation": "standingCapability",
+        }
+        self._assert_rejected(doc, "unreachable")
+
+    def test_authorization_must_cover_exactly_permitted_effects(self):
+        doc = _first_operation()
+        doc["authorization"] = {}
+        self._assert_rejected(doc, "non-empty object")
+        doc = _first_operation()
+        doc["authorization"]["deviceMutation"] = "standingCapability"
+        self._assert_rejected(doc, "cover exactly")
+
+    def test_stdout_step_requires_action_reference(self):
+        doc = _stdout_operation()
+        del next(step for step in doc["steps"] if step["kind"] == "captureRemoteStdout")[
+            "actionRef"
+        ]
+        self._assert_rejected(doc, "requires actionRef")
+
+    def test_stdout_step_rejects_unknown_catalog_and_action(self):
+        for catalog_id, action_id in (
+            ("unknown-diagnostics", "boundedHilog"),
+            ("arkdeck-diagnostics", "unknownAction"),
+            ("arkui-ui-dump", "boundedHilog"),
+        ):
+            doc = _stdout_operation()
+            step = next(step for step in doc["steps"] if step["kind"] == "captureRemoteStdout")
+            step["actionRef"] = {"catalogId": catalog_id, "actionId": action_id}
+            self._assert_rejected(doc, "unregistered stdout action")
+
+    def test_non_stdout_step_rejects_action_reference(self):
+        for action_ref in (
+            {
+                "catalogId": "arkdeck-diagnostics",
+                "actionId": "boundedHilog",
+            },
+            None,
+        ):
+            doc = _first_operation()
+            doc["steps"][0]["actionRef"] = action_ref
+            self._assert_rejected(
+                doc, "only captureRemoteStdout or runApprovedRemoteRead")
+
+    def test_evidence_remote_read_requires_action_reference(self):
+        doc = _first_operation()
+        step = next(
+            step for step in doc["steps"]
+            if step["kind"] == "runApprovedRemoteRead")
+        del step["actionRef"]
+        self._assert_rejected(doc, "evidence-eligible operation requires actionRef")
+
+    def test_remote_read_rejects_unknown_or_cross_catalog_action(self):
+        for action_ref, fragment in (
+            (
+                {"catalogId": "arkdeck-remote-operations", "actionId": "unknownRead"},
+                "unregistered remote action",
+            ),
+            (
+                {"catalogId": "arkdeck-diagnostics", "actionId": "boundedHilog"},
+                "requires arkdeck-remote-operations",
+            ),
+        ):
+            doc = _first_operation()
+            step = next(
+                step for step in doc["steps"]
+                if step["kind"] == "runApprovedRemoteRead")
+            step["actionRef"] = action_ref
+            self._assert_rejected(doc, fragment)
+
+    def test_action_reference_is_closed(self):
+        doc = _stdout_operation()
+        step = next(step for step in doc["steps"] if step["kind"] == "captureRemoteStdout")
+        step["actionRef"]["command"] = "hilog"
+        self._assert_rejected(doc, "unknown keys")
+
+
+class SchemaVocabularyLockstepTests(unittest.TestCase):
+    """The JSON Schema file and the python validator must not drift apart."""
+
+    @classmethod
+    def setUpClass(cls):
+        schema_path = generate.CATALOG_DIR / "schema" / "operation.schema.json"
+        cls.schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    def test_every_defs_reference_resolves(self):
+        """A dangling `$ref` silently disables validation of whatever it guards.
+
+        `#/$defs/identifier` was referenced twice and never defined, and the
+        only block that used it is `completeOverwriteRecovery` — carried by
+        exactly one operation, `flash.dayu200`, the destructive full flash. So
+        the one operation that most needed schema validation was the one
+        operation no validator could load. Nothing caught it because nothing in
+        the repository ever compiles this schema: the vocabulary tests below
+        compare enum tuples, which a dangling pointer does not disturb.
+        """
+        text = json.dumps(self.schema)
+        referenced = set(re.findall(r"#/\$defs/([A-Za-z0-9_]+)", text))
+        defined = set(self.schema.get("$defs", {}))
+        self.assertEqual(
+            referenced - defined,
+            set(),
+            "schema references a $defs entry that does not exist",
+        )
+
+    def test_identifier_definition_accepts_the_step_ids_it_guards(self):
+        """The `identifier` shape must actually admit the values it validates."""
+        identifier = self.schema["$defs"]["identifier"]
+        pattern = re.compile(identifier["pattern"])
+        maximum = identifier["maxLength"]
+
+        def accepts(value):
+            return bool(pattern.fullmatch(value)) and len(value) <= maximum
+
+        for path in sorted((generate.CATALOG_DIR / "operations").glob("*.json")):
+            document = json.loads(path.read_text(encoding="utf-8"))
+            recovery = document.get("completeOverwriteRecovery")
+            if not recovery:
+                continue
+            declared = {step["stepID"] for step in document["steps"]}
+            guarded = [recovery["overwriteStepID"], *recovery["verificationStepIDs"]]
+            for value in guarded:
+                self.assertTrue(accepts(value), f"{path.name}: {value!r} rejected")
+                # A well-formed identifier that names no step would still be a
+                # broken recovery declaration, so pin the reference too.
+                self.assertIn(value, declared, f"{path.name}: {value!r} is not a step")
+        for junk in ["Flash-Partitions", "flash_partitions", "-flash", "", "a" * 65]:
+            self.assertFalse(accepts(junk), f"identifier wrongly accepts {junk!r}")
+
+    def test_top_level_vocabulary_matches(self):
+        self.assertEqual(
+            set(self.schema["required"]), set(generate.TOP_LEVEL_REQUIRED)
+        )
+        self.assertEqual(
+            set(self.schema["properties"]),
+            set(generate.TOP_LEVEL_REQUIRED) | set(generate.TOP_LEVEL_OPTIONAL),
+        )
+
+    def test_step_vocabulary_matches(self):
+        step = self.schema["$defs"]["step"]
+        self.assertEqual(set(step["required"]), set(generate.STEP_REQUIRED))
+        self.assertEqual(
+            set(step["properties"]),
+            set(generate.STEP_REQUIRED) | set(generate.STEP_OPTIONAL),
+        )
+        self.assertEqual(
+            step["properties"]["actionRef"], {"$ref": "#/$defs/actionRef"})
+        condition = step["allOf"][0]
+        self.assertEqual(
+            condition["if"]["properties"]["kind"]["const"], "captureRemoteStdout")
+        self.assertEqual(condition["then"]["required"], ["actionRef"])
+        remote_condition = condition["else"]
+        self.assertEqual(
+            remote_condition["if"]["properties"]["kind"]["const"],
+            "runApprovedRemoteRead")
+        self.assertNotIn("required", remote_condition["then"])
+        self.assertEqual(
+            remote_condition["else"]["not"]["required"], ["actionRef"])
+        selected = self.schema["allOf"][0]
+        self.assertEqual(
+            set(selected["if"]["properties"]["id"]["enum"]),
+            set(generate.ACTION_REFERENCE_REQUIRED_OPERATIONS),
+        )
+
+    def test_field_vocabulary_matches(self):
+        field = self.schema["$defs"]["field"]
+        self.assertEqual(set(field["required"]), set(generate.FIELD_REQUIRED))
+        self.assertEqual(
+            set(field["properties"]),
+            set(generate.FIELD_REQUIRED) | set(generate.FIELD_OPTIONAL),
+        )
+        self.assertEqual(set(field["properties"]["type"]["enum"]), set(generate.FIELD_TYPES))
+
+    def test_enum_vocabularies_match(self):
+        defs = self.schema["$defs"]
+        self.assertEqual(tuple(defs["effect"]["enum"]), generate.EFFECTS)
+        self.assertEqual(tuple(defs["cancellation"]["enum"]), generate.CANCELLATIONS)
+        self.assertEqual(tuple(defs["binding"]["enum"]), generate.BINDINGS)
+        self.assertEqual(tuple(defs["compensation"]["enum"]), generate.COMPENSATIONS)
+        self.assertEqual(
+            tuple(defs["authorizationPolicy"]["enum"]), generate.AUTHORIZATION_POLICIES
+        )
+        self.assertEqual(tuple(self.schema["properties"]["provider"]["enum"]), generate.PROVIDERS)
+        self.assertEqual(
+            tuple(self.schema["properties"]["concurrencyKey"]["enum"]),
+            generate.CONCURRENCY_KEYS,
+        )
+
+    def test_forbidden_field_names_match_schema_pattern(self):
+        pattern = self.schema["$defs"]["fieldTable"]["properties"]["fields"][
+            "propertyNames"
+        ]["pattern"]
+        match = re.match(r"^\^\(\?!(.+)\)\[a-z\]\[a-zA-Z0-9\]\*\$$", pattern)
+        self.assertIsNotNone(match, f"unexpected propertyNames pattern shape: {pattern}")
+        names = {token.rstrip("$").lstrip("^") for token in match.group(1).split("|")}
+        self.assertEqual(names, set(generate.FORBIDDEN_FIELD_NAMES))
+
+    def test_schema_pins_unknown_outcome_and_mutation_attempts(self):
+        self.assertEqual(
+            self.schema["properties"]["unknownOutcome"]["const"], "reconcileRequired"
+        )
+        self.assertEqual(
+            self.schema["properties"]["retry"]["properties"]["mutationAttempts"]["const"], 1
+        )
+        self.assertEqual(
+            self.schema["properties"]["authorization"]["properties"]["destructive"]["const"],
+            "runtimeCapability",
+        )
+
+    def test_schema_has_no_executable_surface(self):
+        text = json.dumps(self.schema)
+        for needle in ("\"argv\":", "\"shell\":", "\"command\":", "\"executable\":"):
+            self.assertNotIn(needle, text.replace("argv$", "").replace("shell$", ""))
+
+    def test_action_reference_schema_matches_registered_pairs(self):
+        action_ref = self.schema["$defs"]["actionRef"]
+        schema_pairs = {
+            arm["properties"]["catalogId"]["const"]: set(
+                arm["properties"]["actionId"]["enum"])
+            for arm in action_ref["oneOf"]
+        }
+        self.assertEqual(
+            schema_pairs,
+            {
+                **{
+                    key: set(value)
+                    for key, value in generate.load_stdout_action_registry().items()
+                },
+                "arkdeck-remote-operations": set(
+                    action_id
+                    for action_id, step_kind
+                    in generate.load_remote_action_registry().items()
+                    if step_kind == "runApprovedRemoteRead"),
+            },
+        )
+
+
+class GeneratedSwiftShapeTests(unittest.TestCase):
+    def test_generated_swift_mentions_every_operation_once(self):
+        operations, _ = _real_operations()
+        swift = generate.generate_swift(operations, generate.catalog_digest(operations))
+        for doc in operations:
+            self.assertEqual(swift.count(f'id: "{doc["id"]}",'), 1)
+        self.assertIn("GENERATED FILE - DO NOT EDIT", swift)
+        # No executable surface reaches the generated vocabulary. Asserted on
+        # the positions that would carry one — a field name or an enum value —
+        # rather than on the file text. The text form held only while the
+        # generated file was names, types and enums; field descriptions now
+        # flow through it, and two of them say "never lowered as caller-supplied
+        # argv" and "no shell fragments", which is the invariant being stated
+        # rather than broken. `validate_field` already refuses these as field
+        # names (FORBIDDEN_FIELD_NAMES), so this is the belt to that brace.
+        for token in sorted(generate.FORBIDDEN_FIELD_NAMES):
+            self.assertNotIn(f'name: "{token}"', swift)
+            self.assertNotIn(f'"{token}"]', swift)
+
+    def test_generated_swift_carries_digest(self):
+        operations, _ = _real_operations()
+        digest = generate.catalog_digest(operations)
+        swift = generate.generate_swift(operations, digest)
+        self.assertIn(f'catalogDigest = "{digest}"', swift)
+        self.assertRegex(digest, r"^[0-9a-f]{64}$")
+
+    def test_generated_swift_carries_exact_stdout_action_references(self):
+        operations, _ = _real_operations()
+        swift = generate.generate_swift(operations, generate.catalog_digest(operations))
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")'
+            ),
+            6,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "windowInventory")'
+            ),
+            1,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "componentTree")'
+            ),
+            0,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "componentDetail")'
+            ),
+            1,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
+            ),
+            12,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
+            ),
+            12,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-remote-operations", actionID: "packageInfo")'
+            ),
+            1,
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -116,7 +116,7 @@ python3 rust/scripts/run-cargo.py test -p arkdeck-cli
 python3 rust/scripts/check-arkforge-pin.py
 ```
 
-`check-arkforge-pin.py` 只接受完整提交修订，且每个 `arkforge-*` crate 必须相同。加上 `--run-vectors` 会在该修订上重跑 ArkForge 的线协议与 StepPermit 向量。拉取私有 ArkForge crate 需要读权限；CI 在 `scripts/ci/arkforge-cargo-fetch.sh` 里使用只读 deploy key。
+`check-arkforge-pin.py` 只接受完整提交修订，且每个 `arkforge-*` crate 必须相同。加上 `--run-vectors` 会在该修订上重跑 ArkForge 的线协议与 StepPermit 向量。拉取私有 ArkForge crate 需要读权限；CI 在 `hack/ci/arkforge-cargo-fetch.sh` 里使用只读 deploy key。
 
 构建并测试 Swift 应用侧 package（不是运行时）：
 
@@ -128,7 +128,7 @@ sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 仓库贡献者可以运行与 GitHub CI 共用的路径感知验证入口。它始终检查 SDD 与 Catalog 一致性，再只选择受当前分支和工作区改动影响的编译车道；比较事实缺失时会运行全部车道，而不是静默跳过验证：
 
 ```bash
-python3 scripts/ci/plan.py \
+python3 hack/ci/plan.py \
   --repo-root . \
   --base-revision origin/main \
   --head-revision HEAD \
@@ -178,11 +178,11 @@ Keychain entitlement 的这份 helper。请按[无头运行时指南](./Packages
 - [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 应用侧 Swift package（ClientKit、Core、Trace adapter）。运行时与 CLI 在 `rust/`
 - [`rust/`](./rust/) — 共享 Rust workspace，13 个 crate：`arkdeck-agentd`、`arkdeck-bootstrap`、`arkdeck-cli`、`arkdeck-client`、`arkdeck-contract`、`arkdeck-control`、`arkdeck-hoststore`、`arkdeck-platform`、`arkdeck-provider-arkforge`、`arkdeck-provider-hdc`、`arkdeck-provider-workspace`、`arkdeck-rockchip-binding`、`arkdeck-soak`。导航见 [rust/README.md](./rust/README.md)，原开发日志在 [docs/rust/development-log.md](./docs/rust/development-log.md)
 - [`windows/`](./windows/) — Windows 11 x64 的 WinUI 3 客户端、ArkDeck.ClientKit 及其测试（开发中）。旧的 SPK-4 spike 在 [`tools/experiments/windows-spikes/`](./tools/experiments/windows-spikes/)
-- [`Catalog/`](./Catalog/) — 已发布的操作、Profile 与 Schema
-- [`spec/`](./spec/) — Rust 与 Windows 实现读取的语言中立控制面与恢复契约
+- [`catalog/`](./catalog/) — 已发布的操作、Profile 与 Schema
+- [`api/`](./api/) — Rust 与 Windows 实现读取的语言中立控制面与恢复契约
 - [`openspec/`](./openspec/) — 产品契约、安全不变量与变更历史
 - [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
-- [`scripts/`](./scripts/) — 仓库检查、CI 与工具脚本
+- [`hack/`](./hack/) — 仓库检查、CI 与工具脚本
 - [`tools/experiments/`](./tools/experiments/) — CI 仍会运行的 `host_loop` 与 `gj_record`，以及归档的 Windows spike
 - [`tests/`](./tests/) — 宿主侧产品 demo，包括 WaterFlowTraceDemo
 - [`docs/archive/`](./docs/archive/) — 历史产品闭环、计划、评审与运行记录

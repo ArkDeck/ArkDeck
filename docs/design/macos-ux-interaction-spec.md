@@ -258,7 +258,7 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - **Network** 使用 `port-forward.create@1` / `port-forward.remove@1`，支持 forward/reverse，端口只接受 1024…65535 的十进制字段。真实 Runtime Job 与 exact inverse/readback 补偿可见，不接受 shell fragment。
 - **Commands** 只允许 `debug.template@1` 已发布的 closed read-only template；App 提交 typed request，Runtime 创建并运行可取消的 Job，页面显示精确 Job、terminal、timeline 与可导出的 bounded Artifact。lowered argv 只在派生 report Artifact 中披露，绝不成为 UI 输入。Root、任意终端等不提供执行入口。
 
-**尚未实现的设计输入**：App 管理的 SMB 挂载与凭据、WSL 本机进程 connector、保存目录书签与跨来源全文搜索、`.abc` deployment、独立 device restart、设备日志 buffer 清除。保留相应需求与安全边界；只有对应 behavior/Catalog/Provider/recovery/readback 发布后才进入当前可操作稿。当前原型不画这些功能的虚假成功态，也不以删规格来消除实现缺口。
+**尚未实现的设计输入**：App 管理的 SMB 挂载与凭据、WSL 本机进程 connector、保存目录书签与跨来源全文搜索、`.abc` deployment、独立 device restart、设备日志 buffer 清除。保留相应需求与安全边界；只有对应 behavior/catalog/Provider/recovery/readback 发布后才进入当前可操作稿。当前原型不画这些功能的虚假成功态，也不以删规格来消除实现缺口。
 
 ### 5.8 Flash
 

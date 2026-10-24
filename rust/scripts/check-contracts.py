@@ -107,9 +107,9 @@ def write_json(path: Path, value: dict) -> None:
 
 def catalog_rust(inputs, info: dict, generator=None) -> str:
     if generator is None:
-        generator = load_module("arkdeck_catalog_generator", ROOT / "scripts/catalog_gen/generate.py")
+        generator = load_module("arkdeck_catalog_generator", ROOT / "hack/catalog_gen/generate.py")
     operations = [json.loads(data) for path, data in inputs.files.items()
-                  if path.startswith("Catalog/operations/") and path.endswith(".json")]
+                  if path.startswith("catalog/operations/") and path.endswith(".json")]
     return contract.formatted(generator.generate_rust(operations, info["catalogDigest"]))
 
 
@@ -127,7 +127,7 @@ def pinned_catalog_inputs(current, digest):
         raise ValueError("unknown pinned Catalog view")
     selected = old if digest == catalog_test_views.OLD else new
     operation_paths = {path: json.loads(data) for path, data in current.files.items()
-                       if path.startswith("Catalog/operations/") and path.endswith(".json")}
+                       if path.startswith("catalog/operations/") and path.endswith(".json")}
     actual = {f"{row['id']}@{row.get('version', 0)}": row for row in operation_paths.values()}
     if len(operation_paths) != len(actual):
         raise ValueError("duplicate Catalog for historical test view")
@@ -144,16 +144,16 @@ def pinned_catalog_inputs(current, digest):
         # ContractInputs records real Git blob identities, even for this
         # synthetic isolated input tree; no old authority/source ID is reused.
         blobs[path] = hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
-    generator = load_module("arkdeck_historical_test_catalog", ROOT / "scripts/catalog_gen/generate.py")
+    generator = load_module("arkdeck_historical_test_catalog", ROOT / "hack/catalog_gen/generate.py")
     profiles = [json.loads(data) for path, data in current.files.items()
-                if path.startswith("Catalog/profiles/") and path.endswith(".json")]
-    matrix_path = "Catalog/generated/effect-authorization-matrix.md"
+                if path.startswith("catalog/profiles/") and path.endswith(".json")]
+    matrix_path = "catalog/generated/effect-authorization-matrix.md"
     expected_matrix = generator.generate_matrix(list(actual.values()), profiles, actual_digest)
     if current.files[matrix_path].decode().replace("\r\n", "\n") != expected_matrix:
         raise ValueError("historical input requires the full official Catalog matrix")
     if actual_digest in catalog_test_views.RECOMMISSION_CATALOGS:
         for path in list(files):
-            if path.startswith('Catalog/profiles/') and path.endswith('.json'):
+            if path.startswith('catalog/profiles/') and path.endswith('.json'):
                 profile = json.loads(files[path])
                 if 'flash.recommission@1' in profile.get('supportedOperations', []):
                     profile['supportedOperations'].remove('flash.recommission@1')
@@ -161,7 +161,7 @@ def pinned_catalog_inputs(current, digest):
                     files[path] = data
                     blobs[path] = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
         profiles = [json.loads(data) for path, data in files.items()
-                    if path.startswith('Catalog/profiles/') and path.endswith('.json')]
+                    if path.startswith('catalog/profiles/') and path.endswith('.json')]
     matrix = generator.generate_matrix(list(selected.values()), profiles, digest).encode()
     files[matrix_path] = matrix
     blobs[matrix_path] = hashlib.sha1(f"blob {len(matrix)}\0".encode() + matrix).hexdigest()
@@ -193,7 +193,7 @@ def historical_workspace_covers(published, historical) -> bool:
         return False
     for path, data in published.files.items():
         expected = historical.files[path]
-        if path.startswith('Catalog/operations/') and path.endswith('.json'):
+        if path.startswith('catalog/operations/') and path.endswith('.json'):
             if json.loads(data) != json.loads(expected):
                 return False
         elif data != expected:
@@ -225,9 +225,9 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
     copy_rust(rust_source or ROOT / "rust", destination / "rust")
     # Test-view proof uses the same current source generator, including when
     # only the immutable historical Catalog input is selected.
-    source_generator = ROOT / "scripts/catalog_gen/generate.py"
+    source_generator = ROOT / "hack/catalog_gen/generate.py"
     if catalog_generator_source is not None or source_generator.is_file():
-        copied_generator = destination / "scripts/catalog_gen/generate.py"
+        copied_generator = destination / "hack/catalog_gen/generate.py"
         copied_generator.parent.mkdir(parents=True, exist_ok=True)
         copied_generator.write_bytes(catalog_generator_source if catalog_generator_source is not None
                                      else source_generator.read_bytes())
@@ -282,10 +282,10 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
     # The reconstructed historical JSON bytes may differ from the merge-base's
     # spelling even when every descriptor value is identical. Candidate views
     # retain the separate published baseline for their correlation checks.
-    write_json(destination / "spec/baselines/swift-single-v1.json",
+    write_json(destination / "api/baselines/swift-single-v1.json",
                info if info["kind"] == "development" else published_info)
     if info["kind"] == "candidate":
-        write_json(destination / "spec/baselines/swift-candidate-inputs.json", info)
+        write_json(destination / "api/baselines/swift-candidate-inputs.json", info)
     generated = destination / "rust/crates/arkdeck-contract/src"
     (generated / "control_generated.rs").write_text(
         contract.formatted(contract.generate(info, inputs)), encoding="utf-8", newline="\n")
@@ -499,7 +499,7 @@ def verify_contract_bundle_digests() -> None:
     if not table.exists():
         return
     roots = {
-        "contracts": ROOT / "openspec/contracts",
+        "contracts": ROOT / "api/contracts",
         "fixtures": ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI",
     }
     for path, digest in sorted(json.loads(table.read_text()).items()):
@@ -552,7 +552,7 @@ def check(output_root: Path) -> Path:
     # Unsupported candidate vocabulary or stale current Catalog output remains a
     # failure. Regeneration in isolation must not hide a stale committed Catalog.
     contract.generate(current_info, current)
-    catalog_path = ROOT / "scripts/catalog_gen/generate.py"
+    catalog_path = ROOT / "hack/catalog_gen/generate.py"
     catalog_bytes = catalog_path.read_bytes()
     catalog_generator = load_module("arkdeck_catalog_snapshot", catalog_path, catalog_bytes)
     catalogs = {"published": catalog_rust(published, published_info, catalog_generator),

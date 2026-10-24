@@ -11,7 +11,7 @@ REPO = Path(__file__).resolve().parents[3]
 
 class CanonicalCatalogTests(Case):
     def alias_catalog(self):
-        alias = json.loads((REPO / "Catalog/operations/flash.dayu200.json").read_text(encoding="utf-8"))
+        alias = json.loads((REPO / "catalog/operations/flash.dayu200.json").read_text(encoding="utf-8"))
         descriptors = [{"id": operation, "version": 1} for operation in OPERATIONS] + [alias]
         body = json.dumps(descriptors, separators=(",", ":"))
         digest = sha(body.encode())

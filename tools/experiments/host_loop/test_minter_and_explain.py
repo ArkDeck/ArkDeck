@@ -598,7 +598,7 @@ class SelectAndExplainShareOneImplementation(unittest.TestCase):
 
         base = dict(task_id="TASK-DEMO-001", status="ready", decision_grade="D0",
                     hardware_required=False, dependencies=(),
-                    allowed_paths=("scripts/**",), base_pin=None)
+                    allowed_paths=("hack/**",), base_pin=None)
         base.update(over)
         return TaskCandidate(**base)
 

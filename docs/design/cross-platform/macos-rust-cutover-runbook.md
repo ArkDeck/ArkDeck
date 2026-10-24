@@ -7,7 +7,7 @@
 
 维护者在一个切换窗口里照本文逐步执行：把安装态的 Swift Runtime（Swift daemon + Rust façade 对）换成
 standalone Rust daemon，然后做正式验收。本文不另立验收规则，真机验收照
-[验收指南](../../../scripts/agent-guides/acceptance.md) 与
+[验收指南](../../../hack/agent-guides/acceptance.md) 与
 [headless GJ runbook](../cli-golden-journey-headless-runbook.md) 执行；安全边界照 `AGENTS.md`
 「Agent 禁令与设备执行边界」与 Constitution（`POL-AGENT-002`、`POL-RECOVERY-001`）。
 两者与本文冲突时以它们为准，并把冲突写进窗口记录。
@@ -32,7 +32,7 @@ standalone Rust daemon，然后做正式验收。本文不另立验收规则，�
 - 第 1 条（P2）：同一 target 上两个及以上停在 Loader 过渡的 parked Flash Job 会让 Rust daemon 起不来；由切换预检提前拒绝（软件侧已由 #2302 补齐：`loaderTransitionsCoverTarget`），不在窗口里现场处理。
 - 第 10 条：第 7 步回滚演练**不执行**。依据 `verification.md:73` 的 XPA-AC-9「no same-release Swift rollback」与 `:43-46` 的 r11 解释；临时 home 下的显式回滚已由 #2268 覆盖。`$ROLLBACK` 只在切换失败时按 §4 使用。
 - 第 13 条：façade/Swift helper 保留到 G5 报告为止。
-- 第 14、15 条：SPK-8 正向用 `FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip`（开关见 `scripts/ci/installed-rust-ui.md:17-32`）；两个负向用例已由 TASK-XPA-019 补齐为 `scripts/ci/installed_spk8_negatives.py foreign-client|version-mismatch`（开关与判据见 `scripts/ci/installed-rust-ui.md`「SPK-8 negative cases」，命令见第 4 步）；`AgentXPCTransportContractTests` 是进程内测试，不能对安装态 daemon 黑盒运行，随 Swift target 删除，黑盒职责由 Rust 控制面黑盒测试与这两个负例承担。
+- 第 14、15 条：SPK-8 正向用 `FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip`（开关见 `hack/ci/installed-rust-ui.md:17-32`）；两个负向用例已由 TASK-XPA-019 补齐为 `hack/ci/installed_spk8_negatives.py foreign-client|version-mismatch`（开关与判据见 `hack/ci/installed-rust-ui.md`「SPK-8 negative cases」，命令见第 4 步）；`AgentXPCTransportContractTests` 是进程内测试，不能对安装态 daemon 黑盒运行，随 Swift target 删除，黑盒职责由 Rust 控制面黑盒测试与这两个负例承担。
 - 第 19 条：接受手工预检在 Job 索引旁创建或触碰 `-wal`/`-shm`（数据库字节不变），不另做零写入打开。
 - 删除 Swift target、Swift CLI 与 façade（原第 20d 刀）改在开窗**之前**完成；窗口里的 `$OLD_ARKDECK` 是当前安装态的 Swift CLI 二进制，不依赖源码。
 - 历史记录提示（须由当前只读预检确认，不能据旧标签判断现状）：保留的 Session `2026/08/rockchip-session-42f8e86d-8cbf-4aa0-a411-5e1624e9f291` 无 Manifest、含未决的历史 Loader 过渡（`evidence/runs/TASK-XPA-017/historical-hap-step-digest-run.md:130-136`），预检会以 `retainedSessions` 拒绝；它涉及未知副作用，只能按 `POL-RECOVERY-001` 推进或由维护者裁决，窗口前先读一次 1a 预检确认。
@@ -56,7 +56,7 @@ Agent 与协调会话在窗口内**不执行**任何 `runtime service update|ins
 下文命令用这些变量，窗口开始时由【维护者】在自己的 shell 里设好：
 
 ```sh
-RUST_OUT=<从 RC DMG 装好的 ArkDeckCLI.app 所在目录（绝对路径）>  # 例如 /Applications；RC 由 scripts/release/build_macos_release.py 产出
+RUST_OUT=<从 RC DMG 装好的 ArkDeckCLI.app 所在目录（绝对路径）>  # 例如 /Applications；RC 由 hack/release/build_macos_release.py 产出
 ARKDECK="$RUST_OUT/ArkDeckCLI.app/Contents/MacOS/arkdeck"            # Rust CLI
 HELPER="$RUST_OUT/ArkDeckCLI.app/Contents/Helpers/ArkDeckAgent.app"  # Rust daemon bundle
 ROLLBACK=<首次切换前维护者 ditto 留存的安装态 helper>                 # Swift daemon + façade；见文首裁决节 P8
@@ -335,7 +335,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 ### 第 4 步：签名 App ↔ Rust Mach service 的正向与负向验收（SPK-8，约 20 分钟）
 
 - 执行者：【维护者】（App 与 UI 跑道是全机唯一的，窗口内不与其他 UI 跑道并行）。三条用例都只读或只写并恢复
-  测试自己的 History filter，不改安装态、不派发设备操作；开关与判据的全文在 `scripts/ci/installed-rust-ui.md`。
+  测试自己的 History filter，不改安装态、不派发设备操作；开关与判据的全文在 `hack/ci/installed-rust-ui.md`。
 - 变量：`$APP` 为从 RC 安装的签名 `ArkDeck.app`，`$CLI` 为 RC 的 `ArkDeckCLI.app/Contents/MacOS/arkdeck`，
   三个 SHA-256 分别对 `$APP/Contents/MacOS/ArkDeck`、`$CLI` 与 `$HELPER/Contents/MacOS/arkdeck-agentd` 用
   `shasum -a 256` 取得；证据目录都用 `$OUT` 下尚不存在的新目录。
@@ -347,7 +347,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
   TEST_RUNNER_ARKDECK_INSTALLED_RUST_CLI="$CLI" TEST_RUNNER_ARKDECK_INSTALLED_RUST_CLI_SHA256=… \
   TEST_RUNNER_ARKDECK_INSTALLED_RUST_DAEMON_SHA256=… \
   TEST_RUNNER_ARKDECK_INSTALLED_RUST_EVIDENCE="$OUT/04-spk8-positive" \
-    sh scripts/ci/run-ui-tests.sh \
+    sh hack/ci/run-ui-tests.sh \
     -only-testing:ArkDeckHDCUITests/FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip
   ```
 
@@ -359,7 +359,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
   ARKDECK_INSTALLED_RUST_APP="$APP" ARKDECK_INSTALLED_RUST_APP_SHA256=… \
   ARKDECK_INSTALLED_RUST_CLI="$CLI" ARKDECK_INSTALLED_RUST_CLI_SHA256=… \
   ARKDECK_INSTALLED_RUST_DAEMON_SHA256=… \
-    python3 scripts/ci/installed_spk8_negatives.py foreign-client "$OUT/04-spk8-foreign-client"
+    python3 hack/ci/installed_spk8_negatives.py foreign-client "$OUT/04-spk8-foreign-client"
   ```
 
   预期：exit 0，`status: PASS`。ad-hoc 签名、无 team 的探针只发一帧只读 `health`；daemon 必须在不回任何帧的
@@ -369,7 +369,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 
   ```sh
   ARKDECK_SPK8_VERSION_MISMATCH=1 ARKDECK_SPK8_APP="$APP" ARKDECK_SPK8_APP_SHA256=… \
-    python3 scripts/ci/installed_spk8_negatives.py version-mismatch "$OUT/02-spk8-version-mismatch"
+    python3 hack/ci/installed_spk8_negatives.py version-mismatch "$OUT/02-spk8-version-mismatch"
   ```
 
   预期：exit 0，`status: PASS`。App 的 `--runtime-readonly-smoke` 入口两次刷新都在 20 秒内答
@@ -388,7 +388,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 - 执行者：【维护者】安排最终验收窗口；操作通过已发布 typed Runtime 入口执行，【协调会话】核对判据与整理记录。GJ-4 不额外引入聊天确认或人工 grant，准入依现行 Runtime authority。
 - 做法：照 [headless GJ runbook](../cli-golden-journey-headless-runbook.md) §1–§6 原样执行，`arkdeck` 一律是
   `$ARKDECK`（Rust CLI），不用 Swift CLI；每条 Journey 用 `agent run --operation <id@version>`，人工动作后
-  `agent resume`（[验收指南](../../../scripts/agent-guides/acceptance.md)）。headless 路径缺失或失败即
+  `agent resume`（[验收指南](../../../hack/agent-guides/acceptance.md)）。headless 路径缺失或失败即
   `BLOCKED_BY_PRODUCT_DEFECT`，不让维护者代跑，不拿 UI 点击替代。
 - 当前 Catalog digest：从 `"$ARKDECK" operation list --output json` 的 `result.catalogDigest` 读（runbook §0 固定事实表），
   必须等于窗口所用 `main` 提交生成的 Catalog；`REAL_DEVICE_PASS` 只在该 digest 上成立（`AGENTS.md`「Agent 禁令与设备执行边界」末条）。
@@ -408,7 +408,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 ### 第 6 步：App 呈现检查（runbook §6b，约 10 分钟）
 
 - 执行者：【维护者】。
-- 做法：照 runbook §6b，经 `scripts/ci/run-ui-tests.sh` 跑真实 Runtime 的纯呈现 opt-in（开关必须带 `TEST_RUNNER_`
+- 做法：照 runbook §6b，经 `hack/ci/run-ui-tests.sh` 跑真实 Runtime 的纯呈现 opt-in（开关必须带 `TEST_RUNNER_`
   前缀，否则跳过；XCUITest target 名是 `ArkDeckHDCUITests`），对象是第 5 步留下的真实 Job（例如 History viewer 用
   GJ-1 的 Job ID）。缺前提得到的 `XCTSkip` 记「未执行」。
 - 记录：逐测试 `pass` / `fail` / `未执行`，附完整命令与 `xcresult` 路径；不套用 Journey 四态。

@@ -106,15 +106,15 @@ AND SHALL NOT 派发任何 deviceMutation 或 destructive step。
 
 ## Agent 执行入口
 
-1. 读取仓库根 `AGENTS.md`,运行 `scripts/check-sdd.sh`;
+1. 读取仓库根 `AGENTS.md`,运行 `hack/check-sdd.sh`;
 
 > **SDD checker 运行时(TASK-SDR-001)**:`check-sdd.sh` 按
 > `ARKDECK_PYTHON` → 当前 checkout `.venv-sdd` → 同一 Git repository
 > 主 checkout 的共享 `.venv-sdd`(git common-dir 推导)→ PATH `python3`
 > 选择解释器;选中候选 preflight(PyYAML exact pin)失败即 fail closed,
 > 不静默降级。checker 本身零安装、零联网、零仓库写入。**每台机器首次
-> 使用前人工运行一次 `scripts/bootstrap-sdd.sh`**(在主 checkout 创建
-> ignored `.venv-sdd` 并安装 `scripts/requirements-sdd.txt`;checker
+> 使用前人工运行一次 `hack/bootstrap-sdd.sh`**(在主 checkout 创建
+> ignored `.venv-sdd` 并安装 `hack/requirements-sdd.txt`;checker
 > 只提示、永不调用它)。
 2. 读取仓库根 `PRODUCT-LOOP.md`,确认当前阻塞最高优先级 Golden Journey 的产品缺陷;
 3. 按 `PRODUCT-LOOP.md` §4 组装一个垂直产品任务(根因 + 产品代码修复 + 必要测试 +

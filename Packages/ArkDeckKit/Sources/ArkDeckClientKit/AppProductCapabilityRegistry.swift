@@ -74,7 +74,7 @@ public enum AppViewerTabCapability: String, CaseIterable, Sendable {
   case advancedDump = "app.viewer.advanced"
 }
 
-/// `openspec/contracts/app-product-capability-registry.yaml` is generated from
+/// `api/contracts/app-product-capability-registry.yaml` is generated from
 /// this table by `arkdeck maintainer contracts export`; the contract tests hold
 /// the two identical.
 public enum AppProductCapabilityRegistry {

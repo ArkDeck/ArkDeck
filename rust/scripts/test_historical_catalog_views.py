@@ -17,7 +17,7 @@ runner = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = runner
 SPEC.loader.exec_module(runner)
 views = runner.catalog_test_views
-MATRIX = 'Catalog/generated/effect-authorization-matrix.md'
+MATRIX = 'catalog/generated/effect-authorization-matrix.md'
 
 
 def blob(data):
@@ -32,7 +32,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         cls.old, cls.new = views.catalogs(cls.real_root / 'rust')
         cls.packet_path = 'rust/tests/fixtures/catalog-lineage-c6-e4/catalogs.json'
         cls.packet = (cls.real_root / cls.packet_path).read_bytes()
-        cls.generator = (cls.real_root / 'scripts/catalog_gen/generate.py').read_bytes()
+        cls.generator = (cls.real_root / 'hack/catalog_gen/generate.py').read_bytes()
         cls.projection = (cls.real_root / runner.REVIEW_PROJECTION).read_bytes()
         cls.projection_digest = next(digest for digest in views.CATALOGS
                                      if cls.projection.count(digest.encode()) == 1)
@@ -41,7 +41,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.base = Path(tempfile.mkdtemp(prefix='arkdeck-historical-view-')).resolve()
         self.assertEqual(self.base.parent, Path(tempfile.gettempdir()).resolve())
         for name, data in [(self.packet_path, self.packet),
-                           ('scripts/catalog_gen/generate.py', self.generator)]:
+                           ('hack/catalog_gen/generate.py', self.generator)]:
             path = self.base / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
@@ -61,7 +61,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
 
     def operation_paths(self, inputs):
         return {path: json.loads(data) for path, data in inputs.files.items()
-                if path.startswith('Catalog/operations/') and path.endswith('.json')}
+                if path.startswith('catalog/operations/') and path.endswith('.json')}
 
     def test_postmerge_current_inputs_become_the_exact_complete_historical_catalog(self):
         before = copy.deepcopy(self.inputs)
@@ -74,7 +74,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         additions = {path for path, row in self.operation_paths(before).items()
                      if f"{row['id']}@{row.get('version', 0)}" in views.ADDITIONAL_REFERENCES}
         self.assertEqual(set(historical.files), set(before.files) - additions)
-        allowed = set(operations) | {MATRIX, "Catalog/profiles/dayu200.json"}
+        allowed = set(operations) | {MATRIX, "catalog/profiles/dayu200.json"}
         for path, data in before.files.items():
             if path not in allowed | additions:
                 self.assertEqual(historical.files[path], data, path)
@@ -113,9 +113,9 @@ class HistoricalCatalogInputs(unittest.TestCase):
     def test_historical_matrix_is_the_full_official_generation(self):
         historical = runner.historical_catalog_inputs(self.inputs)
         profiles = [json.loads(data) for path, data in historical.files.items()
-                    if path.startswith('Catalog/profiles/') and path.endswith('.json')]
+                    if path.startswith('catalog/profiles/') and path.endswith('.json')]
         generator = runner.load_module('historical_catalog_expected_generator',
-                                      self.base / 'scripts/catalog_gen/generate.py')
+                                      self.base / 'hack/catalog_gen/generate.py')
         expected = generator.generate_matrix(list(self.old.values()), profiles, views.OLD).encode()
         self.assertEqual(historical.files[MATRIX], expected)
 
@@ -150,14 +150,14 @@ class HistoricalCatalogInputs(unittest.TestCase):
                                catalog_source='// isolated generated Catalog\n',
                                review_source=self.projection,
                                catalog_generator_source=self.generator)
-        actual = json.loads((destination / 'spec/baselines/swift-single-v1.json').read_bytes())
+        actual = json.loads((destination / 'api/baselines/swift-single-v1.json').read_bytes())
         self.assertEqual(actual, selected)
         self.assertEqual(actual['catalogDigest'], views.OLD)
         for path, pin in actual['files'].items():
             data = (destination / path).read_bytes()
             self.assertEqual(hashlib.sha256(data).hexdigest(), pin['sha256'], path)
             self.assertEqual(blob(data), pin['blob'], path)
-        self.assertFalse((destination / 'spec/baselines/swift-candidate-inputs.json').exists())
+        self.assertFalse((destination / 'api/baselines/swift-candidate-inputs.json').exists())
 
     def test_a_historical_input_stays_exact_when_the_base_is_already_historical(self):
         historical = runner.historical_catalog_inputs(self.inputs)
@@ -169,7 +169,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         published = copy.deepcopy(historical)
         self.assertTrue(runner.historical_workspace_covers(published, historical))
         path = next(path for path in historical.files
-                    if not path.startswith('Catalog/') and b'\n' in historical.files[path])
+                    if not path.startswith('catalog/') and b'\n' in historical.files[path])
         representation = (historical.files[path].replace(b'\r\n', b'\n')
                           if b'\r\n' in historical.files[path]
                           else historical.files[path].replace(b'\n', b'\r\n'))
@@ -205,7 +205,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         del missing.files[first]
         mutations.append(missing)
         extra = copy.deepcopy(self.inputs)
-        extra.files['Catalog/operations/unclassified.json'] = self.inputs.files[first]
+        extra.files['catalog/operations/unclassified.json'] = self.inputs.files[first]
         mutations.append(extra)
         duplicate = copy.deepcopy(self.inputs)
         duplicate.files[first] = self.inputs.files[second]

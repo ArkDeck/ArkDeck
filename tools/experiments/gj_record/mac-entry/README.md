@@ -53,9 +53,9 @@ Root 准备真实发布 CLI/daemon 和该 config 后，远程会话中一次执�
 python3 -B entry.py preflight --config /private/tmp/mac-pair-config.json --execute
 ```
 
-它串行采集 fixed facts、complete Job+Agent ledgers、physical candidates/target/availability，并复用主仓 fixed-facts/Catalog/Raw-integrity 判据，匹配实际 image hashes、同 target/revision/ready binding。只读确认需要 native、HDC、物理连接与普通 target adoption 的实际条件，输出本机 preflight 分类和四个 operation 的真实 availability。未接管时 Root 消费刚取得的 actual candidate/observation/generation 经 typed target adopt，再刷新 preflight；不会要求用户代跑。某个非 GJ1 operation unavailable 会报告 false，保留其实际 reason 供 Root 修复，不为它声称 GJ2/GJ3 ready。这个命令不运行 device operation，也不发 PASS；通过后 Root 继续下面的完整串行路线。
+它串行采集 fixed facts、complete Job+Agent ledgers、physical candidates/target/availability，并复用主仓 fixed-facts/catalog/Raw-integrity 判据，匹配实际 image hashes、同 target/revision/ready binding。只读确认需要 native、HDC、物理连接与普通 target adoption 的实际条件，输出本机 preflight 分类和四个 operation 的真实 availability。未接管时 Root 消费刚取得的 actual candidate/observation/generation 经 typed target adopt，再刷新 preflight；不会要求用户代跑。某个非 GJ1 operation unavailable 会报告 false，保留其实际 reason 供 Root 修复，不为它声称 GJ2/GJ3 ready。这个命令不运行 device operation，也不发 PASS；通过后 Root 继续下面的完整串行路线。
 
-完整 preflight 的两端均取得新的 `runtime service status`，要求 installed/loaded/socketPresent/ready 全为 true、diagnostics 为空、daemonPath/whole SHA 等于配置且 daemonHealth 为当前 Catalog 的 ok。原有 `scripts/ci/installed_rust_ui.py` 的只读 native verifier 提供 launchd PID、active Mach endpoint、`proc_pidpath` 和 PID 动态 codesign/CDHash 校验；`proc_pidinfo(PROC_PIDTBSDINFO)` 提供同账户的精确 PID/start 秒与微秒。对该公开 status 指定的私有 Unix socket 只建立连接读取 `LOCAL_PEERPID`，不发送任何 IPC frame；peer 必须就是该 PID。socket inode、process birth、映像路径在每次 native read 前后不变，两个端点的完整 native tuple 也必须相同。仅允许固定 `launchctl print`、`lipo -archs`、codesign 只读参数；不读取 Runtime 私有 JSON、凭据或 Journal，不调用无 `--job` 的 verify，不创建 observe Job。kernel/动态签名字段不可读或缺失时停止；本机 Windows 的纯测试不构成实际 Mac native proof。
+完整 preflight 的两端均取得新的 `runtime service status`，要求 installed/loaded/socketPresent/ready 全为 true、diagnostics 为空、daemonPath/whole SHA 等于配置且 daemonHealth 为当前 Catalog 的 ok。原有 `hack/ci/installed_rust_ui.py` 的只读 native verifier 提供 launchd PID、active Mach endpoint、`proc_pidpath` 和 PID 动态 codesign/CDHash 校验；`proc_pidinfo(PROC_PIDTBSDINFO)` 提供同账户的精确 PID/start 秒与微秒。对该公开 status 指定的私有 Unix socket 只建立连接读取 `LOCAL_PEERPID`，不发送任何 IPC frame；peer 必须就是该 PID。socket inode、process birth、映像路径在每次 native read 前后不变，两个端点的完整 native tuple 也必须相同。仅允许固定 `launchctl print`、`lipo -archs`、codesign 只读参数；不读取 Runtime 私有 JSON、凭据或 Journal，不调用无 `--job` 的 verify，不创建 observe Job。kernel/动态签名字段不可读或缺失时停止；本机 Windows 的纯测试不构成实际 Mac native proof。
 
 ## 可直接执行的首段
 
@@ -109,9 +109,9 @@ Root 检查实际四态/完整判据，不以 assembler process exit 或 prepara
 
 ## 2026-10-07: build 5 and shared Session applicability
 
-The preceding 2026-10-06 preparation and CI records remain historical. The signed/notarized build 4 from [release run 37461315601](https://github.com/ArkDeck/ArkDeck/actions/runs/37461315601), source `361d306fd667bb59ad5e1ba8346eef64960b75ee`, remains immutable. Its Catalog/contracts still match this pair, but its shared Rust Session publisher contains the admission-chronology defect corrected by [PR #2623](https://github.com/ArkDeck/ArkDeck/pull/2623). Fresh evidence can precede capability consumption by one second; the old publisher refuses the valid known-terminal HAP source before finalization, and the complete import-reference census correctly refuses that unfinished publication. The correction applies to macOS as well as Windows.
+The preceding 2026-10-06 preparation and CI records remain historical. The signed/notarized build 4 from [release run 37461315601](https://github.com/ArkDeck/ArkDeck/actions/runs/37461315601), source `361d306fd667bb59ad5e1ba8346eef64960b75ee`, remains immutable. Its catalog/contracts still match this pair, but its shared Rust Session publisher contains the admission-chronology defect corrected by [PR #2623](https://github.com/ArkDeck/ArkDeck/pull/2623). Fresh evidence can precede capability consumption by one second; the old publisher refuses the valid known-terminal HAP source before finalization, and the complete import-reference census correctly refuses that unfinished publication. The correction applies to macOS as well as Windows.
 
-Formal Mac acceptance now needs a released source containing that reviewed correction. Build 5 keeps marketing version `0.1.0` and synchronizes the App/CLI/daemon build metadata through the official `scripts/release/release_version.py bump-build`; App `Info.plist` keeps its published build-setting placeholders. This is an implementation-applicability requirement, not a new same-git-SHA rule for the two hosts: same Catalog/canonical operations, adopted material bytes and all original Journey predicates remain mandatory, while each host records its actual source and image identity. Do not overwrite build 4 or relabel its receipt.
+Formal Mac acceptance now needs a released source containing that reviewed correction. Build 5 keeps marketing version `0.1.0` and synchronizes the App/CLI/daemon build metadata through the official `hack/release/release_version.py bump-build`; App `Info.plist` keeps its published build-setting placeholders. This is an implementation-applicability requirement, not a new same-git-SHA rule for the two hosts: same catalog/canonical operations, adopted material bytes and all original Journey predicates remain mandatory, while each host records its actual source and image identity. Do not overwrite build 4 or relabel its receipt.
 
 This metadata layer follows [PR #2624](https://github.com/ArkDeck/ArkDeck/pull/2624), directly above the shared Session fix. Merging its `release-version.json` change into protected `main` automatically triggers the official `release-rc.yml` workflow. The planned new artifact is `arkdeck-rc-0.1.0-5` with `ArkDeck-0.1.0-5.dmg`; readiness requires its actual successful signing/notarization, immutable receipt and exact merged protected-main source, not this version edit or a branch build. Re-dispatching build 4 would skip an existing artifact. This preparation does not dispatch or publish a release and does not access signing secrets.
 
@@ -123,9 +123,9 @@ The official bump/check/print and four pure `Versions` cases are the local scope
 
 | Command | Result | Log under the directory above |
 | --- | --- | --- |
-| `python scripts/release/release_version.py bump-build`, then `check` / `print` | each exit0; `0.1.0` / build`5` in lockstep | `version-bump.log`, `version-final-check.log`, `version-final-print.log` |
-| `python scripts/release/test_build_macos_release.py Versions` | exit0, four tests / no skips, 0.533s | `versions-pure.log` |
-| `sh scripts/check-sdd.sh` (installed Git shell) | exit0 | `sdd-pre.log` |
+| `python hack/release/release_version.py bump-build`, then `check` / `print` | each exit0; `0.1.0` / build`5` in lockstep | `version-bump.log`, `version-final-check.log`, `version-final-print.log` |
+| `python hack/release/test_build_macos_release.py Versions` | exit0, four tests / no skips, 0.533s | `versions-pure.log` |
+| `sh hack/check-sdd.sh` (installed Git shell) | exit0 | `sdd-pre.log` |
 | `git diff --check` | exit0 | `diff-pre.log` |
 
 Final exact-source SDD/diff receipts and the five-file byte/hash manifest are retained with this packet; these pure checks do not build or run the Mac release.

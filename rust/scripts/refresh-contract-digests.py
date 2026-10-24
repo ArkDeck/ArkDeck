@@ -26,7 +26,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TABLE = ROOT / "rust/tests/fixtures/contracts-bundle/owned.json"
-CONTRACTS = ROOT / "openspec/contracts"
+CONTRACTS = ROOT / "api/contracts"
 FIXTURES = ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI"
 
 

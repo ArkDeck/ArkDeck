@@ -6,7 +6,7 @@ namespace ArkDeck.App.UITests;
 
 /// <summary>
 /// XPA-AC-8 on Windows: each page's UIA tree, in each catalogue language, matches the
-/// semantic snapshot of spec/ui-semantics/surfaces.json (identifier, role, accessible name,
+/// semantic snapshot of api/ui-semantics/surfaces.json (identifier, role, accessible name,
 /// live setting); no button anywhere is disabled; state changes reach a live region. The
 /// daemon states come from the scripted test transport (<c>--test-transport</c>), which the
 /// window labels as such.

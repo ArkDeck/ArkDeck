@@ -5,7 +5,7 @@
 > had already reduced it to an operator-invoked Maskrom rescue utility with
 > zero product-runtime references; CHG-2026-065 removes that rescue copy too —
 > the Xcode embed phases, the `rockchip-component.yml` workflow, the
-> `scripts/rockchip_component/` pipeline and the
+> `hack/rockchip_component/` pipeline and the
 > `openspec/integrations/rockchip/bundled-component/` registry are deleted,
 > and the release tuple shrinks to the single App. The GPL source-offer /
 > SBOM / notice obligations below were duties of *distribution* and

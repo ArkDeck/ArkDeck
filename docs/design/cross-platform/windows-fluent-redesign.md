@@ -82,11 +82,11 @@ Local targeted checks：下列检查均为 exit 0。命令的工作目录为 `wi
 | `dotnet test ClientKit.Tests/ArkDeck.ClientKit.Tests.csproj -c Release -p:Platform=x64`，筛选 ClientTests、DeviceRunDeadlineTests | 17 / 17，覆盖有界等待、超时及禁止重放；`ClientKit.Tests/bin/fluent-redesign/fluent-client-bounds.trx`。首次沙箱 NuGet 审计联网失败，恢复正常网络访问后通过。 |
 | `dotnet test App.UITests/ArkDeck.App.UITests.csproj -c Release --no-restore -p:Platform=x64`，筛选 FluentLayoutTests、SemanticSnapshotTests.PagesMatch | 76 / 76：54 个宽窄窗口 / 深浅主题布局案例、22 个双语语义案例；`App.UITests/bin/fluent-redesign/fluent-release-ui.trx`。 |
 | 同一 UIA 项目，筛选 AccessibilityTests；关键界面流程 | Tab 顺序 25 / 25、225% 字号 40 / 40、高对比度 token / access key / Escape 检查通过；关键流程 14 / 14。日志为 `fluent-final-layout-semantics.trx`、`fluent-layout-accessibility.trx` 和 `fluent-final-flows.trx`。这些较早的组合 run 含展开态 Inspector 测试准备失败，不作为整个 run 通过的证据；修正显式展开准备后，最终 76 项矩阵全部通过。 |
-| `scripts/package-rc.ps1 -SigningMode development -AllowDirty -SkipMsix -Smoke`，指定新的输出目录与现有签名证书 | 签名包安装、doctor、App UIA、卸载与状态保留均 PASS；包目录中的 `smoke.json` 记录完整步骤，调用记录见 `AppPackages/fluent-final-package.log`。 |
+| `hack/package-rc.ps1 -SigningMode development -AllowDirty -SkipMsix -Smoke`，指定新的输出目录与现有签名证书 | 签名包安装、doctor、App UIA、卸载与状态保留均 PASS；包目录中的 `smoke.json` 记录完整步骤，调用记录见 `AppPackages/fluent-final-package.log`。 |
 | 同一 UIA 项目，筛选 InstalledRcTests，指向实际当前用户安装及其 endpoint / signer pin | 1 / 1，正常连接、真实诊断、协议及按钮检查通过；`App.UITests/bin/fluent-redesign/fluent-installed-final.trx`。 |
 | 开始菜单入口与卸载保护检查 | 原生窗口已打开，真实 doctor 可读，无 fixture transport / recovery banner；App 打开时卸载拒绝且文件与注册项保留。`AppPackages/installed-shortcut-summary.json`、`uninstall-protection.log`。 |
 | `python rust/scripts/run-cargo.py fmt -p <crate> -- --check`，覆盖全部 workspace crate | 13 / 13，exit 0。全仓 `fmt --all --check` 触发 Windows 命令长度上限（error 206），改为同一缓存内逐 crate 检查；日志见 `AppPackages/fluent-pr-fmt.json`。 |
-| `bash scripts/check-sdd.sh`；`git diff --check` | SDD 与 diff 格式检查通过；日志见 `AppPackages/fluent-sdd.log`。 |
+| `bash hack/check-sdd.sh`；`git diff --check` | SDD 与 diff 格式检查通过；日志见 `AppPackages/fluent-sdd.log`。 |
 
 CI：本次安装验收记录整理于 PR 提交前，尚无 GitHub CI 结果。提交后的 PR 号、run id 和结论在 PR 正文记录。本机未运行完整统一门；Rust 源码和契约输入未修改，仅打包时执行 `cargo build --release --locked`。
 

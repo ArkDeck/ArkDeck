@@ -2,7 +2,7 @@
 //! Swift's `CLIRegistryProjection` answers it, for the leaves this CLI serves.
 //!
 //! `command_registry.json` is Swift's projection of its whole registry — the
-//! `commands` of the published `openspec/contracts/cli-command-registry.yaml`
+//! `commands` of the published `api/contracts/cli-command-registry.yaml`
 //! — and `CLIRustCommandRegistryCopyContractTests` holds it to that
 //! projection. A leaf is listed exactly when this parser serves its path, so
 //! the answer never names a command this CLI would refuse as unknown, and each

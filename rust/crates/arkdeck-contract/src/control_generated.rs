@@ -5,7 +5,7 @@ pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
     "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2";
-pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
+pub const SWIFT_BASELINE: &str = include_str!("../../../../api/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
     "agent.abandon",
@@ -123,443 +123,443 @@ pub const METHODS: &[&str] = &[
 pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
     (
         "agent.abandon",
-        include_str!("../../../../spec/control/methods/agent.abandon.json"),
+        include_str!("../../../../api/control/methods/agent.abandon.json"),
     ),
     (
         "agent.list",
-        include_str!("../../../../spec/control/methods/agent.list.json"),
+        include_str!("../../../../api/control/methods/agent.list.json"),
     ),
     (
         "agent.resume",
-        include_str!("../../../../spec/control/methods/agent.resume.json"),
+        include_str!("../../../../api/control/methods/agent.resume.json"),
     ),
     (
         "agent.run",
-        include_str!("../../../../spec/control/methods/agent.run.json"),
+        include_str!("../../../../api/control/methods/agent.run.json"),
     ),
     (
         "agent.status",
-        include_str!("../../../../spec/control/methods/agent.status.json"),
+        include_str!("../../../../api/control/methods/agent.status.json"),
     ),
     (
         "artifact.export",
-        include_str!("../../../../spec/control/methods/artifact.export.json"),
+        include_str!("../../../../api/control/methods/artifact.export.json"),
     ),
     (
         "artifact.import.abort",
-        include_str!("../../../../spec/control/methods/artifact.import.abort.json"),
+        include_str!("../../../../api/control/methods/artifact.import.abort.json"),
     ),
     (
         "artifact.import.append",
-        include_str!("../../../../spec/control/methods/artifact.import.append.json"),
+        include_str!("../../../../api/control/methods/artifact.import.append.json"),
     ),
     (
         "artifact.import.begin",
-        include_str!("../../../../spec/control/methods/artifact.import.begin.json"),
+        include_str!("../../../../api/control/methods/artifact.import.begin.json"),
     ),
     (
         "artifact.import.commit",
-        include_str!("../../../../spec/control/methods/artifact.import.commit.json"),
+        include_str!("../../../../api/control/methods/artifact.import.commit.json"),
     ),
     (
         "artifact.import.inspect",
-        include_str!("../../../../spec/control/methods/artifact.import.inspect.json"),
+        include_str!("../../../../api/control/methods/artifact.import.inspect.json"),
     ),
     (
         "artifact.import.inspection",
-        include_str!("../../../../spec/control/methods/artifact.import.inspection.json"),
+        include_str!("../../../../api/control/methods/artifact.import.inspection.json"),
     ),
     (
         "artifact.import.list",
-        include_str!("../../../../spec/control/methods/artifact.import.list.json"),
+        include_str!("../../../../api/control/methods/artifact.import.list.json"),
     ),
     (
         "artifact.import.release",
-        include_str!("../../../../spec/control/methods/artifact.import.release.json"),
+        include_str!("../../../../api/control/methods/artifact.import.release.json"),
     ),
     (
         "artifact.inspect",
-        include_str!("../../../../spec/control/methods/artifact.inspect.json"),
+        include_str!("../../../../api/control/methods/artifact.inspect.json"),
     ),
     (
         "artifact.list",
-        include_str!("../../../../spec/control/methods/artifact.list.json"),
+        include_str!("../../../../api/control/methods/artifact.list.json"),
     ),
     (
         "artifact.quota",
-        include_str!("../../../../spec/control/methods/artifact.quota.json"),
+        include_str!("../../../../api/control/methods/artifact.quota.json"),
     ),
     (
         "artifact.read",
-        include_str!("../../../../spec/control/methods/artifact.read.json"),
+        include_str!("../../../../api/control/methods/artifact.read.json"),
     ),
     (
         "capability.inspect",
-        include_str!("../../../../spec/control/methods/capability.inspect.json"),
+        include_str!("../../../../api/control/methods/capability.inspect.json"),
     ),
     (
         "capability.list",
-        include_str!("../../../../spec/control/methods/capability.list.json"),
+        include_str!("../../../../api/control/methods/capability.list.json"),
     ),
     (
         "cleanupDebt.continue",
-        include_str!("../../../../spec/control/methods/cleanupDebt.continue.json"),
+        include_str!("../../../../api/control/methods/cleanupDebt.continue.json"),
     ),
     (
         "cleanupDebt.list",
-        include_str!("../../../../spec/control/methods/cleanupDebt.list.json"),
+        include_str!("../../../../api/control/methods/cleanupDebt.list.json"),
     ),
     (
         "control-action.list",
-        include_str!("../../../../spec/control/methods/control-action.list.json"),
+        include_str!("../../../../api/control/methods/control-action.list.json"),
     ),
     (
         "control-action.reconcile",
-        include_str!("../../../../spec/control/methods/control-action.reconcile.json"),
+        include_str!("../../../../api/control/methods/control-action.reconcile.json"),
     ),
     (
         "control-action.show",
-        include_str!("../../../../spec/control/methods/control-action.show.json"),
+        include_str!("../../../../api/control/methods/control-action.show.json"),
     ),
     (
         "debug.evaluate",
-        include_str!("../../../../spec/control/methods/debug.evaluate.json"),
+        include_str!("../../../../api/control/methods/debug.evaluate.json"),
     ),
     (
         "debug.probe",
-        include_str!("../../../../spec/control/methods/debug.probe.json"),
+        include_str!("../../../../api/control/methods/debug.probe.json"),
     ),
     (
         "debug.start",
-        include_str!("../../../../spec/control/methods/debug.start.json"),
+        include_str!("../../../../api/control/methods/debug.start.json"),
     ),
     (
         "debug.status",
-        include_str!("../../../../spec/control/methods/debug.status.json"),
+        include_str!("../../../../api/control/methods/debug.status.json"),
     ),
     (
         "debug.template.run",
-        include_str!("../../../../spec/control/methods/debug.template.run.json"),
+        include_str!("../../../../api/control/methods/debug.template.run.json"),
     ),
     (
         "device.display-name.clear",
-        include_str!("../../../../spec/control/methods/device.display-name.clear.json"),
+        include_str!("../../../../api/control/methods/device.display-name.clear.json"),
     ),
     (
         "device.display-name.set",
-        include_str!("../../../../spec/control/methods/device.display-name.set.json"),
+        include_str!("../../../../api/control/methods/device.display-name.set.json"),
     ),
     (
         "device.observations",
-        include_str!("../../../../spec/control/methods/device.observations.json"),
+        include_str!("../../../../api/control/methods/device.observations.json"),
     ),
     (
         "diagnostic.session.mark",
-        include_str!("../../../../spec/control/methods/diagnostic.session.mark.json"),
+        include_str!("../../../../api/control/methods/diagnostic.session.mark.json"),
     ),
     (
         "diagnostic.session.status",
-        include_str!("../../../../spec/control/methods/diagnostic.session.status.json"),
+        include_str!("../../../../api/control/methods/diagnostic.session.status.json"),
     ),
     (
         "diagnostic.session.stop",
-        include_str!("../../../../spec/control/methods/diagnostic.session.stop.json"),
+        include_str!("../../../../api/control/methods/diagnostic.session.stop.json"),
     ),
     (
         "doctor",
-        include_str!("../../../../spec/control/methods/doctor.json"),
+        include_str!("../../../../api/control/methods/doctor.json"),
     ),
     (
         "flash.bind-current-loader",
-        include_str!("../../../../spec/control/methods/flash.bind-current-loader.json"),
+        include_str!("../../../../api/control/methods/flash.bind-current-loader.json"),
     ),
     (
         "flash.bootloader-status",
-        include_str!("../../../../spec/control/methods/flash.bootloader-status.json"),
+        include_str!("../../../../api/control/methods/flash.bootloader-status.json"),
     ),
     (
         "flash.device-access",
-        include_str!("../../../../spec/control/methods/flash.device-access.json"),
+        include_str!("../../../../api/control/methods/flash.device-access.json"),
     ),
     (
         "flash.lanePlanPreview",
-        include_str!("../../../../spec/control/methods/flash.lanePlanPreview.json"),
+        include_str!("../../../../api/control/methods/flash.lanePlanPreview.json"),
     ),
     (
         "flash.prerequisites",
-        include_str!("../../../../spec/control/methods/flash.prerequisites.json"),
+        include_str!("../../../../api/control/methods/flash.prerequisites.json"),
     ),
     (
         "flash.reconcile-alias",
-        include_str!("../../../../spec/control/methods/flash.reconcile-alias.json"),
+        include_str!("../../../../api/control/methods/flash.reconcile-alias.json"),
     ),
     (
         "health",
-        include_str!("../../../../spec/control/methods/health.json"),
+        include_str!("../../../../api/control/methods/health.json"),
     ),
     (
         "history.filter.delete",
-        include_str!("../../../../spec/control/methods/history.filter.delete.json"),
+        include_str!("../../../../api/control/methods/history.filter.delete.json"),
     ),
     (
         "history.filter.list",
-        include_str!("../../../../spec/control/methods/history.filter.list.json"),
+        include_str!("../../../../api/control/methods/history.filter.list.json"),
     ),
     (
         "history.filter.save",
-        include_str!("../../../../spec/control/methods/history.filter.save.json"),
+        include_str!("../../../../api/control/methods/history.filter.save.json"),
     ),
     (
         "human-action.list",
-        include_str!("../../../../spec/control/methods/human-action.list.json"),
+        include_str!("../../../../api/control/methods/human-action.list.json"),
     ),
     (
         "human-action.resume",
-        include_str!("../../../../spec/control/methods/human-action.resume.json"),
+        include_str!("../../../../api/control/methods/human-action.resume.json"),
     ),
     (
         "human-action.show",
-        include_str!("../../../../spec/control/methods/human-action.show.json"),
+        include_str!("../../../../api/control/methods/human-action.show.json"),
     ),
     (
         "job.archive",
-        include_str!("../../../../spec/control/methods/job.archive.json"),
+        include_str!("../../../../api/control/methods/job.archive.json"),
     ),
     (
         "job.archive.preview",
-        include_str!("../../../../spec/control/methods/job.archive.preview.json"),
+        include_str!("../../../../api/control/methods/job.archive.preview.json"),
     ),
     (
         "job.cancel",
-        include_str!("../../../../spec/control/methods/job.cancel.json"),
+        include_str!("../../../../api/control/methods/job.cancel.json"),
     ),
     (
         "job.events",
-        include_str!("../../../../spec/control/methods/job.events.json"),
+        include_str!("../../../../api/control/methods/job.events.json"),
     ),
     (
         "job.evidence",
-        include_str!("../../../../spec/control/methods/job.evidence.json"),
+        include_str!("../../../../api/control/methods/job.evidence.json"),
     ),
     (
         "job.list",
-        include_str!("../../../../spec/control/methods/job.list.json"),
+        include_str!("../../../../api/control/methods/job.list.json"),
     ),
     (
         "job.plan",
-        include_str!("../../../../spec/control/methods/job.plan.json"),
+        include_str!("../../../../api/control/methods/job.plan.json"),
     ),
     (
         "job.reconcile",
-        include_str!("../../../../spec/control/methods/job.reconcile.json"),
+        include_str!("../../../../api/control/methods/job.reconcile.json"),
     ),
     (
         "job.result",
-        include_str!("../../../../spec/control/methods/job.result.json"),
+        include_str!("../../../../api/control/methods/job.result.json"),
     ),
     (
         "job.run",
-        include_str!("../../../../spec/control/methods/job.run.json"),
+        include_str!("../../../../api/control/methods/job.run.json"),
     ),
     (
         "job.show",
-        include_str!("../../../../spec/control/methods/job.show.json"),
+        include_str!("../../../../api/control/methods/job.show.json"),
     ),
     (
         "job.status",
-        include_str!("../../../../spec/control/methods/job.status.json"),
+        include_str!("../../../../api/control/methods/job.status.json"),
     ),
     (
         "job.submit",
-        include_str!("../../../../spec/control/methods/job.submit.json"),
+        include_str!("../../../../api/control/methods/job.submit.json"),
     ),
     (
         "job.timeline",
-        include_str!("../../../../spec/control/methods/job.timeline.json"),
+        include_str!("../../../../api/control/methods/job.timeline.json"),
     ),
     (
         "operation.describe",
-        include_str!("../../../../spec/control/methods/operation.describe.json"),
+        include_str!("../../../../api/control/methods/operation.describe.json"),
     ),
     (
         "operation.list",
-        include_str!("../../../../spec/control/methods/operation.list.json"),
+        include_str!("../../../../api/control/methods/operation.list.json"),
     ),
     (
         "recovery.flash-invocation.list",
-        include_str!("../../../../spec/control/methods/recovery.flash-invocation.list.json"),
+        include_str!("../../../../api/control/methods/recovery.flash-invocation.list.json"),
     ),
     (
         "runtime.bundle.inspect",
-        include_str!("../../../../spec/control/methods/runtime.bundle.inspect.json"),
+        include_str!("../../../../api/control/methods/runtime.bundle.inspect.json"),
     ),
     (
         "runtime.bundle.list",
-        include_str!("../../../../spec/control/methods/runtime.bundle.list.json"),
+        include_str!("../../../../api/control/methods/runtime.bundle.list.json"),
     ),
     (
         "runtime.bundle.register",
-        include_str!("../../../../spec/control/methods/runtime.bundle.register.json"),
+        include_str!("../../../../api/control/methods/runtime.bundle.register.json"),
     ),
     (
         "runtime.bundle.remove",
-        include_str!("../../../../spec/control/methods/runtime.bundle.remove.json"),
+        include_str!("../../../../api/control/methods/runtime.bundle.remove.json"),
     ),
     (
         "runtime.hdc.impact-preview",
-        include_str!("../../../../spec/control/methods/runtime.hdc.impact-preview.json"),
+        include_str!("../../../../api/control/methods/runtime.hdc.impact-preview.json"),
     ),
     (
         "runtime.hdc.restart",
-        include_str!("../../../../spec/control/methods/runtime.hdc.restart.json"),
+        include_str!("../../../../api/control/methods/runtime.hdc.restart.json"),
     ),
     (
         "runtime.hdc.status",
-        include_str!("../../../../spec/control/methods/runtime.hdc.status.json"),
+        include_str!("../../../../api/control/methods/runtime.hdc.status.json"),
     ),
     (
         "runtime.storage.policy",
-        include_str!("../../../../spec/control/methods/runtime.storage.policy.json"),
+        include_str!("../../../../api/control/methods/runtime.storage.policy.json"),
     ),
     (
         "runtime.storage.root",
-        include_str!("../../../../spec/control/methods/runtime.storage.root.json"),
+        include_str!("../../../../api/control/methods/runtime.storage.root.json"),
     ),
     (
         "runtime.storage.status",
-        include_str!("../../../../spec/control/methods/runtime.storage.status.json"),
+        include_str!("../../../../api/control/methods/runtime.storage.status.json"),
     ),
     (
         "runtime.tool.inspect",
-        include_str!("../../../../spec/control/methods/runtime.tool.inspect.json"),
+        include_str!("../../../../api/control/methods/runtime.tool.inspect.json"),
     ),
     (
         "runtime.tool.list",
-        include_str!("../../../../spec/control/methods/runtime.tool.list.json"),
+        include_str!("../../../../api/control/methods/runtime.tool.list.json"),
     ),
     (
         "runtime.tool.register",
-        include_str!("../../../../spec/control/methods/runtime.tool.register.json"),
+        include_str!("../../../../api/control/methods/runtime.tool.register.json"),
     ),
     (
         "runtime.tool.remove",
-        include_str!("../../../../spec/control/methods/runtime.tool.remove.json"),
+        include_str!("../../../../api/control/methods/runtime.tool.remove.json"),
     ),
     (
         "runtime.tool.select",
-        include_str!("../../../../spec/control/methods/runtime.tool.select.json"),
+        include_str!("../../../../api/control/methods/runtime.tool.select.json"),
     ),
     (
         "session.cleanup.apply",
-        include_str!("../../../../spec/control/methods/session.cleanup.apply.json"),
+        include_str!("../../../../api/control/methods/session.cleanup.apply.json"),
     ),
     (
         "session.cleanup.preview",
-        include_str!("../../../../spec/control/methods/session.cleanup.preview.json"),
+        include_str!("../../../../api/control/methods/session.cleanup.preview.json"),
     ),
     (
         "session.export.apply",
-        include_str!("../../../../spec/control/methods/session.export.apply.json"),
+        include_str!("../../../../api/control/methods/session.export.apply.json"),
     ),
     (
         "session.export.preview",
-        include_str!("../../../../spec/control/methods/session.export.preview.json"),
+        include_str!("../../../../api/control/methods/session.export.preview.json"),
     ),
     (
         "session.list",
-        include_str!("../../../../spec/control/methods/session.list.json"),
+        include_str!("../../../../api/control/methods/session.list.json"),
     ),
     (
         "session.pin",
-        include_str!("../../../../spec/control/methods/session.pin.json"),
+        include_str!("../../../../api/control/methods/session.pin.json"),
     ),
     (
         "session.show",
-        include_str!("../../../../spec/control/methods/session.show.json"),
+        include_str!("../../../../api/control/methods/session.show.json"),
     ),
     (
         "session.unpin",
-        include_str!("../../../../spec/control/methods/session.unpin.json"),
+        include_str!("../../../../api/control/methods/session.unpin.json"),
     ),
     (
         "target.adopt",
-        include_str!("../../../../spec/control/methods/target.adopt.json"),
+        include_str!("../../../../api/control/methods/target.adopt.json"),
     ),
     (
         "target.availability",
-        include_str!("../../../../spec/control/methods/target.availability.json"),
+        include_str!("../../../../api/control/methods/target.availability.json"),
     ),
     (
         "target.display-name.clear",
-        include_str!("../../../../spec/control/methods/target.display-name.clear.json"),
+        include_str!("../../../../api/control/methods/target.display-name.clear.json"),
     ),
     (
         "target.display-name.set",
-        include_str!("../../../../spec/control/methods/target.display-name.set.json"),
+        include_str!("../../../../api/control/methods/target.display-name.set.json"),
     ),
     (
         "target.list",
-        include_str!("../../../../spec/control/methods/target.list.json"),
+        include_str!("../../../../api/control/methods/target.list.json"),
     ),
     (
         "target.show",
-        include_str!("../../../../spec/control/methods/target.show.json"),
+        include_str!("../../../../api/control/methods/target.show.json"),
     ),
     (
         "trace.cache.purge",
-        include_str!("../../../../spec/control/methods/trace.cache.purge.json"),
+        include_str!("../../../../api/control/methods/trace.cache.purge.json"),
     ),
     (
         "trace.cache.status",
-        include_str!("../../../../spec/control/methods/trace.cache.status.json"),
+        include_str!("../../../../api/control/methods/trace.cache.status.json"),
     ),
     (
         "trace.inspect",
-        include_str!("../../../../spec/control/methods/trace.inspect.json"),
+        include_str!("../../../../api/control/methods/trace.inspect.json"),
     ),
     (
         "trace.probe",
-        include_str!("../../../../spec/control/methods/trace.probe.json"),
+        include_str!("../../../../api/control/methods/trace.probe.json"),
     ),
     (
         "workspace.preset.list",
-        include_str!("../../../../spec/control/methods/workspace.preset.list.json"),
+        include_str!("../../../../api/control/methods/workspace.preset.list.json"),
     ),
     (
         "workspace.preset.register",
-        include_str!("../../../../spec/control/methods/workspace.preset.register.json"),
+        include_str!("../../../../api/control/methods/workspace.preset.register.json"),
     ),
     (
         "workspace.preset.remove",
-        include_str!("../../../../spec/control/methods/workspace.preset.remove.json"),
+        include_str!("../../../../api/control/methods/workspace.preset.remove.json"),
     ),
     (
         "workspace.preset.show",
-        include_str!("../../../../spec/control/methods/workspace.preset.show.json"),
+        include_str!("../../../../api/control/methods/workspace.preset.show.json"),
     ),
     (
         "workspace.preset.update",
-        include_str!("../../../../spec/control/methods/workspace.preset.update.json"),
+        include_str!("../../../../api/control/methods/workspace.preset.update.json"),
     ),
     (
         "workspace.project.list",
-        include_str!("../../../../spec/control/methods/workspace.project.list.json"),
+        include_str!("../../../../api/control/methods/workspace.project.list.json"),
     ),
     (
         "workspace.project.register",
-        include_str!("../../../../spec/control/methods/workspace.project.register.json"),
+        include_str!("../../../../api/control/methods/workspace.project.register.json"),
     ),
     (
         "workspace.project.remove",
-        include_str!("../../../../spec/control/methods/workspace.project.remove.json"),
+        include_str!("../../../../api/control/methods/workspace.project.remove.json"),
     ),
     (
         "workspace.project.show",
-        include_str!("../../../../spec/control/methods/workspace.project.show.json"),
+        include_str!("../../../../api/control/methods/workspace.project.show.json"),
     ),
     (
         "workspace.project.update",
-        include_str!("../../../../spec/control/methods/workspace.project.update.json"),
+        include_str!("../../../../api/control/methods/workspace.project.update.json"),
     ),
 ];
 

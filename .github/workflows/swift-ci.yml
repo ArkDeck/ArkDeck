@@ -83,29 +83,29 @@ jobs:
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Event revision checkout regression tests
-        run: python3 scripts/ci/test_event_checkout.py
+        run: python3 hack/ci/test_event_checkout.py
 
       - name: CI planner contract tests
-        run: python3 scripts/ci/test_plan.py
+        run: python3 hack/ci/test_plan.py
 
       - name: Linux runner pool activation tests
-        run: python3 scripts/ci/test_linux_runner_pool.py
+        run: python3 hack/ci/test_linux_runner_pool.py
 
       - name: CI cache scope tests
-        run: python3 scripts/ci/test_cache_scope.py
+        run: python3 hack/ci/test_cache_scope.py
 
       - name: Local Cargo cache runner tests
         run: python3 rust/scripts/test_run_cargo.py
 
       - name: CI workflow contract tests
-        run: python3 scripts/test_agent_pr_workflow.py
+        run: python3 hack/tests/test_agent_pr_workflow.py
 
       # The App holds the daemon to its exact version and build
       # (AgentXPCContract.serverCodeRequirement), so the pbxproj pair and the
-      # helper Info.plists must equal scripts/release/release-version.json.
+      # helper Info.plists must equal hack/release/release-version.json.
       # Runs on every PR because the copies live in several lanes' paths.
       - name: Release version lockstep
-        run: python3 scripts/release/release_version.py check
+        run: python3 hack/release/release_version.py check
 
       # A main run plans from the newest main commit this workflow passed on,
       # not from the push's `before` (see plan.py). If that cannot be read the
@@ -126,7 +126,7 @@ jobs:
         env:
           ARKDECK_MAIN_LAST_SUCCESS: ${{ steps.last-success.outputs.oid }}
         run: >-
-          python3 scripts/ci/plan.py
+          python3 hack/ci/plan.py
           --repo-root "$GITHUB_WORKSPACE"
           --event "$GITHUB_EVENT_PATH"
           --main-last-success "$ARKDECK_MAIN_LAST_SUCCESS"
@@ -231,7 +231,7 @@ jobs:
       # merge groups restore only trusted main keys; every job still builds/tests.
       - name: Select build cache scope
         id: cache-scope
-        run: python3 scripts/ci/cache_scope.py --kind swiftpm --github-output "$GITHUB_OUTPUT"
+        run: python3 hack/ci/cache_scope.py --kind swiftpm --github-output "$GITHUB_OUTPUT"
 
       - name: Restore stable SwiftPM cache
         id: swift-build-cache
@@ -299,13 +299,13 @@ jobs:
           swift --version
 
       - name: Xcode stable-workspace contract tests
-        run: python3 scripts/ci/test_run_xcodebuild.py
+        run: python3 hack/ci/test_run_xcodebuild.py
 
       # Agent cache prefixes include a hash of this exact branch. Main and
       # merge groups restore only trusted main keys; every job still builds/tests.
       - name: Select build cache scope
         id: cache-scope
-        run: python3 scripts/ci/cache_scope.py --kind xcode --github-output "$GITHUB_OUTPUT"
+        run: python3 hack/ci/cache_scope.py --kind xcode --github-output "$GITHUB_OUTPUT"
 
       - name: Restore Xcode build cache
         id: app-build-cache
@@ -322,7 +322,7 @@ jobs:
       - name: Build ArkDeck app and UI-test bundle
         env:
           ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode
-        run: sh scripts/ci/run-xcodebuild.sh
+        run: sh hack/ci/run-xcodebuild.sh
 
       - name: Save successful Xcode build cache
         if: >-
@@ -348,7 +348,7 @@ jobs:
       ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
 
   # The Windows client (TASK-XPA-007): ArkDeck.ClientKit's generated contract
-  # bindings, the App's generated strings (spec/ui-semantics -> .resw, equal to
+  # bindings, the App's generated strings (api/ui-semantics -> .resw, equal to
   # the macOS .xcstrings) and design tokens, then the build (ClientKit, App.Core,
   # the WinUI 3 App, the tests) and the MSTest suites on a hosted Windows x64
   # runner. Git keeps repository bytes (autocrlf off): the generator checks, the

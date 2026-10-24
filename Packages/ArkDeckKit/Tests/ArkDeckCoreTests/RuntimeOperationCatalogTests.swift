@@ -4,7 +4,7 @@ import Testing
 @testable import ArkDeckCore
 
 /// Semantic invariants over the generated catalog data. Byte-level parity
-/// with Catalog/ JSON is owned by scripts/catalog_gen + check-sdd family 11;
+/// with catalog/ JSON is owned by hack/catalog_gen + check-sdd family 11;
 /// these tests pin the Swift-side guarantees the runtime will rely on.
 struct RuntimeOperationCatalogTests {
   @Test func nativeDeviceObservationPrecedesEveryMutation() throws {
