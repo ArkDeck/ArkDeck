@@ -60,9 +60,14 @@ on:
 permissions:
   contents: read
 
+# One run per ref. On an agent branch a newer push supersedes the run testing
+# the older commit, which would otherwise hold a macOS runner for ~34 minutes
+# to report on a head nobody will merge. main (nightly and dispatch) is never
+# cancelled. The job-level group below still serialises the macOS lanes
+# across all refs.
 concurrency:
-  group: swift-slow-lanes
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ui-tests:
