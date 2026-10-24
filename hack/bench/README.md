@@ -30,7 +30,7 @@ read-only control methods.  A host result is not hardware evidence
 ## Use
 
 ```bash
-cd scripts
+cd hack
 python3 -m bench capture \
   --daemon ../rust/target/release/arkdeck-agentd \
   --soak ../rust/target/release/arkdeck-soak \
@@ -40,7 +40,7 @@ python3 -m bench capture \
 ```
 
 ```bash
-cd scripts
+cd hack
 python3 -m bench compare \
   --committed bench/baselines/perf-baseline-<date>.json \
   --candidate /tmp/arkdeck-perf/perf-baseline-<date>.json \
@@ -48,7 +48,7 @@ python3 -m bench compare \
 ```
 
 ```bash
-cd scripts
+cd hack
 python3 -m bench select-baseline \
   --candidate /tmp/arkdeck-perf/perf-baseline-<date>.json \
   --directory bench/baselines
@@ -66,7 +66,7 @@ then archives the measurement instead of comparing. A document written before
 Unit tests:
 
 ```bash
-cd scripts
+cd hack
 python3 -m unittest discover -s bench -t .
 ```
 
@@ -296,7 +296,7 @@ the `loadSource`).
 Python (`"$ARKDECK_PYTHON"`) and `PYTHONUTF8=1`:
 
 ```bash
-cd scripts
+cd hack
 PYTHONUTF8=1 "$ARKDECK_PYTHON" -m bench capture --runtime-kind rust \
   --daemon <target>/release/arkdeck-agentd.exe --soak <target>/release/arkdeck-soak.exe \
   --build-configuration release --out-dir <dir>
@@ -338,7 +338,7 @@ A capture on a shared or busy host is advisory as everywhere else
 Recovery is opt-in so the existing cold-start/RSS capture keeps its workload:
 
 ```sh
-cd scripts
+cd hack
 python3 -m bench capture --runtime-kind rust --build-configuration release \
   --daemon /private/tmp/task-target/release/arkdeck-agentd \
   --soak /private/tmp/task-target/release/arkdeck-soak \
