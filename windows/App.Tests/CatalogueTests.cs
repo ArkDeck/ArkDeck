@@ -30,7 +30,7 @@ public sealed class CatalogueTests
     [TestMethod]
     public void BothLanguagesCarryEveryKeyWithTheSourceValues()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "strings.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "strings.json")));
         var entries = doc.RootElement.GetProperty("entries").EnumerateArray().ToArray();
         CollectionAssert.AreEqual(entries.Select(e => e.GetProperty("key").GetString()).ToArray(), UiStrings.All.ToArray());
         foreach (var (language, member) in new[] { ("en-US", "en"), ("zh-Hans", "zh-Hans") })
@@ -47,7 +47,7 @@ public sealed class CatalogueTests
     public void SharedEntriesKeepTheMacOSValues()
     {
         // Independent of the generator: read the .xcstrings tables directly.
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "strings.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "strings.json")));
         var shared = 0;
         foreach (var entry in doc.RootElement.GetProperty("entries").EnumerateArray())
         {

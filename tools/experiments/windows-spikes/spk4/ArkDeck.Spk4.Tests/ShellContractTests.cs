@@ -52,7 +52,7 @@ public sealed class ShellContractTests
     [TestMethod]
     public void UnavailableCapabilitiesCarryTheirCoverageCliPath()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("openspec", "contracts", "cli-feature-coverage.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "contracts", "cli-feature-coverage.json")));
         var byFeature = doc.RootElement.GetProperty("entries").EnumerateArray()
             .ToDictionary(e => e.GetProperty("feature").GetString()!, e => e);
         foreach (var cap in UnavailableCatalog.DebugTabs.Append(UnavailableCatalog.TraceViewer))

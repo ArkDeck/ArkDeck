@@ -178,7 +178,7 @@ public sealed class ShellContractTests
     [TestMethod]
     public void CliCommandsAreTheCoverageTargetCommands()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("openspec", "contracts", "cli-feature-coverage.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "contracts", "cli-feature-coverage.json")));
         var commands = doc.RootElement.GetProperty("entries").EnumerateArray()
             .SelectMany(e => new[] { e.TryGetProperty("targetCommand", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString()! : null }
                 .Concat(e.TryGetProperty("equivalentCommands", out var eq) ? eq.EnumerateArray().Select(c => c.GetString()) : []))
@@ -211,7 +211,7 @@ public sealed class ShellContractTests
     [TestMethod]
     public void TerminalStatesAreTheRecoveryTablesTerminalClass()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "recovery", "job-state-preflight.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "recovery", "job-state-preflight.json")));
         var terminal = doc.RootElement.GetProperty("states").EnumerateObject().Where(p => p.Value.GetString() == "terminal").Select(p => p.Name).Order().ToArray();
         CollectionAssert.AreEqual(terminal, JobSummary.TerminalStates.Order().ToArray());
     }
@@ -219,7 +219,7 @@ public sealed class ShellContractTests
     [TestMethod]
     public void EverySnapshotNamesKnownKeysAndRoles()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "surfaces.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "surfaces.json")));
         var roles = doc.RootElement.GetProperty("roles").EnumerateObject().Select(p => p.Name).ToHashSet();
         var keys = UiStrings.All.ToHashSet();
         var scenarios = ArkDeck.App.Core.Testing.ScriptedDaemon.Scenarios.ToHashSet();

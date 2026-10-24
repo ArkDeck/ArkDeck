@@ -50,7 +50,7 @@ public sealed class GeneratorTests
         Assert.AreEqual(ControlContract.Methods.Count, ContractSchemas.Verify());
         foreach (var method in ControlContract.Methods)
         {
-            var bytes = File.ReadAllBytes(RepoPaths.At("spec", "control", "methods", method + ".json"));
+            var bytes = File.ReadAllBytes(RepoPaths.At("api", "control", "methods", method + ".json"));
             Assert.AreEqual(ControlContract.MethodSchemaSha256[method], Convert.ToHexStringLower(SHA256.HashData(bytes)), method);
         }
     }

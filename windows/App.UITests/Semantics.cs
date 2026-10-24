@@ -37,7 +37,7 @@ internal sealed partial class Catalogue
     public static Catalogue Load(string appLanguage)
     {
         var member = appLanguage == "zh-Hans" ? "zh-Hans" : "en";
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "strings.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "strings.json")));
         var values = doc.RootElement.GetProperty("entries").EnumerateArray()
             .ToDictionary(e => e.GetProperty("key").GetString()!, e => e.GetProperty(member).GetString()!);
         return new Catalogue(appLanguage, values);
@@ -74,7 +74,7 @@ internal static class SurfaceSpec
 
     public static IReadOnlyList<Snapshot> Load(Catalogue strings)
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "surfaces.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "surfaces.json")));
         return doc.RootElement.GetProperty("snapshots").EnumerateArray().Select(s => new Snapshot(
             s.GetProperty("id").GetString()!,
             s.GetProperty("scenario").GetString()!,
@@ -102,7 +102,7 @@ internal static class SurfaceSpec
 
     private static Dictionary<string, string> LoadRoles()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "surfaces.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("api", "ui-semantics", "surfaces.json")));
         return doc.RootElement.GetProperty("roles").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
     }
 }
