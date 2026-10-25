@@ -25,13 +25,13 @@ arkdeck-provider-arkforge = { path = "crates/arkdeck-provider-arkforge" }
 # `rust/scripts/check-arkforge-pin.py`. PR #46 introduced consumer contract 1.0.0.
 # Development uses a commit, never a tag/release. Upgrade every rev together,
 # regenerate Cargo.lock and run the upstream consumer contracts and lane tests.
-arkforge-arkdeck-adapter = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
-arkforge-artifact = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
-arkforge-authority-api = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
-arkforge-client = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
-arkforge-core = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
-arkforge-ipc = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
-arkforge-platform = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eadcb24203be5c5aab94fbca4faa0951863ffaba" }
+arkforge-arkdeck-adapter = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
+arkforge-artifact = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
+arkforge-authority-api = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
+arkforge-client = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
+arkforge-core = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
+arkforge-ipc = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
+arkforge-platform = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "41e1c5e3ab425d312e93f5d95a3c4511334ad0f9" }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["float_roundtrip"] }
 sha2 = "0.10.9"
