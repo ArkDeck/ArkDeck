@@ -1,5 +1,3 @@
-$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer
-$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json
 $(SRCROOT)/Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE
 $(SRCROOT)/Packages/ArkDeckKit/THIRD_PARTY_NOTICES.md
 $(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/bounds_checking_function-MulanPSL-2.0.txt
@@ -20,3 +18,8 @@ $(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/protobuf-BSD-3-
 $(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/sqlite-Public-Domain.txt
 $(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/trace_streamer-Apache-2.0.txt
 $(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/zlib-Zlib.txt
+$(SRCROOT)/.arktrace-native/AppInputs/receipt.json
+$(SRCROOT)/.arktrace-native/AppInputs/Helpers/arktrace-host-process
+$(SRCROOT)/.arktrace-native/AppInputs/Helpers/trace_streamer
+$(SRCROOT)/.arktrace-native/AppInputs/TraceStreamer/manifest.json
+$(SRCROOT)/.arktrace-native/AppInputs/ArkTraceRuntime/manifest.json

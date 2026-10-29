@@ -137,6 +137,7 @@ case $derived_data in
   *) fail 'ARKDECK_UI_TEST_DERIVED_DATA must be an absolute path' ;;
 esac
 mkdir -p "$derived_data" || fail "cannot create DerivedData at $derived_data"
+derived_data=$(CDPATH= cd -P -- "$derived_data" && pwd)
 
 # A runner or App left behind by an interrupted run holds automation and makes
 # the next launch time out. Neither is a service; killing them loses nothing —
@@ -189,12 +190,37 @@ fi
 printf 'ArkDeck UI tests: DerivedData %s\n' "$derived_data" >&2
 printf 'ArkDeck UI tests: these drive the real App and are not a merge gate\n' >&2
 
+# Build with the same pinned SDK and fixed resources as the normal App lane.
+# An ad-hoc outer signature does not make unsigned Trace tools runtime-usable.
+workspace_path="$derived_data/workspace"
+source_packages="$derived_data/SourcePackages"
+preparation="$derived_data/native-trace-preparation.json"
+if [ "$action" != test-without-building ]; then
+  (
+    set -- python3 "$repo_root/hack/ci/prepare-native-trace.py" \
+      --repo "$repo_root" --workspace "$workspace_path" --source-packages "$source_packages" \
+      --materialize --resolve --xcodebuild "$xcodebuild_executable"
+    if [ -n "${ARKTRACE_RUST_XCFRAMEWORK:-}" ]; then set -- "$@" --sdk "$ARKTRACE_RUST_XCFRAMEWORK"; fi
+    if [ -n "${ARKTRACE_NATIVE_APP_SIGNING_IDENTITY:-}" ]; then set -- "$@" --signing-identity "$ARKTRACE_NATIVE_APP_SIGNING_IDENTITY"; fi
+    if [ -n "${ARKDECK_TRACE_NATIVE_INPUTS:-}" ]; then set -- "$@" --inputs "$ARKDECK_TRACE_NATIVE_INPUTS"; fi
+    "$@" > "$preparation"
+  ) || fail 'native Trace preparation failed'
+fi
+[ -f "$preparation" ] || fail 'no prepared App build; run --build-once first'
+ARKTRACE_RUST_XCFRAMEWORK=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["relativeSDK"])' "$preparation")
+trace_native_source=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"])' "$preparation")
+export ARKTRACE_RUST_XCFRAMEWORK
+unset ARKTRACE_RUST_SDK_FIXTURES
+
 set -- "$xcodebuild_executable" \
-  -project "$repo_root/apple/ArkDeck.xcodeproj" \
+  -project "$workspace_path/apple/ArkDeck.xcodeproj" \
   -scheme ArkDeck \
   -configuration Debug \
   -destination platform=macOS,arch=arm64 \
   -derivedDataPath "$derived_data" \
+  -clonedSourcePackagesDirPath "$source_packages" \
+  -onlyUsePackageVersionsFromResolvedFile \
+  ARKDECK_TRACE_NATIVE_SOURCE="$trace_native_source" \
   ARCHS=arm64 \
   ONLY_ACTIVE_ARCH=YES \
   CODE_SIGN_IDENTITY=- \

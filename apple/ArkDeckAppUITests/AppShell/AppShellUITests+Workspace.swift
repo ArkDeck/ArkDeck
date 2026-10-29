@@ -247,7 +247,9 @@ extension AppShellUITests {
       ("(en)", "Open a trace", "Open Trace…", "Trace Keyboard Shortcuts", "Timeline", "Search TID, thread, or slice"),
       ("(zh-Hans)", "打开 Trace", "打开 Trace…", "Trace 键盘快捷键", "时间轴", "搜索 TID、线程或 slice"),
     ] {
-      let app = launch(arguments: ["-AppleLanguages", language])
+      // This test covers the empty Viewer and shortcut presentation. Native
+      // signed-tool startup has separate checks; CI tools are compile-only.
+      let app = launch(arguments: ["-AppleLanguages", language, "--ui-test-trace-empty-viewer"])
       select("app.navigation.trace", in: app)
       let openViewer = app.buttons["trace.openViewer"]
       XCTAssertTrue(openViewer.waitForExistenceFast(timeout: 10))

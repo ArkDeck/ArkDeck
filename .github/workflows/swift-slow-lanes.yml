@@ -105,6 +105,7 @@ jobs:
           set -eu
           test -d "$DEVELOPER_DIR"
           xcodebuild -version
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
       - name: Widen the runner display
         run: |
           set -euo pipefail
@@ -128,6 +129,10 @@ jobs:
       - name: Run the App UI tests
         env:
           ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests
+          ARKTRACE_CARGO_OWNER: arkdeck-ui-ci
+          ARKTRACE_CARGO_CACHE_ROOT: ${{ runner.temp }}/arkdeck-ui-tests/ArkTraceCargo
+          ARKTRACE_RUST_SDK_CACHE_ROOT: ${{ runner.temp }}/arkdeck-ui-tests/ArkTraceSDK
+          ARKTRACE_NATIVE_APP_INPUT_CACHE_ROOT: ${{ runner.temp }}/arkdeck-ui-tests/ArkTraceAppInputs
           UI_TEST_SCOPE: ${{ inputs.scope || 'all' }}
         run: |
           # pipefail matters here: the run is piped through tee for live

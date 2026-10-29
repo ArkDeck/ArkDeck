@@ -715,8 +715,18 @@ def source_packages(environment: Mapping[str, str]) -> list[str]:
 
 
 def build_app(work: Path, environment: Mapping[str, str]) -> Path:
+    work = work.resolve()
     archive = work / "ArkDeck.xcarchive"
     export = work / "export"
+    workspace = work / "workspace"
+    packages = Path(environment.get("ARKDECK_XCODE_SOURCE_PACKAGES") or work / "SourcePackages").resolve()
+    prepared = json.loads(run([
+        "python3", REPO / "hack/ci/prepare-native-trace.py", "--repo", REPO,
+        "--workspace", workspace, "--source-packages", packages, "--materialize", "--resolve",
+        "--signing-identity", environment.get("ARKDECK_CODESIGN_IDENTITY") or DEFAULT_IDENTITY,
+        "--require-runtime"], env=environment))
+    require(prepared["runtimeUsable"] is True, "release requires signed native Trace inputs")
+    environment = {**environment, "ARKTRACE_RUST_XCFRAMEWORK": prepared["relativeSDK"]}
     keychain = codesign_keychain(environment)
     # A command-line setting replaces the project's, so the Release
     # configuration's own `--timestamp` is restated beside the keychain.
@@ -727,9 +737,10 @@ def build_app(work: Path, environment: Mapping[str, str]) -> Path:
     # Release default (both slices), so the setting is given at invocation
     # scope, which every target of the build takes. ONLY_ACTIVE_ARCH=NO builds
     # exactly ARCHS for the generic destination.
-    run(["xcodebuild", "-project", PROJECT, "-scheme", "ArkDeck", "-configuration", "Release",
+    run(["xcodebuild", "-project", workspace / "apple/ArkDeck.xcodeproj", "-scheme", "ArkDeck", "-configuration", "Release",
          "-destination", "generic/platform=macOS", "-derivedDataPath", work / "DerivedData",
-         *source_packages(environment), "-onlyUsePackageVersionsFromResolvedFile",
+         "-clonedSourcePackagesDirPath", packages, "-onlyUsePackageVersionsFromResolvedFile",
+         "ARKDECK_TRACE_NATIVE_SOURCE=" + prepared["source"],
          "-archivePath", archive, "ARCHS=arm64", "ONLY_ACTIVE_ARCH=NO", *signing, "archive"],
         env=environment, cwd=REPO, capture=False)
     run(["xcodebuild", "-exportArchive", "-archivePath", archive,

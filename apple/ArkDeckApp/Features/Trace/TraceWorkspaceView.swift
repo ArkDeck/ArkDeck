@@ -177,17 +177,16 @@ final class TraceWorkspaceViewModel {
   private let detailProvider: any RuntimeJobDetailApplicationProviding
   private var historyPinnedTargetID: String?
   private var viewerReadGeneration = 0
-  let documentController: TraceDocumentController
+  private let openDocument: @MainActor (URL) -> Void
 
   init(
     provider: any TraceApplicationProviding,
     detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil,
-    documentController: TraceDocumentController = TraceDocumentController(
-      configuration: ArkDeckTraceConfiguration.make())
+    openDocument: @escaping @MainActor (URL) -> Void
   ) {
     self.provider = provider
     self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
-    self.documentController = documentController
+    self.openDocument = openDocument
   }
 
   var targets: [TraceTargetPresentation] {
@@ -618,7 +617,7 @@ final class TraceWorkspaceViewModel {
     switch result {
     case .completed(let url):
       latestViewerArtifactName = artifact.name
-      documentController.open(url)
+      openDocument(url)
       viewerOpenRequestID &+= 1
     case .failed:
       viewerArtifactFailure = traceString("trace.viewer.readFailed")
