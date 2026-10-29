@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import copy
+import errno
 import importlib.util
 import io
 import json
@@ -16,7 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import jsonschema
 from test_manifest_preconsume import PreconsumeManifestSchemaTests
@@ -44,6 +45,41 @@ RUN_DIRECTORY_SPEC = importlib.util.spec_from_file_location(
     "arkdeck_run_directory", SCRIPT.with_name("run-directory.py"))
 run_directory = importlib.util.module_from_spec(RUN_DIRECTORY_SPEC)
 RUN_DIRECTORY_SPEC.loader.exec_module(run_directory)
+
+
+@unittest.skipIf(os.name == "nt", "Unix-domain socket exchange")
+class ReadOnlySocketRefusalTests(unittest.TestCase):
+    def exchange(self, send_error, response):
+        connection = MagicMock()
+        connection.sendall.side_effect = send_error
+        connection.makefile.return_value = io.BytesIO(response)
+        socket = MagicMock()
+        socket.return_value.__enter__.return_value = connection
+        with tempfile.TemporaryDirectory() as temporary, patch.object(readonly.socket, "socket", socket):
+            result = readonly.exchange("endpoint", Path(temporary), [], "oversized", b"request",
+                                       None, "malformedFrame", valid_request=False)
+        socket.assert_called_once()
+        connection.connect.assert_called_once_with("endpoint")
+        connection.sendall.assert_called_once_with(b"request")
+        return result
+
+    def test_peer_close_still_requires_its_refusal_without_replaying(self):
+        response = b'{"ok":false,"error":{"code":"malformedFrame"}}\n'
+        for code in (errno.EPIPE, errno.ENOTCONN):
+            with self.subTest(errno=code):
+                self.assertEqual(self.exchange(OSError(code, "closed peer"), response), json.loads(response))
+
+    def test_peer_close_does_not_accept_missing_or_wrong_response(self):
+        for response, error in ((b"", json.JSONDecodeError),
+                                (b'{"ok":true}\n', AssertionError),
+                                (b'{"ok":false,"error":{"code":"internalError"}}\n', AssertionError)):
+            with self.subTest(response=response), self.assertRaises(error):
+                self.exchange(OSError(errno.ENOTCONN, "closed peer"), response)
+
+    def test_unrelated_send_error_is_not_suppressed(self):
+        with self.assertRaises(OSError) as caught:
+            self.exchange(OSError(errno.EACCES, "denied"), b'{"ok":false}\n')
+        self.assertEqual(caught.exception.errno, errno.EACCES)
 
 
 class ReadOnlyToolSelectionExpectationTests(unittest.TestCase):
