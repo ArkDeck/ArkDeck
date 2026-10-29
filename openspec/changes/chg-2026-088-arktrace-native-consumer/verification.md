@@ -40,6 +40,9 @@ On macOS arm64, Xcode 27.1 / Swift 6.4 and Rust 1.99.0:
   UI presentation is therefore unverified. Logs: `arkdeck-viewer-ui-first.log`
   and `arkdeck-viewer-ui-retry.log`; no system automation settings were changed.
 - Trace facade contracts: 12 tests, exit 0. Log: `trace-facade-contracts.log`.
+- App Debug fixture compilation: build-for-testing passes (exit 0). The
+  actual compiler invocation defines DEBUG; the Release configuration does
+  not. Logs: `arkdeck-debug-fixture-build.log`, `debug-configuration.log`.
 - Planner tests: 61 tests, exit 0. Log: `planner-tests.log`.
 - Design interaction tests: 86 tests, exit 0. The new and old upstream
   shortcut catalogs are byte-identical; only the prototype reference pin
@@ -83,6 +86,12 @@ Run 40886736757 passed App build-for-testing, then found an obsolete
 Swift source assertion requiring the capture form to call a document
 controller directly. The contract now verifies the injected open callback
 and its composition through the shared Trace Runtime.
+UI run 40887088035 executed 75 tests (16 skipped); its four failures all
+come from the empty Viewer presentation case. The App Debug configuration
+had not defined DEBUG, so the explicit fixture was compiled out. Defining
+DEBUG only in the App Debug configuration restores that test entry without
+enabling it in Release. The corrected App compiles locally; UI rerun results
+are recorded in the PR description.
 Final CI run IDs are recorded in the PR delivery description. CI uses
 Xcode 27.0, separately from the local 27.1 build.
 
