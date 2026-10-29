@@ -220,6 +220,21 @@ for stale_index in "$scratch_path"/arm64-apple-macosx/*/index; do
   fi
 done
 
+# The native test graph uses the same verified SDK as the App. Resolve the
+# pinned source without that local target, then stage it while holding this
+# runner's mirror lock. Default tests continue to exercise the portable graph.
+if [ -n "${ARKTRACE_RUST_XCFRAMEWORK:-}" ]; then
+  env -u ARKTRACE_RUST_XCFRAMEWORK -u ARKTRACE_RUST_SDK_FIXTURES \
+    "$swift_executable" package --package-path "$stable_package" \
+    --scratch-path "$scratch_path" --cache-path "$dependency_cache" resolve
+  python3 "$repo_root/hack/ci/prepare-native-trace.py" \
+    --repo "$repo_root" --workspace "$workspace_path" --source-packages "$scratch_path" \
+    --sdk "$ARKTRACE_RUST_XCFRAMEWORK" --sdk-only > "$cache_root/native-trace-sdk.json"
+  ARKTRACE_RUST_XCFRAMEWORK=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["relativeSDK"])' "$cache_root/native-trace-sdk.json")
+  export ARKTRACE_RUST_XCFRAMEWORK
+  unset ARKTRACE_RUST_SDK_FIXTURES
+fi
+
 exec "$swift_executable" "$swift_command" \
   --arch arm64 \
   --package-path "$stable_package" \

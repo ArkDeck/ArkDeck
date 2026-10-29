@@ -71,6 +71,31 @@ class RunSwiftPMTests(unittest.TestCase):
         )
         return result, cache_root
 
+    def test_native_preparation_precedes_tests_and_failure_stops_the_graph(self) -> None:
+        temporary = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        script, _ = self.make_runner_repo(temporary / "repo", "let value = 1\n", 1_700_000_000)
+        prepare = temporary / "repo/hack/ci/prepare-native-trace.py"
+        prepare.parent.mkdir(parents=True)
+        prepare.write_text("import json,sys\nassert '--sdk-only' in sys.argv\nprint(json.dumps({'relativeSDK':'.arktrace-native/verified/CArkTrace.xcframework'}))\n")
+        swift = temporary / "swift"
+        swift.write_text('#!/bin/sh\nprintf "%s:%s:%s\\n" "$1" "${ARKTRACE_RUST_XCFRAMEWORK:-none}" "${ARKTRACE_RUST_SDK_FIXTURES:-none}"\n')
+        swift.chmod(0o700)
+        environment = os.environ | {
+            "ARKDECK_SWIFTPM_CACHE_ROOT": str(temporary / "cache"),
+            "ARKDECK_SWIFT_EXECUTABLE": str(swift),
+            "ARKTRACE_RUST_XCFRAMEWORK": str(temporary / "SDK/CArkTrace.xcframework"),
+            "ARKTRACE_RUST_SDK_FIXTURES": "1",
+        }
+        command = ["/bin/sh", str(script), "test", "--filter", "ArkDeckTraceNativeRuntimeTests"]
+        result = subprocess.run(command, env=environment, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "package:none:none", "test:.arktrace-native/verified/CArkTrace.xcframework:none"])
+        prepare.write_text("raise SystemExit(19)\n")
+        result = subprocess.run(command, env=environment, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 19, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["package:none:none"])
+
     def test_build_uses_stable_paths_outside_the_worktree(self) -> None:
         result, cache_root = self.invoke("build", "--target", "ArkDeckCore")
         canonical_cache_root = cache_root.resolve()

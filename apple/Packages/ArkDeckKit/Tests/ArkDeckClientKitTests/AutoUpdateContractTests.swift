@@ -723,7 +723,7 @@ struct AutoUpdateContractTests {
     let package = try String(
       contentsOf: repository.appending(path: "apple/Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
-    let arkTraceRevision = "9172c9525f954ec397e0555d7d03cd4367f3efcf"
+    let arkTraceRevision = "1d0e02fbe571fe5af6a99b6fe2b3c764fc488400"
     #expect(
       package.components(separatedBy: ".package(").count - 1 == 6,
       "the package's direct remote-source dependency set is closed")

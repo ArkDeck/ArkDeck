@@ -299,7 +299,15 @@ jobs:
           swift --version
 
       - name: Xcode stable-workspace contract tests
-        run: python3 hack/ci/test_run_xcodebuild.py
+        run: |
+          python3 hack/ci/test_run_xcodebuild.py
+          python3 hack/ci/test_prepare_native_trace.py
+
+      - name: Exact ArkTrace Rust SDK toolchain
+        run: |
+          set -eu
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustc +1.99.0 --version
 
       # Agent cache prefixes include a hash of this exact branch. Main and
       # merge groups restore only trusted main keys; every job still builds/tests.
@@ -322,7 +330,17 @@ jobs:
       - name: Build ArkDeck app and UI-test bundle
         env:
           ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode
+          ARKTRACE_CARGO_OWNER: arkdeck-app-ci
+          ARKTRACE_CARGO_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode/ArkTraceCargo
+          ARKTRACE_RUST_SDK_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode/ArkTraceSDK
+          ARKTRACE_NATIVE_APP_INPUT_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode/ArkTraceAppInputs
         run: sh hack/ci/run-xcodebuild.sh
+
+      - name: Native Trace adapter contracts
+        env:
+          ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode/NativeSwiftPM
+        run: sh hack/ci/test-native-trace.sh
 
       - name: Save successful Xcode build cache
         if: >-

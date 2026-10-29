@@ -697,7 +697,9 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
         commands.extend(
             [
                 (python, "hack/ci/test_run_xcodebuild.py"),
+                (python, "hack/ci/test_prepare_native_trace.py"),
                 ("sh", "hack/ci/run-xcodebuild.sh"),
+                ("sh", "hack/ci/test-native-trace.sh"),
             ]
         )
     if plan.lanes.rust:

@@ -72,7 +72,6 @@
 		C20000000000000000000004 /* ArkTraceAnalysis in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000092 /* ArkTraceAnalysis */; };
 		C20000000000000000000005 /* ArkTraceCore in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000093 /* ArkTraceCore */; };
 		C20000000000000000000006 /* ArkTraceRendering in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000094 /* ArkTraceRendering */; };
-		C20000000000000000000007 /* trace_streamer in Embed Trace Streamer Helper */ = {isa = PBXBuildFile; fileRef = C20000000000000000000013 /* trace_streamer */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C20000000000000000000008 /* ArkDeckTraceAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000095 /* ArkDeckTraceAdapter */; };
 		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
@@ -154,7 +153,6 @@
 		B10000000000000000000008 /* TraceLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = TraceLocalizable.xcstrings; sourceTree = "<group>"; };
 		C20000000000000000000011 /* TraceViewerWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceViewerWorkspaceView.swift; sourceTree = "<group>"; };
 		C20000000000000000000012 /* TraceViewerLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = TraceViewerLocalizable.xcstrings; sourceTree = "<group>"; };
-		C20000000000000000000013 /* trace_streamer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = TraceStreamerPrepared/trace_streamer; sourceTree = BUILT_PRODUCTS_DIR; };
 		C20000000000000000000015 /* TraceStreamerHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceStreamerHelper.entitlements; sourceTree = "<group>"; };
 		A100000000000000000000D2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
@@ -178,17 +176,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		C20000000000000000000031 /* Embed Trace Streamer Helper */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 6;
-			files = (
-				C20000000000000000000007 /* trace_streamer in Embed Trace Streamer Helper */,
-			);
-			name = "Embed Trace Streamer Helper";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -260,7 +247,6 @@
 		C20000000000000000000014 /* Trace Streamer Helper */ = {
 			isa = PBXGroup;
 			children = (
-				C20000000000000000000013 /* trace_streamer */,
 				C20000000000000000000015 /* TraceStreamerHelper.entitlements */,
 			);
 			name = "Trace Streamer Helper";
@@ -496,8 +482,6 @@
 				A10000000000000000000042 /* Sources */,
 				A10000000000000000000040 /* Frameworks */,
 				A10000000000000000000041 /* Resources */,
-				C20000000000000000000032 /* Prepare Trace Streamer Helper */,
-				C20000000000000000000031 /* Embed Trace Streamer Helper */,
 				C20000000000000000000030 /* Copy Pinned Trace Runtime Resources */,
 			);
 			buildRules = (
@@ -581,25 +565,6 @@
 /* End PBXProject section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		C20000000000000000000032 /* Prepare Trace Streamer Helper */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = ();
-			inputFileListPaths = ();
-			inputPaths = (
-				"$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer",
-				"$(SRCROOT)/ArkDeckApp/TraceStreamerHelper.entitlements",
-			);
-			name = "Prepare Trace Streamer Helper";
-			outputFileListPaths = ();
-			outputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/TraceStreamerPrepared/trace_streamer",
-				"$(BUILT_PRODUCTS_DIR)/TraceStreamerPrepared/trace_streamer.cstemp",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -eu\nsource_binary=\"${SRCROOT}/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer\"\nhelper_entitlements=\"${SRCROOT}/ArkDeckApp/TraceStreamerHelper.entitlements\"\nprepared_directory=\"${BUILT_PRODUCTS_DIR}/TraceStreamerPrepared\"\nprepared_binary=\"${prepared_directory}/trace_streamer\"\nif [ ! -x \"${source_binary}\" ]; then\n  echo \"error: pinned trace_streamer packaging artifact is missing; restore it from the pinned ArkTrace revision\" >&2\n  exit 1\nfi\n/bin/mkdir -p \"${prepared_directory}\"\n/bin/cp -f \"${source_binary}\" \"${prepared_binary}\"\n/bin/chmod 755 \"${prepared_binary}\"\n/usr/bin/codesign --force --sign - --identifier com.arkdeck.desktop.trace-streamer --options runtime --entitlements \"${helper_entitlements}\" \"${prepared_binary}\"\n";
-		};
 		C20000000000000000000030 /* Copy Pinned Trace Runtime Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -608,17 +573,26 @@
 				"$(SRCROOT)/ArkDeckApp/TraceRuntimeResources.xcfilelist",
 			);
 			inputPaths = (
-				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/trace_streamer",
 				"$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES",
+				"$(SRCROOT)/.arktrace-native/AppInputs",
+				"$(SRCROOT)/.arktrace-native/AppInputs/Helpers",
+				"$(SRCROOT)/.arktrace-native/AppInputs/TraceStreamer",
+				"$(SRCROOT)/.arktrace-native/AppInputs/ArkTraceRuntime",
+				"$(ARKDECK_TRACE_NATIVE_SOURCE)/hack",
+				"$(ARKDECK_TRACE_NATIVE_SOURCE)/api/ffi-v2.sha256",
 			);
 			name = "Copy Pinned Trace Runtime Resources";
 			outputFileListPaths = (
 				"$(SRCROOT)/ArkDeckApp/TraceRuntimeOutputs.xcfilelist",
 			);
-			outputPaths = ();
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/arktrace-host-process",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/trace_streamer",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ArkTraceRuntime/manifest.json",
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nsource_manifest=\"${SRCROOT}/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json\"\nsource_license=\"${SRCROOT}/Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE\"\nsource_notices=\"${SRCROOT}/Packages/ArkDeckKit/THIRD_PARTY_NOTICES.md\"\nsource_licenses=\"${SRCROOT}/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES\"\nembedded_binary=\"${TARGET_BUILD_DIR}/${EXECUTABLE_FOLDER_PATH}/trace_streamer\"\nif [ ! -x \"${embedded_binary}\" ]; then\n  echo \"error: signed trace_streamer was not embedded by the Copy Files phase\" >&2\n  exit 1\nfi\nresources=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmanifest_dir=\"${resources}/TraceStreamer\"\nlicense_root=\"${resources}/ArkTrace\"\nlicense_destination=\"${license_root}/Licenses\"\n/bin/rm -rf \"${license_destination}\"\n/bin/mkdir -p \"${manifest_dir}\" \"${license_destination}\"\n/bin/cp -f \"${source_manifest}\" \"${manifest_dir}/manifest.json\"\n/bin/cp -f \"${source_license}\" \"${license_root}/LICENSE\"\n/bin/cp -f \"${source_notices}\" \"${license_root}/THIRD_PARTY_NOTICES.md\"\nfor source_path in \"${source_licenses}\"/*.txt; do\n  filename=\"${source_path##*/}\"\n  /bin/cp -f \"${source_path}\" \"${license_destination}/${filename}\"\ndone\nembedded_sha=$(/usr/bin/shasum -a 256 \"${embedded_binary}\" | /usr/bin/awk '{print $1}')\n/usr/bin/plutil -replace binarySHA256 -string \"${embedded_sha}\" \"${manifest_dir}/manifest.json\"\n/bin/chmod 644 \"${manifest_dir}/manifest.json\" \"${license_root}/LICENSE\" \"${license_root}/THIRD_PARTY_NOTICES.md\" \"${license_destination}\"/*.txt\n";
+			shellScript = "set -eu\nsource_license=\"${SRCROOT}/Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE\"\nsource_notices=\"${SRCROOT}/Packages/ArkDeckKit/THIRD_PARTY_NOTICES.md\"\nsource_licenses=\"${SRCROOT}/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES\"\nresources=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nlicense_root=\"${resources}/ArkTrace\"\nlicense_destination=\"${license_root}/Licenses\"\npython3 \"${ARKDECK_TRACE_NATIVE_SOURCE}/hack/copy_native_app_resources.py\" --product arkdeck --inputs \"${SRCROOT}/.arktrace-native/AppInputs\" --bundle \"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\n/bin/rm -rf \"${license_destination}\"\n/bin/mkdir -p \"${license_destination}\"\n/bin/cp -f \"${source_license}\" \"${license_root}/LICENSE\"\n/bin/cp -f \"${source_notices}\" \"${license_root}/THIRD_PARTY_NOTICES.md\"\nfor source_path in \"${source_licenses}\"/*.txt; do\n  filename=\"${source_path##*/}\"\n  /bin/cp -f \"${source_path}\" \"${license_destination}/${filename}\"\ndone\n/bin/chmod 644 \"${license_root}/LICENSE\" \"${license_root}/THIRD_PARTY_NOTICES.md\" \"${license_destination}\"/*.txt\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -941,7 +915,7 @@
 			repositoryURL = "https://github.com/ArkDeck/ArkTrace.git";
 			requirement = {
 				kind = revision;
-				revision = 9172c9525f954ec397e0555d7d03cd4367f3efcf;
+				revision = 1d0e02fbe571fe5af6a99b6fe2b3c764fc488400;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

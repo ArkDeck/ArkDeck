@@ -1,6 +1,14 @@
 // swift-tools-version: 6.4
 
 import PackageDescription
+import Foundation
+
+// The native product is available only with a matching staged ArkTrace SDK.
+let nativeTraceSDK = ProcessInfo.processInfo.environment["ARKTRACE_RUST_XCFRAMEWORK"] != nil
+let nativeTraceDependencies: [Target.Dependency] = nativeTraceSDK
+  ? [.product(name: "ArkTraceRustRuntime", package: "ArkTrace")] : []
+let nativeTraceSettings: [SwiftSetting] = nativeTraceSDK
+  ? [.define("ARKTRACE_NATIVE_RUNTIME")] : []
 
 // The App's side of ArkDeck. The Runtime (daemon, engine, storage, providers)
 // and the CLI are Rust (CHG-2026-074); Swift carries no Runtime semantics, and
@@ -45,7 +53,7 @@ let package = Package(
       exact: "1.15.0"),
     .package(
       url: "https://github.com/ArkDeck/ArkTrace.git",
-      revision: "9172c9525f954ec397e0555d7d03cd4367f3efcf"),
+      revision: "1d0e02fbe571fe5af6a99b6fe2b3c764fc488400"),
   ],
   targets: [
     // The App's client library. It carries the App-side SSH remote build
@@ -72,8 +80,8 @@ let package = Package(
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
         .product(name: "ArkTraceCore", package: "ArkTrace"),
         .product(name: "ArkTraceRuntime", package: "ArkTrace"),
-      ],
-      swiftSettings: swiftSettings),
+      ] + nativeTraceDependencies,
+      swiftSettings: swiftSettings + nativeTraceSettings),
     // The fake HDC the App UI tests point the App at.
     .executableTarget(
       name: "ArkDeckFakeHDCFixture",
@@ -91,9 +99,10 @@ let package = Package(
       dependencies: [
         "ArkDeckTraceAdapter",
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
+        .product(name: "ArkTraceCore", package: "ArkTrace"),
         .product(name: "ArkTraceRuntime", package: "ArkTrace"),
-      ],
-      swiftSettings: swiftSettings),
+      ] + nativeTraceDependencies,
+      swiftSettings: swiftSettings + nativeTraceSettings),
     .testTarget(
       name: "ArkDeckContractTests",
       dependencies: [

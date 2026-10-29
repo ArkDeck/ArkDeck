@@ -164,6 +164,11 @@ def tool(name: str, arguments: list[str]) -> int:
             dirty = failure == ("forge-dirty" if forge else "source-dirty")
             print(" M changed.rs" if dirty else "", end="")
             return 0
+    elif name == "python3" and arguments[0].endswith("/prepare-native-trace.py"):
+        print(json.dumps({"runtimeUsable": failure != "unsigned-native-trace",
+                          "relativeSDK": ".arktrace-native/fixture/CArkTrace.xcframework",
+                          "source": str(Path(option(arguments, "--source-packages")) / "checkouts/ArkTrace")}))
+        return 0
     elif name == "security":
         if arguments[:4] == ["find-identity", "-v", "-p", "codesigning"] and len(arguments) <= 5:
             print(f'  1) ABCDEF "{IDENTITY}"')
@@ -265,7 +270,7 @@ def tool(name: str, arguments: list[str]) -> int:
 
 class Fixture(unittest.TestCase):
     TOOLS = ["git", "security", "cargo", "lipo", "codesign", "spctl", "ditto", "xcodebuild",
-             "xcrun", "hdiutil", "swift", "launchctl"]
+             "xcrun", "hdiutil", "swift", "launchctl", "python3"]
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(
@@ -410,7 +415,14 @@ class Release(Fixture):
         self.assertEqual(len(archive), 1)
         for setting in ("ARCHS=arm64", "ONLY_ACTIVE_ARCH=NO", "-onlyUsePackageVersionsFromResolvedFile"):
             self.assertIn(setting, archive[0])
-        self.assertNotIn("-clonedSourcePackagesDirPath", archive[0])
+        packages = option(archive[0], "-clonedSourcePackagesDirPath")
+        self.assertTrue(packages.startswith(str(self.tmp)))
+        preparation = self.called("python3")[0]
+        self.assertIn("--require-runtime", preparation)
+        self.assertIn("--materialize", preparation)
+        self.assertIn("--resolve", preparation)
+        self.assertEqual(option(preparation, "--signing-identity"), IDENTITY)
+        self.assertIn("ARKDECK_TRACE_NATIVE_SOURCE=" + packages + "/checkouts/ArkTrace", archive[0])
         self.assertTrue(option(archive[0], "-derivedDataPath").startswith(str(self.tmp)))
         # The App is exported for Developer ID with the committed options.
         export = self.called("xcodebuild", "-exportArchive")
@@ -534,6 +546,12 @@ class Release(Fixture):
         archive = self.called("xcodebuild", "-project")[0]
         self.assertEqual(option(archive, "-clonedSourcePackagesDirPath"), str(packages))
         self.assertIn("-onlyUsePackageVersionsFromResolvedFile", archive)
+
+    def test_unsigned_native_trace_inputs_stop_the_release_before_archive(self):
+        self.env["FIXTURE_FAIL"] = "unsigned-native-trace"
+        result = self.run_script(self.arguments, 1)
+        self.assertIn("release requires signed native Trace inputs", result.stderr)
+        self.assertEqual(self.called("xcodebuild", "-project"), [])
 
     def test_relative_source_packages_directory_is_refused_before_any_build(self):
         self.env["ARKDECK_XCODE_SOURCE_PACKAGES"] = "SourcePackages"

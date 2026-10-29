@@ -28,6 +28,10 @@ Environment overrides:
   ARKDECK_XCODE_CACHE_ROOT       Absolute cache root owned by this runner.
   ARKDECK_XCODEBUILD_EXECUTABLE  Absolute xcodebuild executable path.
   ARKDECK_XCODE_JOBS            Optional build task limit (1–64).
+  ARKTRACE_RUST_XCFRAMEWORK     Optional verified normal macOS SDK artifact.
+  ARKTRACE_NATIVE_APP_SIGNING_IDENTITY  Developer ID for runnable Trace tools.
+  ARKDECK_TRACE_NATIVE_INPUTS   Optional immutable fixed ArkDeck tool artifact.
+  ARKTRACE_CARGO_CACHE_ROOT     Session-owned stable ArkTrace Cargo cache.
 
 The runner owns the project, scheme, arm64 architecture, destination,
 DerivedData, package caches, module cache, and build action. Both configurations
@@ -161,6 +165,31 @@ fi
 printf 'ArkDeck Xcode cache: %s\n' "$cache_root" >&2
 printf 'ArkDeck Xcode worktree: %s\n' "$repo_root" >&2
 
+# Resolve the exact source before adding the local binary target. A missing
+# SDK or preparation error fails this App build; the App has no Swift-engine
+# fallback. These inputs are staged after rsync removes ignored artifacts.
+env -u ARKTRACE_RUST_XCFRAMEWORK -u ARKTRACE_RUST_SDK_FIXTURES \
+  "$xcodebuild_executable" \
+  -project "$workspace_path/apple/ArkDeck.xcodeproj" -scheme ArkDeck \
+  -clonedSourcePackagesDirPath "$source_packages" -packageCachePath "$package_cache" \
+  -onlyUsePackageVersionsFromResolvedFile -resolvePackageDependencies
+set -- python3 "$repo_root/hack/ci/prepare-native-trace.py" \
+  --repo "$repo_root" --workspace "$workspace_path" --source-packages "$source_packages"
+if [ -n "${ARKTRACE_RUST_XCFRAMEWORK:-}" ]; then
+  set -- "$@" --sdk "$ARKTRACE_RUST_XCFRAMEWORK"
+fi
+if [ -n "${ARKTRACE_NATIVE_APP_SIGNING_IDENTITY:-}" ]; then
+  set -- "$@" --signing-identity "$ARKTRACE_NATIVE_APP_SIGNING_IDENTITY"
+fi
+if [ -n "${ARKDECK_TRACE_NATIVE_INPUTS:-}" ]; then
+  set -- "$@" --inputs "$ARKDECK_TRACE_NATIVE_INPUTS"
+fi
+"$@" > "$cache_root/native-trace-preparation.json"
+ARKTRACE_RUST_XCFRAMEWORK=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["relativeSDK"])' "$cache_root/native-trace-preparation.json")
+trace_native_source=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"])' "$cache_root/native-trace-preparation.json")
+export ARKTRACE_RUST_XCFRAMEWORK
+unset ARKTRACE_RUST_SDK_FIXTURES
+
 # Package targets have their own projects: the App's ARCHS does not constrain
 # their Release defaults. Pass arm64 at invocation scope so dependencies cannot
 # silently build an unused Intel slice. Do not override Release signing here:
@@ -195,4 +224,5 @@ exec env \
   COMPILATION_CACHE_ENABLE_CACHING=YES \
   COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS=YES \
   COMPILER_INDEX_STORE_ENABLE=NO \
+  ARKDECK_TRACE_NATIVE_SOURCE="$trace_native_source" \
   "$@"

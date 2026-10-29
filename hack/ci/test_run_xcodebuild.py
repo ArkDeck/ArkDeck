@@ -20,6 +20,7 @@ SCRIPT = Path(__file__).with_name("run-xcodebuild.sh")
 def load_tests(loader, tests, pattern):
     # Keep host keyboard lifecycle regressions in the existing App CI entry.
     tests.addTests(loader.discover(str(SCRIPT.parent), "test_ui_test_input_source.py"))
+    tests.addTests(loader.discover(str(SCRIPT.parent), "test_prepare_native_trace.py"))
     return tests
 
 
@@ -33,6 +34,16 @@ class RunUITestsTests(unittest.TestCase):
             scripts.mkdir(parents=True)
             wrapper = scripts / "run-ui-tests.sh"
             shutil.copy2(SCRIPT.with_name("run-ui-tests.sh"), wrapper)
+            (scripts / "prepare-native-trace.py").write_text(
+                "import argparse,json,os,sys\n"
+                "p=argparse.ArgumentParser()\n"
+                "for key in ('repo','workspace','source-packages','sdk','signing-identity','inputs','xcodebuild'): p.add_argument('--'+key)\n"
+                "for key in ('materialize','resolve'): p.add_argument('--'+key, action='store_true')\n"
+                "a=p.parse_args()\n"
+                "if os.environ.get('FAKE_TRACE_PREPARATION_EXIT'): sys.exit(41)\n"
+                "print(json.dumps({'relativeSDK':'.arktrace-native/test/CArkTrace.xcframework',"
+                "'source':a.source_packages+'/checkouts/ArkTrace'}))\n"
+            )
             (scripts / "ui_test_input_source.py").write_text(
                 "import os, subprocess, sys\n"
                 "print('keyboard-guard', flush=True)\n"
@@ -72,6 +83,15 @@ class RunUITestsTests(unittest.TestCase):
                                   result.stdout.splitlines())
                     self.assertNotIn("ARG:-only-testing:ArkDeckHDCUITests",
                                      result.stdout.splitlines())
+                    self.assertIn("ARG:ARKDECK_TRACE_NATIVE_SOURCE=" + str(
+                        (root / "Derived Data/SourcePackages/checkouts/ArkTrace").resolve()),
+                        result.stdout.splitlines())
+            failed_preparation = subprocess.run(
+                ["sh", str(wrapper), "--build-once"], cwd=root,
+                env=environment | {"FAKE_TRACE_PREPARATION_EXIT": "1"}, text=True, capture_output=True,
+            )
+            self.assertNotEqual(failed_preparation.returncode, 0)
+            self.assertNotIn("ARG:", failed_preparation.stdout)
             refused = subprocess.run(
                 ["sh", str(wrapper), "--no-build"], cwd=root,
                 env=environment | {"GUARD_FAILURE": "1"}, text=True, capture_output=True,
@@ -101,6 +121,17 @@ class RunXcodebuildTests(unittest.TestCase):
         script = root / "hack/ci/run-xcodebuild.sh"
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
+        # Runner orchestration uses synthetic preparation; the actual pinned
+        # checkout and bundle admission have separate failure regressions.
+        (script.parent / "prepare-native-trace.py").write_text(
+            "import argparse,json,os,sys\n"
+            "p=argparse.ArgumentParser()\n"
+            "for key in ('repo','workspace','source-packages','sdk','signing-identity','inputs'): p.add_argument('--'+key)\n"
+            "a=p.parse_args()\n"
+            "if os.environ.get('FAKE_TRACE_PREPARATION_EXIT'): sys.exit(int(os.environ['FAKE_TRACE_PREPARATION_EXIT']))\n"
+            "print(json.dumps({'relativeSDK':'.arktrace-native/test/CArkTrace.xcframework',"
+            "'source':a.source_packages+'/checkouts/ArkTrace'}))\n"
+        )
         project = root / "apple/ArkDeck.xcodeproj/project.pbxproj"
         project.parent.mkdir(parents=True)
         project.write_text("// project\n", encoding="utf-8")
@@ -183,6 +214,8 @@ class RunXcodebuildTests(unittest.TestCase):
         self.assertIn("COMPILATION_CACHE_ENABLE_CACHING=YES", arguments)
         self.assertIn("COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS=YES", arguments)
         self.assertIn("COMPILER_INDEX_STORE_ENABLE=NO", arguments)
+        self.assertIn("-resolvePackageDependencies", arguments)
+        self.assertIn(f"ARKDECK_TRACE_NATIVE_SOURCE={canonical_cache / 'SourcePackages/checkouts/ArkTrace'}", arguments)
         self.assertFalse((cache_root / "DerivedData/Index.noindex").exists())
         self.assertIn("CODE_SIGNING_ALLOWED=NO", arguments)
         self.assertNotIn("-jobs", arguments)
@@ -447,7 +480,7 @@ class RunXcodebuildTests(unittest.TestCase):
 
 
 class TraceResourcePhaseTests(unittest.TestCase):
-    """Keep packaging incremental without changing its signed-helper boundary."""
+    """Copy admitted native tools without changing their post-signing bytes."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -461,118 +494,98 @@ class TraceResourcePhaseTests(unittest.TestCase):
         cls.phase = cls.objects["C20000000000000000000030"]
 
     def file_list(self, name: str) -> list[str]:
-        return (self.repo_root / "apple" / "ArkDeckApp" / name).read_text().splitlines()
+        return (self.repo_root / "apple/ArkDeckApp" / name).read_text().splitlines()
 
-    def test_resource_phase_is_incremental_after_final_helper_signing(self) -> None:
+    def test_native_phase_owns_both_tools_and_preserves_script_sandbox(self) -> None:
         self.assertNotEqual(str(self.phase.get("alwaysOutOfDate", "0")), "1")
-        self.assertEqual(
-            self.phase["inputPaths"],
-            [
-                "$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/trace_streamer",
-                # The script enumerates *.txt; track directory entry changes
-                # as well as the exact files declared in the input file list.
-                "$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES",
-            ],
-        )
-        self.assertEqual(self.phase["inputFileListPaths"], [
-            "$(SRCROOT)/ArkDeckApp/TraceRuntimeResources.xcfilelist",
+        self.assertNotIn("C20000000000000000000031", self.objects)
+        self.assertNotIn("C20000000000000000000032", self.objects)
+        self.assertCountEqual(self.phase["outputPaths"], [
+            "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/arktrace-host-process",
+            "$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/trace_streamer",
+            "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ArkTraceRuntime/manifest.json",
         ])
-        self.assertEqual(self.phase["outputFileListPaths"], [
-            "$(SRCROOT)/ArkDeckApp/TraceRuntimeOutputs.xcfilelist",
-        ])
-        app = self.objects["A10000000000000000000050"]
-        order = app["buildPhases"]
-        prepare, embed, resources = (
-            "C20000000000000000000032", "C20000000000000000000031",
-            "C20000000000000000000030",
-        )
-        self.assertLess(order.index(prepare), order.index(embed))
-        self.assertLess(order.index(embed), order.index(resources))
-        embedded_file = self.objects[self.objects[embed]["files"][0]]
-        self.assertIn("CodeSignOnCopy", embedded_file["settings"]["ATTRIBUTES"])
-        preparation = self.objects[prepare]["shellScript"]
-        self.assertIn("--options runtime --entitlements", preparation)
         self.assertNotIn("codesign", self.phase["shellScript"])
+        self.assertNotIn("plutil", self.phase["shellScript"])
         for configuration in ("A10000000000000000000072", "A10000000000000000000073"):
-            self.assertEqual(
-                self.objects[configuration]["buildSettings"]["ENABLE_USER_SCRIPT_SANDBOXING"],
-                "YES",
-            )
+            self.assertEqual(self.objects[configuration]["buildSettings"]["ENABLE_USER_SCRIPT_SANDBOXING"], "YES")
 
-    def test_declared_files_cover_exact_canonical_inputs_and_packaged_outputs(self) -> None:
-        source = "$(SRCROOT)/Packages/ArkDeckKit"
-        licenses = sorted(
-            path.name for path in
-            (self.repo_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES").glob("*.txt")
-        )
-        self.assertTrue(licenses)
-        expected_inputs = [
-            f"{source}/ThirdParty/TraceStreamer/macx/trace_streamer",
-            f"{source}/ThirdParty/TraceStreamer/macx/manifest.json",
-            f"{source}/Resources/ArkTraceCLIResources/LICENSE",
-            f"{source}/THIRD_PARTY_NOTICES.md",
-            *(f"{source}/ThirdParty/TraceStreamer/LICENSES/{name}" for name in licenses),
-        ]
-        self.assertCountEqual(self.file_list("TraceRuntimeResources.xcfilelist"), expected_inputs)
-        destination = "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)"
-        expected_outputs = [
-            f"{destination}/TraceStreamer/manifest.json",
-            f"{destination}/ArkTrace/LICENSE",
-            f"{destination}/ArkTrace/THIRD_PARTY_NOTICES.md",
-            f"{destination}/ArkTrace/Licenses",
-            *(f"{destination}/ArkTrace/Licenses/{name}" for name in licenses),
-        ]
-        self.assertCountEqual(self.file_list("TraceRuntimeOutputs.xcfilelist"), expected_outputs)
+    def test_sandbox_inputs_cover_all_admitted_files_and_enumerated_directories(self) -> None:
+        for folder in ("", "/Helpers", "/TraceStreamer", "/ArkTraceRuntime"):
+            self.assertIn("$(SRCROOT)/.arktrace-native/AppInputs" + folder, self.phase["inputPaths"])
+        for name in ("receipt.json", "Helpers/arktrace-host-process", "Helpers/trace_streamer",
+                     "TraceStreamer/manifest.json", "ArkTraceRuntime/manifest.json"):
+            self.assertIn("$(SRCROOT)/.arktrace-native/AppInputs/" + name,
+                          self.file_list("TraceRuntimeResources.xcfilelist"))
+        source = "$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/"
+        destination = "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ArkTrace/Licenses/"
+        for path in (self.repo_root / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES").glob("*.txt"):
+            self.assertIn(source + path.name, self.file_list("TraceRuntimeResources.xcfilelist"))
+            self.assertIn(destination + path.name, self.file_list("TraceRuntimeOutputs.xcfilelist"))
 
-    def test_packaging_hashes_final_helper_without_mutating_canonical_manifest(self) -> None:
+    def test_packaging_preserves_admitted_bytes_and_stops_on_failed_validation(self) -> None:
         temporary = Path(self.enterContext(tempfile.TemporaryDirectory()))
         source_root = temporary / "source"
-        for entry in self.file_list("TraceRuntimeResources.xcfilelist"):
-            relative = entry.removeprefix("$(SRCROOT)/")
-            destination = source_root / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if destination.name == "trace_streamer":
-                destination.write_bytes(b"canonical unsigned helper fixture")
-            else:
-                shutil.copyfile(self.repo_root / "apple" / relative, destination)
-        canonical_manifest = source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json"
-        canonical_bytes = canonical_manifest.read_bytes()
-        canonical = json.loads(canonical_bytes)
-        products = temporary / "products"
-        helper = products / "ArkDeck.app/Contents/MacOS/trace_streamer"
-        helper.parent.mkdir(parents=True)
-        resources = products / "ArkDeck.app/Contents/Resources"
-        license_root = resources / "ArkTrace/Licenses"
-        license_root.mkdir(parents=True)
-        stale_license = license_root / "stale-license.txt"
-        stale_license.write_text("must not survive the next packaging pass")
-        environment = os.environ | {
-            "SRCROOT": str(source_root),
-            "TARGET_BUILD_DIR": str(products),
-            "EXECUTABLE_FOLDER_PATH": "ArkDeck.app/Contents/MacOS",
-            "UNLOCALIZED_RESOURCES_FOLDER_PATH": "ArkDeck.app/Contents/Resources",
+        native_inputs = source_root / ".arktrace-native/AppInputs"
+        native_inputs.mkdir(parents=True)
+        native_files = {
+            "Helpers/trace_streamer": b"signed parser fixture",
+            "Helpers/arktrace-host-process": b"signed host fixture",
+            "TraceStreamer/manifest.json": b'{"binarySHA256":"admitted-parser"}',
+            "ArkTraceRuntime/manifest.json": b'{"helperSHA256":"admitted-host"}',
         }
-        # Synthetic bytes model the already-signed Copy Files output. This
-        # tests packaging data flow, not signature validity or device behavior.
-        for final_bytes in (b"first signed helper fixture", b"updated signed helper fixture"):
-            helper.write_bytes(final_bytes)
-            helper.chmod(0o755)
-            subprocess.run(
-                ["/bin/sh", "-c", self.phase["shellScript"]],
-                env=environment, text=True, capture_output=True, check=True, timeout=10,
-            )
-            packaged = json.loads((resources / "TraceStreamer/manifest.json").read_text())
-            self.assertEqual(packaged, canonical | {"binarySHA256": hashlib.sha256(final_bytes).hexdigest()})
-            self.assertEqual(canonical_manifest.read_bytes(), canonical_bytes)
-            self.assertEqual(helper.read_bytes(), final_bytes)
-            self.assertFalse(stale_license.exists())
-            expected_licenses = source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES"
-            self.assertCountEqual(
-                [path.name for path in license_root.iterdir()],
-                [path.name for path in expected_licenses.iterdir()],
-            )
-            for path in expected_licenses.iterdir():
-                self.assertEqual((license_root / path.name).read_bytes(), path.read_bytes())
+        for name, data in native_files.items():
+            path = native_inputs / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        for entry in self.file_list("TraceRuntimeResources.xcfilelist"):
+            if "/.arktrace-native/" in entry:
+                continue
+            relative = entry.removeprefix("$(SRCROOT)/")
+            target = source_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(self.repo_root / "apple" / relative, target)
+        scripts = temporary / "native-source/hack"
+        scripts.mkdir(parents=True)
+        copier = scripts / "copy_native_app_resources.py"
+        # Exact admission/signature checks are exercised by ArkTrace. This
+        # seam verifies the downstream phase neither re-signs nor rewrites
+        # tools/manifests after its shared copier has accepted them.
+        copier.write_text(
+            "from pathlib import Path\nimport sys,shutil\n"
+            "assert sys.argv[1:3]==['--product','arkdeck']\n"
+            "source,bundle=Path(sys.argv[4]),Path(sys.argv[6])\n"
+            "for src,dst in {'Helpers/trace_streamer':'MacOS/trace_streamer',"
+            "'Helpers/arktrace-host-process':'Helpers/arktrace-host-process',"
+            "'TraceStreamer/manifest.json':'Resources/TraceStreamer/manifest.json',"
+            "'ArkTraceRuntime/manifest.json':'Resources/ArkTraceRuntime/manifest.json'}.items():\n"
+            " target=bundle/'Contents'/dst\n target.parent.mkdir(parents=True,exist_ok=True)\n"
+            " shutil.copyfile(source/src,target)\n"
+        )
+        products = temporary / "products"
+        bundle = products / "ArkDeck.app"
+        licenses = bundle / "Contents/Resources/ArkTrace/Licenses"
+        licenses.mkdir(parents=True)
+        (licenses / "stale.txt").write_text("remove")
+        environment = os.environ | {
+            "SRCROOT": str(source_root), "TARGET_BUILD_DIR": str(products),
+            "UNLOCALIZED_RESOURCES_FOLDER_PATH": "ArkDeck.app/Contents/Resources",
+            "ARKDECK_TRACE_NATIVE_SOURCE": str(scripts.parent), "WRAPPER_NAME": "ArkDeck.app",
+        }
+        subprocess.run(["/bin/sh", "-c", self.phase["shellScript"]], env=environment,
+                       text=True, capture_output=True, check=True, timeout=10)
+        for name, data in native_files.items():
+            target = ("MacOS/trace_streamer" if name=="Helpers/trace_streamer" else
+                      name if name.startswith("Helpers/") else "Resources/" + name)
+            self.assertEqual((bundle / "Contents" / target).read_bytes(), data)
+            self.assertEqual((native_inputs / name).read_bytes(), data)
+        self.assertFalse((licenses / "stale.txt").exists())
+        for source in (source_root / "Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES").iterdir():
+            self.assertEqual((licenses / source.name).read_bytes(), source.read_bytes())
+        copier.write_text("raise SystemExit(17)\n")
+        refused = subprocess.run(["/bin/sh", "-c", self.phase["shellScript"]], env=environment,
+                                 text=True, capture_output=True, timeout=10)
+        self.assertEqual(refused.returncode, 17)
 
 
 if __name__ == "__main__":

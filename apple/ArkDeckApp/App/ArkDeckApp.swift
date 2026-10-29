@@ -109,11 +109,17 @@ private final class ArkDeckAppModelStore {
     provider: ViewerUIFixture.provider() ?? UIDumpApplicationFacade.make())
   @ObservationIgnored lazy var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
-  @ObservationIgnored lazy var traceDocument = TraceDocumentController(
-    configuration: ArkDeckTraceConfiguration.make())
+  let traceRuntime: ArkDeckTraceBootstrap = {
+#if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("--ui-test-trace-empty-viewer") {
+      return ArkDeckTraceBootstrap.emptyViewerFixture()
+    }
+#endif
+    return ArkDeckTraceBootstrap()
+  }()
+  var traceDocument: TraceDocumentController? { traceRuntime.controller }
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
-    provider: TraceApplicationFacade.make(),
-    documentController: traceDocument)
+    provider: TraceApplicationFacade.make(), openDocument: { [traceRuntime] in traceRuntime.open($0) })
   // Settings reads Runtime storage through ClientKit. UI automation supplies
   // only in-memory replies. The support bundle is written by ClientKit into
   // the directory the user picks and reads no Runtime storage.
@@ -212,8 +218,15 @@ private struct WorkspaceKeyboardCommands: Commands {
 
 @main
 struct ArkDeckApp: App {
-  @State private var models = ArkDeckAppModelStore()
+  @State private var models: ArkDeckAppModelStore
+  @NSApplicationDelegateAdaptor(ArkDeckApplicationDelegate.self) private var appDelegate
   @Environment(\.openWindow) private var openWindow
+
+  init() {
+    let store = ArkDeckAppModelStore()
+    _models = State(initialValue: store)
+    appDelegate.traceRuntime = store.traceRuntime
+  }
 
   var body: some Scene {
     WindowGroup(id: ArkDeckWindow.main) {
@@ -249,15 +262,15 @@ struct ArkDeckApp: App {
         .keyboardShortcut("n")
         Button(traceViewerText("Open Trace…"), action: presentTraceOpenPanel)
           .keyboardShortcut("o", modifiers: [.command, .shift])
-        Button(traceViewerText("Reload Trace")) { models.traceDocument.reload() }
+        Button(traceViewerText("Reload Trace")) { models.traceDocument?.reload() }
           .keyboardShortcut("r", modifiers: [.command, .shift])
-          .disabled(models.traceDocument.sourceURL == nil)
+          .disabled(models.traceRuntime.phase != .ready || models.traceDocument?.sourceURL == nil)
         Divider()
-        Button(traceViewerText("Filter Trace Processes")) { models.traceDocument.focusProcessFilter() }
-          .disabled(models.traceDocument.trackGroups.isEmpty)
-        Button(traceViewerText("viewer.searchEvents.menu")) { models.traceDocument.focusTraceSearch() }
+        Button(traceViewerText("Filter Trace Processes")) { models.traceDocument?.focusProcessFilter() }
+          .disabled(models.traceRuntime.phase != .ready || models.traceDocument?.trackGroups.isEmpty != false)
+        Button(traceViewerText("viewer.searchEvents.menu")) { models.traceDocument?.focusTraceSearch() }
           .keyboardShortcut("f", modifiers: [.command, .shift])
-          .disabled(models.traceDocument.metadata == nil)
+          .disabled(models.traceRuntime.phase != .ready || models.traceDocument?.metadata == nil)
       }
       CommandGroup(replacing: .help) {
         Button(traceViewerText("Trace Keyboard Shortcuts")) {
@@ -294,7 +307,7 @@ struct ArkDeckApp: App {
 
   private func openTrace(_ url: URL) {
     guard url.isFileURL else { return }
-    models.traceDocument.open(url)
+    models.traceRuntime.open(url)
     openWindow(id: ArkDeckWindow.traceViewer)
   }
 }
@@ -489,16 +502,86 @@ private struct TraceViewerSceneView: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
-    TraceViewerRootView(
-      controller: models.traceDocument,
-      openCapture: {
-        models.requestTraceWorkspace()
-        openWindow(id: ArkDeckWindow.main)
-      })
+    if let controller = models.traceDocument, models.traceRuntime.phase == .ready {
+      TraceViewerRootView(
+        controller: controller,
+        openCapture: {
+          models.requestTraceWorkspace()
+          openWindow(id: ArkDeckWindow.main)
+        })
       .focusedSceneValue(\.workspaceSearch, WorkspaceKeyboardAction(
         title: traceViewerText("Filter Trace Processes"),
-        isEnabled: !models.traceDocument.trackGroups.isEmpty,
-        perform: { models.traceDocument.focusProcessFilter() }))
+        isEnabled: !controller.trackGroups.isEmpty,
+        perform: { controller.focusProcessFilter() }))
+    } else {
+      ArkDeckTraceStartupView(bootstrap: models.traceRuntime)
+    }
+  }
+}
+
+private struct ArkDeckTraceStartupView: View {
+  let bootstrap: ArkDeckTraceBootstrap
+
+  var body: some View {
+    Group {
+      if let failure = bootstrap.failure {
+        ContentUnavailableView {
+          Label(traceViewerText("Trace is unavailable"), systemImage: "exclamationmark.triangle")
+        } description: {
+          Text(failure.reason)
+        } actions: {
+          if bootstrap.shutdownRequested {
+            Button(traceViewerText("Retry Quit")) { NSApp.terminate(nil) }
+              .keyboardShortcut(.defaultAction)
+          } else {
+            Button(traceViewerText("Retry")) { Task { await bootstrap.retryStartup() } }
+              .keyboardShortcut(.defaultAction)
+          }
+        }
+      } else {
+        ProgressView(traceViewerText(bootstrap.shutdownRequested ? "Closing Trace…" : "Preparing Trace…"))
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .task { await bootstrap.start() }
+  }
+}
+
+private final class ArkDeckApplicationDelegate: NSObject, NSApplicationDelegate {
+  weak var traceRuntime: ArkDeckTraceBootstrap?
+  private var terminationTask: Task<Void, Never>?
+
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard let traceRuntime else { return .terminateNow }
+    guard terminationTask == nil else { return .terminateLater }
+    terminationTask = Task { [self] in
+      defer { terminationTask = nil }
+      do {
+        try await traceRuntime.stop()
+        sender.reply(toApplicationShouldTerminate: true)
+      } catch {
+        sender.reply(toApplicationShouldTerminate: false)
+        presentShutdownFailure(in: sender)
+      }
+    }
+    return .terminateLater
+  }
+
+  private func presentShutdownFailure(in application: NSApplication) {
+    let alert = NSAlert()
+    alert.messageText = traceViewerText("Trace could not close")
+    alert.informativeText = traceRuntime?.failure?.reason ?? traceViewerText("Trace is unavailable")
+    alert.addButton(withTitle: traceViewerText("Retry Quit"))
+    alert.addButton(withTitle: traceViewerText("Cancel"))
+    let respond: (NSApplication.ModalResponse) -> Void = { response in
+      guard response == .alertFirstButtonReturn else { return }
+      Task { application.terminate(nil) }
+    }
+    if let window = application.keyWindow ?? application.mainWindow {
+      alert.beginSheetModal(for: window, completionHandler: respond)
+    } else {
+      respond(alert.runModal())
+    }
   }
 }
 
