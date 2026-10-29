@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import tarfile
+import textwrap
 import unittest
 import zipfile
 from unittest.mock import patch
@@ -689,6 +690,84 @@ class ArkForgePinBumpTests(unittest.TestCase):
     REV_A = "0445530207ac5e6689e61e7b51c0edd4de7f2aec"
     REV_B = "eedaa3e3bae641374e453cad302eb214d55d6b08"
     REV_C = "1111111111111111111111111111111111111111"
+
+    def run_pull_request_step(self, root: Path, **overrides):
+        workflow = Path(__file__).resolve().parents[2].joinpath(
+            ".github/workflows/arkforge-pin-bump.yml"
+        ).read_text(encoding="utf-8")
+        step = workflow.split("- name: Open the bump pull request", 1)[1]
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1])
+        commands = root / "commands"
+        commands.mkdir(exist_ok=True)
+        # Exercise the actual workflow shell. The remote refuses a second push
+        # just as the scheduled job did when it recreated an existing proposal.
+        fake = f"#!{sys.executable}\n" + textwrap.dedent('''\
+            import json, os, pathlib, sys
+            root = pathlib.Path(os.environ["RUNNER_TEMP"])
+            command = pathlib.Path(sys.argv[0]).name
+            args = sys.argv[1:]
+            with (root / "calls.jsonl").open("a") as output:
+                output.write(json.dumps([command, *args]) + "\\n")
+            if command == "gh" and args[:2] == ["pr", "list"]:
+                if os.environ.get("LIST_FAIL"):
+                    sys.exit(23)
+                if (root / "pr").exists():
+                    # A closed proposal is visible only with --state all.
+                    if (root / "pr").read_text() != "closed" or "all" in args:
+                        print("2716")
+            elif command == "gh" and args[:2] == ["pr", "create"]:
+                (root / "pr").write_text("open")
+                print("https://github.com/ArkDeck/ArkDeck/pull/2716")
+            elif command == "git" and args[:3] == ["diff", "--cached", "--quiet"]:
+                sys.exit(1)
+            elif command == "git" and args[0] == "push":
+                if (root / "pushed").exists() or os.environ.get("PUSH_FAIL"):
+                    sys.exit("rejected: non-fast-forward")
+                (root / "pushed").touch()
+        ''')
+        for name in ("git", "gh"):
+            executable = commands / name
+            executable.write_text(fake, encoding="utf-8")
+            executable.chmod(0o755)
+        env = os.environ | {
+            "PATH": str(commands) + os.pathsep + os.environ["PATH"],
+            "RUNNER_TEMP": str(root), "GITHUB_REPOSITORY": "ArkDeck/ArkDeck",
+            "REVISION": self.REV_B, "GH_TOKEN": "fixture-token", **overrides,
+        }
+        result = subprocess.run(["sh", "-c", script], cwd=root, env=env,
+                                text=True, capture_output=True, timeout=10)
+        calls = [json.loads(line) for line in (root / "calls.jsonl").read_text().splitlines()]
+        return result, calls
+
+    def test_daily_rerun_reuses_the_pr_without_pushing_a_divergent_commit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first, calls = self.run_pull_request_step(root)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(sum(call[:2] == ["git", "push"] for call in calls), 1)
+            self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in calls), 1)
+            before = len(calls)
+            second, calls = self.run_pull_request_step(root)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertIn("#2716 already exists", second.stdout)
+            self.assertEqual([call[:3] for call in calls[before:]], [["gh", "pr", "list"]])
+
+    def test_closed_proposal_is_not_recreated_or_overwritten(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "pr").write_text("closed")
+            result, calls = self.run_pull_request_step(root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual([call[:3] for call in calls], [["gh", "pr", "list"]])
+
+    def test_lookup_and_push_errors_still_fail_the_workflow(self):
+        for failure in ("LIST_FAIL", "PUSH_FAIL"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                result, calls = self.run_pull_request_step(Path(temporary), **{failure: "1"})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn(["gh", "pr", "create"], [call[:3] for call in calls])
+                if failure == "LIST_FAIL":
+                    self.assertEqual(len(calls), 1)
 
     def test_rewrite_moves_every_crate_to_one_full_revision(self) -> None:
         text = MANIFEST.format(rev=self.REV_A)

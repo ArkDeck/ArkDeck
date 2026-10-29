@@ -67,9 +67,17 @@ jobs:
         run: |
           set -eu
           test -n "$REVISION"
+          branch="agent/arkforge-rev-${REVISION}"
+          # A scheduled rerun starts from main, so a new commit would diverge
+          # from yesterday's branch. Reuse the proposal before touching Git;
+          # a closed proposal is also a maintainer decision, not a retry.
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --base main --state all --json number --jq '.[0].number // ""')
+          if [ -n "$existing" ]; then
+            echo "pull request #${existing} already exists; leaving its branch unchanged"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          branch="agent/arkforge-rev-${REVISION}"
           git add rust/Cargo.toml rust/Cargo.lock
           git diff --cached --quiet && exit 1
           git commit \
@@ -78,11 +86,6 @@ jobs:
             -m "Stack-Base: main"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin "HEAD:refs/heads/${branch}"
-          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --base main --json number --jq '.[0].number // ""')
-          if [ -n "$existing" ]; then
-            echo "pull request #${existing} already exists"
-            exit 0
-          fi
           body="${RUNNER_TEMP}/arkforge-pin-pr-body.md"
           cat > "$body" <<EOF
           Scheduled comparison found ArkForge's default branch ahead of rust/Cargo.toml.
