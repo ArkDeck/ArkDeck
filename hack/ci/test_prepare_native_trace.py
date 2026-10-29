@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("prepare_native_trace", Path(__file__).with_name("prepare-native-trace.py"))
 module = importlib.util.module_from_spec(spec)
@@ -13,6 +14,24 @@ spec.loader.exec_module(module)
 
 
 class NativeTraceSourceTests(unittest.TestCase):
+    def test_explicit_cache_is_registered_and_registration_failure_propagates(self):
+        source = Path("/private/tmp/resolved-ArkTrace")
+        with patch.dict(module.os.environ, {"ARKTRACE_CARGO_OWNER": "arkdeck-app-ci",
+                        "ARKTRACE_CARGO_CACHE_ROOT": "/private/tmp/app-cache"}, clear=True), \
+             patch.object(module.subprocess, "run") as run:
+            module.register_cargo_cache(source)
+            arguments = run.call_args.args[0]
+            self.assertEqual(arguments[1:], [str(source / "hack/cargo_cache.py"), "register",
+                "--owner", "arkdeck-app-ci", "--cache-root", "/private/tmp/app-cache",
+                "--source-root", str(source), "--adopt-existing"])
+            self.assertTrue(run.call_args.kwargs["check"])
+            run.side_effect = subprocess.CalledProcessError(1, arguments)
+            with self.assertRaises(subprocess.CalledProcessError):
+                module.register_cargo_cache(source)
+        with patch.dict(module.os.environ, {}, clear=True), patch.object(module.subprocess, "run") as run:
+            module.register_cargo_cache(source)
+            run.assert_not_called()
+
     def test_materialization_preserves_source_and_omits_ignored_state(self):
         root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         repo, workspace = root / "repo", root / "workspace"
