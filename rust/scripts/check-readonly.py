@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -254,10 +255,12 @@ def exchange(endpoint: str, directory: Path, rows: list, name: str, data: bytes,
             connection.connect(endpoint)
             try:
                 connection.sendall(data)
-            except BrokenPipeError:
+            except OSError as error:
                 # An oversized frame may be rejected before its trailing bytes.
+                # Darwin can report ENOTCONN for that same closed peer.
                 # Read the refusal from this connection; never replay it.
-                pass
+                if error.errno not in (errno.EPIPE, errno.ENOTCONN):
+                    raise
             with connection.makefile("rb") as reader:
                 response = reader.readline(8 * 1024 * 1024 + 1)
     record(directory, rows, name, "response.jsonl", response,

@@ -48,6 +48,9 @@ On macOS arm64, Xcode 27.1 / Swift 6.4 and Rust 1.99.0:
   shortcut catalogs are byte-identical; only the prototype reference pin
   and migrated source path changed. Log: `design-interactions.log`.
 - SDD validation: exit 0. Log: `arkdeck-sdd.log` in the same directory.
+- Contract recorder/isolation regression suite: 81 tests, exit 0, using the
+  CI-pinned Python dependencies. Log: `readonly-regression.log`. Rust format
+  check also passes (exit 0); log: `rust-fmt.log`.
 
 Native SDK preparation runs before App, UI-test and release builds. Release
 preparation requires signed, runtime-usable tools and fails before archiving
@@ -92,6 +95,13 @@ had not defined DEBUG, so the explicit fixture was compiled out. Defining
 DEBUG only in the App Debug configuration restores that test entry without
 enabling it in Release. The corrected App compiles locally; UI rerun results
 are recorded in the PR description.
+Run 40894065355 passed the Swift/App and Rust workspace lanes, but the macOS
+contract recorder stopped on the oversized request with `ENOTCONN`. The
+recorded request and clean daemon shutdown locate the failure in the test
+client's early-peer-close handling, which handled only `EPIPE`. The recorder
+now reads and validates the refusal on the original connection for either
+errno; it does not resend, accept an absent/wrong response, or suppress other
+send errors. Focused regression cases cover these boundaries.
 Final CI run IDs are recorded in the PR delivery description. CI uses
 Xcode 27.0, separately from the local 27.1 build.
 
