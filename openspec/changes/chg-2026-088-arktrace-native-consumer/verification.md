@@ -69,6 +69,9 @@ ArkTrace #68 merged after its full PR CI run 40882774322 passed, including
 ArkDeck #2718 first failed Swift CI run 40884657679 in the design prototype
 shortcut pin assertion, before compilation. The unchanged shortcut catalog
 was verified against both source revisions and its mirror reference refreshed.
+Run 40885074528 then reached native preparation and exposed missing
+`rustfmt` in the minimal Rust toolchain. App, UI and release setup now
+install that exact component because SDK binding verification invokes it.
 Final CI run IDs are recorded in the PR delivery description. CI uses
 Xcode 27.0, separately from the local 27.1 build.
 

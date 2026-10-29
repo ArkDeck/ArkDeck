@@ -105,7 +105,8 @@ jobs:
           set -eu
           test -d "$DEVELOPER_DIR"
           xcodebuild -version
-          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update --component rustfmt
+          rustfmt +1.99.0 --version
       - name: Widen the runner display
         run: |
           set -euo pipefail

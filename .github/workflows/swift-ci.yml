@@ -306,7 +306,8 @@ jobs:
       - name: Exact ArkTrace Rust SDK toolchain
         run: |
           set -eu
-          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update --component rustfmt
+          rustfmt +1.99.0 --version
           rustc +1.99.0 --version
 
       # Agent cache prefixes include a hash of this exact branch. Main and

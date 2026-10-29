@@ -127,7 +127,8 @@ jobs:
         run: |
           set -eu
           rustup toolchain install stable --profile minimal --no-self-update
-          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update --component rustfmt
+          rustfmt +1.99.0 --version
           rustup target add aarch64-apple-darwin
           rustc --version
           cargo --version
