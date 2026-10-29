@@ -40,6 +40,9 @@ On macOS arm64, Xcode 27.1 / Swift 6.4 and Rust 1.99.0:
   UI presentation is therefore unverified. Logs: `arkdeck-viewer-ui-first.log`
   and `arkdeck-viewer-ui-retry.log`; no system automation settings were changed.
 - Planner tests: 61 tests, exit 0. Log: `planner-tests.log`.
+- Design interaction tests: 86 tests, exit 0. The new and old upstream
+  shortcut catalogs are byte-identical; only the prototype reference pin
+  and migrated source path changed. Log: `design-interactions.log`.
 - SDD validation: exit 0. Log: `arkdeck-sdd.log` in the same directory.
 
 Native SDK preparation runs before App, UI-test and release builds. Release
@@ -63,8 +66,10 @@ to PR CI.
 
 ArkTrace #68 merged after its full PR CI run 40882774322 passed, including
 `CI required`, SwiftPM, offline gates, macOS SDK and Windows checks.
-The ArkDeck PR and final CI run IDs will be recorded in its delivery
-description after push. CI uses
+ArkDeck #2718 first failed Swift CI run 40884657679 in the design prototype
+shortcut pin assertion, before compilation. The unchanged shortcut catalog
+was verified against both source revisions and its mirror reference refreshed.
+Final CI run IDs are recorded in the PR delivery description. CI uses
 Xcode 27.0, separately from the local 27.1 build.
 
 ## Retained historical evidence
