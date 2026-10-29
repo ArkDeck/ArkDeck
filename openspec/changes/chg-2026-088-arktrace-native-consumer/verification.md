@@ -28,7 +28,7 @@ On macOS arm64, Xcode 27.1 / Swift 6.4 and Rust 1.99.0:
   inputs. This is compilation, not signed native App startup acceptance.
   Log: `/private/tmp/arkdeck-main-sync-20261029/arkdeck-app-build.log`.
 - Build/UI runner and packaging tests: 44 tests, exit 0. SwiftPM runner tests:
-  14 tests, exit 0. Source preparation tests: 4 tests, exit 0.
+  14 tests, exit 0. Source preparation tests: 5 tests, exit 0.
   Logs: `runner-resource-tests.log`, `swift-runner-tests.log`, and
   `native-prep-tests.log` in the same temporary evidence directory.
 - Release builder: 40 sandbox-compatible tests passed; the real hdiutil test
@@ -72,6 +72,12 @@ was verified against both source revisions and its mirror reference refreshed.
 Run 40885074528 then reached native preparation and exposed missing
 `rustfmt` in the minimal Rust toolchain. App, UI and release setup now
 install that exact component because SDK binding verification invokes it.
+Run 40885874251 exposed the upstream cache-owner registration requirement.
+The common native preparation entry now registers explicitly configured
+owner/cache pairs against the pinned checkout before building, preserving
+restored products and refusing mismatched owner/source bindings. An actual
+temporary-cache registration replay verified idempotence and retained bytes
+and inode; the source preparation suite passes five tests.
 Final CI run IDs are recorded in the PR delivery description. CI uses
 Xcode 27.0, separately from the local 27.1 build.
 

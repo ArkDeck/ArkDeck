@@ -97,6 +97,19 @@ def prepare_sdk(repo, workspace, source_packages, sdk):
             "source": str(source)}
 
 
+
+def register_cargo_cache(source):
+    owner = os.environ.get("ARKTRACE_CARGO_OWNER")
+    cache = os.environ.get("ARKTRACE_CARGO_CACHE_ROOT")
+    if owner and cache:
+        # CI owns these fixed cache roots. Registration is idempotent and
+        # preserves restored build products; a different owner/source fails
+        # rather than silently rebinding a live local session.
+        subprocess.run([sys.executable, str(source / "hack/cargo_cache.py"), "register",
+                        "--owner", owner, "--cache-root", cache, "--source-root", str(source),
+                        "--adopt-existing"], check=True, stdout=sys.stderr)
+
+
 def prepare(repo, workspace, source_packages, sdk=None, signing_identity=None, inputs=None):
     for path in (repo, workspace, source_packages):
         physical(path)
@@ -116,6 +129,7 @@ def prepare(repo, workspace, source_packages, sdk=None, signing_identity=None, i
     copy_parser(parser, source / "third_party/trace-streamer/macx/trace_streamer", regular)
     copy_parser(parser, workspace / "apple/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer", regular)
     if inputs is None:
+        register_cargo_cache(source)
         result = shared_prepare(source, sdk, signing_identity, "arkdeck", repo)
     else:
         # Reuse an admitted immutable build artifact without starting another
