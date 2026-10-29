@@ -10,18 +10,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # sha2 0.11 removed the asm feature used by arkdeck-platform on aarch64.
+    # Keep 0.10 patch updates; remove this after migrating that backend.
+    ignore:
+      - dependency-name: sha2
+        versions: [">=0.11"]
 
-  - package-ecosystem: swift
-    directory: /apple/Packages/ArkDeckKit
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-
-  - package-ecosystem: swift
-    directory: /apple/ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+  # Swift version updates are temporarily paused (2026-10-29): Dependabot's
+  # Swift 6.3.1 cannot parse ArkDeckKit's required Swift 6.4 manifest.
+  # Restore /apple/Packages/ArkDeckKit when its updater supports Swift >=6.4.
+  # Restore the Xcode entry at /apple (the directory containing .xcodeproj),
+  # not at xcshareddata/swiftpm: a bare Package.resolved is not discoverable.
+  # Until then, update Package.swift and both Package.resolved files together
+  # using the project's Xcode 27 toolchain and run the existing Swift/App CI.
 
   - package-ecosystem: nuget
     directory: /windows
