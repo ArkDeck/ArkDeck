@@ -39,6 +39,7 @@ On macOS arm64, Xcode 27.1 / Swift 6.4 and Rust 1.99.0:
   timed out while enabling Xcode automation mode before any UI assertions.
   UI presentation is therefore unverified. Logs: `arkdeck-viewer-ui-first.log`
   and `arkdeck-viewer-ui-retry.log`; no system automation settings were changed.
+- Trace facade contracts: 12 tests, exit 0. Log: `trace-facade-contracts.log`.
 - Planner tests: 61 tests, exit 0. Log: `planner-tests.log`.
 - Design interaction tests: 86 tests, exit 0. The new and old upstream
   shortcut catalogs are byte-identical; only the prototype reference pin
@@ -78,6 +79,10 @@ owner/cache pairs against the pinned checkout before building, preserving
 restored products and refusing mismatched owner/source bindings. An actual
 temporary-cache registration replay verified idempotence and retained bytes
 and inode; the source preparation suite passes five tests.
+Run 40886736757 passed App build-for-testing, then found an obsolete
+Swift source assertion requiring the capture form to call a document
+controller directly. The contract now verifies the injected open callback
+and its composition through the shared Trace Runtime.
 Final CI run IDs are recorded in the PR delivery description. CI uses
 Xcode 27.0, separately from the local 27.1 build.
 

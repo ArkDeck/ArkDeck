@@ -317,7 +317,8 @@ struct TraceApplicationFacadeContractTests {
     #expect(workspace.contains("TracePublishedArtifactPolicy.selectRawTrace("))
     #expect(workspace.contains("allowSensitive: true"))
     #expect(workspace.contains("case .completed(let url):"))
-    #expect(workspace.contains("documentController.open(url)"))
+    #expect(workspace.contains("openDocument(url)"))
+    #expect(app.contains("openDocument: { [traceRuntime] in traceRuntime.open($0) }"))
   }
 
   @Test func runtimeProbeDecoderPinsTargetBindingAdapterTagsAndAllParameters() throws {
