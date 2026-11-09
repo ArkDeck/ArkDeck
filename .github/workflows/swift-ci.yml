@@ -31,6 +31,10 @@ on:
     branches: [main, "agent/**"]
   merge_group:
     types: [checks_requested]
+  # GITHUB_TOKEN pushes start no push run; the ArkForge pin bump dispatches
+  # this workflow on its agent branch, which plan.py plans as that branch's
+  # push. A dispatched run restores trusted main caches and saves none.
+  workflow_dispatch:
 
 permissions:
   contents: read

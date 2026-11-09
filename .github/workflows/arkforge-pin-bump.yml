@@ -6,10 +6,12 @@ name: ArkForge pin bump
 # rust/scripts/check-arkforge-pin.py --run-vectors, and open one pull request.
 # The pin is a commit, never a tag or a branch name.
 #
-# The pull request is pushed with GITHUB_TOKEN. GitHub does not start push
-# workflows from that token, so guard and swift do not run for the bump until
-# the branch is pushed again by a credential that triggers Actions. The vector
-# run in this workflow is the check that happens before the pull request opens.
+# The branch is pushed and the pull request opened with GITHUB_TOKEN. GitHub
+# starts no push or pull_request workflow from that token, but it does start
+# workflow_dispatch, so after opening the pull request this workflow dispatches
+# SDD Guard and Swift CI on the branch. Their guard and swift checks report on
+# the branch head, as a push run's would. The vector run in this workflow is
+# the check that happens before the pull request opens.
 
 on:
   schedule:
@@ -18,6 +20,8 @@ on:
   workflow_dispatch:
 
 permissions:
+  # actions: write is for dispatching the required checks on the bump branch.
+  actions: write
   contents: write
   pull-requests: write
 
@@ -92,8 +96,10 @@ jobs:
 
           Every arkforge-* crate is pinned at ${REVISION}, a commit rather than a tag or branch. rust/Cargo.lock was updated with cargo update -p for those crates. python3 rust/scripts/check-arkforge-pin.py --run-vectors passed in this workflow before the pull request was opened.
 
-          This branch was pushed with GITHUB_TOKEN, which does not start push workflows. guard and swift appear after the branch is pushed again by a credential that triggers Actions.
+          This branch was pushed with GITHUB_TOKEN, which does not start push workflows, so this workflow dispatches SDD Guard and Swift CI on the branch after opening this pull request. Their guard and swift checks report on the branch head.
           EOF
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
             --title "chore: bump the ArkForge pin to ${REVISION}" \
             --body-file "$body"
+          gh workflow run sdd-guard.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+          gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"

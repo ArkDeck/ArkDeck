@@ -338,16 +338,20 @@ def validate_automatic_check_contract(
         if token in capability_text:
             raise WorkflowContractError(f"forbidden workflow capability: {token}")
 
-    if extract_event_names(sdd_text) != ("push", "merge_group", "pull_request"):
-        raise WorkflowContractError("SDD Guard event set must be push + merge_group + pull_request")
+    # workflow_dispatch: the ArkForge pin bump's GITHUB_TOKEN push starts no
+    # push run, so that workflow dispatches both required checks on its head.
+    if extract_event_names(sdd_text) != ("push", "merge_group", "pull_request", "workflow_dispatch"):
+        raise WorkflowContractError(
+            "SDD Guard event set must be push + merge_group + pull_request + workflow_dispatch"
+        )
     if EXPECTED_PUSH_FLOW not in sdd_text:
         raise WorkflowContractError("SDD Guard push branches drifted")
     if extract_pull_request_types(sdd_text) != ("reopened", "edited"):
         raise WorkflowContractError(
             "SDD Guard pull_request types must be reopened + edited"
         )
-    if extract_event_names(swift_text) != ("push", "merge_group"):
-        raise WorkflowContractError("Swift CI must run on push + merge_group")
+    if extract_event_names(swift_text) != ("push", "merge_group", "workflow_dispatch"):
+        raise WorkflowContractError("Swift CI must run on push + merge_group + workflow_dispatch")
     for text in (swift_text, sdd_text):
         if "  merge_group:\n    types: [checks_requested]\n" not in text:
             raise WorkflowContractError("required checks must handle merge_group checks_requested")

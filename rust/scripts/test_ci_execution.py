@@ -816,6 +816,13 @@ class ArkForgePinBumpTests(unittest.TestCase):
         self.assertLess(vectors, pull)
         self.assertIn('branch="agent/arkforge-rev-${REVISION}"', workflow)
         self.assertIn("refs/heads/${branch}", workflow)
+        # GITHUB_TOKEN pushes start no push run; the required checks are dispatched.
+        self.assertIn("  actions: write\n", workflow)
+        for required in ("sdd-guard.yml", "swift-ci.yml"):
+            dispatch = workflow.index(
+                f'gh workflow run {required} --repo "$GITHUB_REPOSITORY" --ref "$branch"'
+            )
+            self.assertLess(workflow.index("gh pr create"), dispatch)
         self.assertIn('cron: "0 6 * * *"', workflow)
         self.assertNotIn("actions/checkout", workflow)
         for refused in ("rev = \"main\"", "tag =", "branch ="):
