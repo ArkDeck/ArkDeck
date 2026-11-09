@@ -13,6 +13,9 @@ on:
     # push workflow. reopened/edited re-run guard on the merge ref; the host
     # loop's check dispatch (an edited body) relies on that run existing.
     types: [reopened, edited]
+  # GITHUB_TOKEN pushes start no push run; the ArkForge pin bump dispatches
+  # this workflow on its agent branch so guard reports on that exact head.
+  workflow_dispatch:
 
 permissions:
   contents: read

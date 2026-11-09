@@ -612,6 +612,23 @@ class GitPlanTests(unittest.TestCase):
         self.assertTrue(plan.lanes.rust)
         self.assertFalse(plan.lanes.swift)
 
+    def test_agent_dispatch_plans_as_the_branch_push(self):
+        self.git("switch", "-qc", "agent/arkforge-rev")
+        head = self.commit_file("rust/Cargo.lock", "# lock\n")
+        dispatch = {"ref": "refs/heads/agent/arkforge-rev", "inputs": None,
+                    "workflow": ".github/workflows/swift-ci.yml"}
+        push = self.event(before=PLAN.ZERO_OID, after=head, ref="refs/heads/agent/arkforge-rev")
+        self.assertEqual(
+            PLAN.plan_from_event(self.root, dispatch, last_success="f" * 40),
+            PLAN.plan_from_push_event(self.root, push),
+        )
+
+    def test_dispatch_off_agent_branches_runs_every_lane(self):
+        dispatch = {"ref": "refs/heads/main", "workflow": ".github/workflows/swift-ci.yml"}
+        plan = PLAN.plan_from_event(self.root, dispatch, last_success=self.base)
+        self.assertEqual(plan.reason, "dispatch-not-agent-branch-fail-closed")
+        self.assertTrue(plan.lanes.compiled)
+
     def test_agent_push_ignores_the_main_last_success(self):
         self.git("switch", "-qc", "agent/docs")
         head = self.commit_file("docs/note.md", "docs\n")

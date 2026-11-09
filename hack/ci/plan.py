@@ -520,7 +520,45 @@ def plan_from_event(repo_root: pathlib.Path, event: Mapping[str, object], *,
                     last_success: str | None = None) -> CIPlan:
     if "merge_group" in event:
         return plan_from_merge_group_event(repo_root, event)
+    # A workflow_dispatch payload names the workflow and has no before/after.
+    if "workflow" in event and "after" not in event:
+        return plan_from_dispatch_event(repo_root, event)
     return plan_from_push_event(repo_root, event, last_success=last_success)
+
+
+def plan_from_dispatch_event(
+    repo_root: pathlib.Path, event: Mapping[str, object]
+) -> CIPlan:
+    """Plan a dispatched run of the exact checkout at the dispatched ref's head.
+
+    GitHub starts no push run for a branch pushed with GITHUB_TOKEN, so the
+    ArkForge pin bump dispatches the required workflows on its agent branch.
+    That plans as the branch's push would; any other ref runs every lane.
+    """
+    ref = event.get("ref")
+    head = _commit_oid(repo_root, "HEAD")
+    if head is None:
+        raise PlanError("dispatched run has no checked-out HEAD commit")
+    if isinstance(ref, str) and ref.startswith("refs/heads/agent/"):
+        return _agent_plan(repo_root, head)
+    return _all_lanes_plan(
+        head_revision=head,
+        base_kind="workflow-dispatch",
+        reason="dispatch-not-agent-branch-fail-closed",
+    )
+
+
+def _agent_plan(repo_root: pathlib.Path, head: str) -> CIPlan:
+    # Every agent head is compared with its current main merge base.  This
+    # handles the all-zero first-push before OID and prevents a later docs
+    # commit from hiding an earlier still-present Swift change.
+    return plan_between(
+        repo_root,
+        base_revision="refs/remotes/origin/main",
+        head_revision=head,
+        use_merge_base=True,
+        base_kind="origin-main",
+    )
 
 
 def plan_from_push_event(
@@ -591,16 +629,7 @@ def plan_from_push_event(
         )
 
     if branch.startswith("agent/"):
-        # Every agent head is compared with its current main merge base.  This
-        # handles the all-zero first-push before OID and prevents a later docs
-        # commit from hiding an earlier still-present Swift change.
-        return plan_between(
-            repo_root,
-            base_revision="refs/remotes/origin/main",
-            head_revision=after,
-            use_merge_base=True,
-            base_kind="origin-main",
-        )
+        return _agent_plan(repo_root, after)
 
     return _all_lanes_plan(
         head_revision=after,
