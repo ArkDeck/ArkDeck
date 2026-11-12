@@ -100,14 +100,20 @@ The macOS app build is separate: `just build-app`, or
 4. Write the title and body in English. State what changed, why, and how you
    checked it. The template is
    [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md).
-5. Required status checks on protected `main` are `guard` (SDD Guard) and `swift`
-   (the Swift CI aggregate). A green check is verification, not maintainer approval.
-6. A human CODEOWNER review is required before merge. See
-   [`.github/CODEOWNERS`](.github/CODEOWNERS). Agents do not merge.
+5. Protected `main` requires a pull request and the status checks `guard`
+   (SDD Guard) and `swift` (the Swift CI aggregate). For a docs-only change the
+   CI planner selects no compiled lane, so `swift` reports as skipped; GitHub
+   treats that as passing. A green check is verification, not maintainer approval.
+6. Branch protection does not require an approving review or a CODEOWNER
+   review today. [`.github/CODEOWNERS`](.github/CODEOWNERS) still names the
+   maintainer who owns every path, and review requests go to them.
+7. The maintainer merges once the required checks pass. The repository allows
+   rebase merges only (no squash or merge commits), and `main` requires linear
+   history. A rebase merge keeps the branch's commit subjects unchanged; there
+   is no `(#N)` subject requirement. Use the pull request page to tie a commit
+   on `main` back to its pull request. Agents do not merge on their own.
 
-Merge is a maintainer action. [Governance enforcement](openspec/governance/enforcement.md)
-records a squash merge whose subject includes `(#N)`, so the git history alone
-can be tied back to the pull request. Do not force-push `main`.
+Do not force-push `main`. Branch protection also applies to administrators.
 
 ## Secrets and device data
 
