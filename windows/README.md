@@ -17,7 +17,10 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 | `scripts/generate-app-icons.py` | Generator of `App/Assets/AppIcon.ico` (16–256 px) and the MSIX visual assets (scale-100/200, the taskbar target sizes) from the macOS AppIcon (`apple/ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset`), resampled, never drawn; `--check` compares decoded pixels |
 | `scripts/generate-xaml-tokens.py` | Generator of `App/Themes/ArkDeckTokens.xaml` from `docs/design/arkdeck-ds/src/tokens.css` (product accent on controls, ruling 16); `--check` fails on drift |
 | `ArkDeck.Windows.slnx` | The solution the `windows` CI lane builds and tests |
-| `spikes/spk4/` | The SPK-4 WinUI 3 spike (its own solution and pins; not part of the lane) |
+
+The SPK-4 WinUI 3 spike is no longer under `windows/`. It lives in
+[`tools/experiments/windows-spikes/spk4/`](../tools/experiments/windows-spikes/spk4/) with its own
+solution and pins, and is not part of the `windows` lane.
 
 ## ArkDeck.ClientKit
 
